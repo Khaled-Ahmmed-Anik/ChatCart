@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  get "conversations/lookup", to: "conversations#lookup"
   resources :conversation_messages, only: :create
   resources :products, only: :index
 
