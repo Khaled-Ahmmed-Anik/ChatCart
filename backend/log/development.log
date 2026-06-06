@@ -628,3 +628,24 @@ Processing by Webhooks::MessengerController#create as JSON
 Completed 201 Created in 62ms (Views: 0.1ms | ActiveRecord: 20.4ms (9 queries, 0 cached) | GC: 0.2ms)
 
 
+Started POST "/products" for 127.0.0.1 at 2026-06-07 02:03:44 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ProductsController#create as JSON
+  Parameters: {"product" => {"name" => "The Party", "price" => 999, "stock_quantity" => 10, "description" => "A modern, vibrant scent with bold and sweet energy. Expressive and confident, made for standout moments.", "tags" => "party,sweet,vibrant,bold,evening", "active" => true}}
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:9:in 'ProductsController#create'
+  [1m[36mProduct Create (1.2ms)[0m  [1m[32mINSERT INTO "products" ("name", "woo_commerce_product_id", "price", "stock_quantity", "description", "tags", "active", "created_at", "updated_at") VALUES ('The Party', NULL, 999.0, 10, 'A modern, vibrant scent with bold and sweet energy. Expressive and confident, made for standout moments.', 'party,sweet,vibrant,bold,evening', TRUE, '2026-06-06 20:03:44.651279', '2026-06-06 20:03:44.651279') RETURNING "id" /*action='create',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:9:in 'ProductsController#create'
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:9:in 'ProductsController#create'
+Completed 201 Created in 30ms (Views: 0.1ms | ActiveRecord: 14.6ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/products" for 127.0.0.1 at 2026-06-07 02:03:50 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ProductsController#index as HTML
+  [1m[36mProduct Load (0.9ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = TRUE AND (stock_quantity > 0) ORDER BY "products"."name" ASC /*action='index',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:5:in 'Enumerable#map'
+Completed 200 OK in 30ms (Views: 0.1ms | ActiveRecord: 12.0ms (1 query, 0 cached) | GC: 0.4ms)
+
+
