@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  namespace :webhooks do
+    post "messenger", to: "messenger#create"
+  end
+
   get "conversations/lookup", to: "conversations#lookup"
   resources :conversation_messages, only: :create
   resources :products, only: :index

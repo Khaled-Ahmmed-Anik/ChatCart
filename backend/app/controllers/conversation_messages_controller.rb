@@ -1,39 +1,22 @@
 class ConversationMessagesController < ApplicationController
   def create
-    conversation = find_or_create_conversation
-    message = nil
-    bot_reply = nil
-    pending_order = nil
-
-    Conversation.transaction do
-      conversation.update!(last_message_at: Time.current)
-      message = conversation.messages.create!(sender_type: :customer, content: message_params[:content])
-      pending_order = conversation.pending_order || conversation.create_pending_order!
-      ConversationMessageProcessor.new(message: message, pending_order: pending_order).process
-      bot_reply = conversation.messages.create!(
-        sender_type: :bot,
-        content: BotReplyGenerator.new(pending_order: pending_order).content
-      )
-    end
+    result = CustomerMessageRecorder.new(
+      channel: message_params[:channel],
+      external_customer_id: message_params[:external_customer_id],
+      content: message_params[:content]
+    ).record
 
     render json: {
-      conversation: serialize_conversation(conversation),
-      message: serialize_message(message),
-      bot_reply: serialize_message(bot_reply),
-      pending_order: serialize_pending_order(pending_order)
+      conversation: serialize_conversation(result.conversation),
+      message: serialize_message(result.message),
+      bot_reply: serialize_message(result.bot_reply),
+      pending_order: serialize_pending_order(result.pending_order)
     }, status: :created
   rescue ActiveRecord::RecordInvalid => error
     render json: { errors: error.record.errors.to_hash(true) }, status: :unprocessable_entity
   end
 
   private
-
-  def find_or_create_conversation
-    Conversation.find_or_create_by!(
-      channel: message_params[:channel],
-      external_customer_id: message_params[:external_customer_id]
-    )
-  end
 
   def message_params
     params.expect(conversation_message: [:channel, :external_customer_id, :content])
