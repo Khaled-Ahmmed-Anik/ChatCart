@@ -2,17 +2,24 @@ class ConversationMessagesController < ApplicationController
   def create
     conversation = find_or_create_conversation
     message = nil
+    bot_reply = nil
     pending_order = nil
 
     Conversation.transaction do
       conversation.update!(last_message_at: Time.current)
       message = conversation.messages.create!(sender_type: :customer, content: message_params[:content])
       pending_order = conversation.pending_order || conversation.create_pending_order!
+      ConversationMessageProcessor.new(message: message, pending_order: pending_order).process
+      bot_reply = conversation.messages.create!(
+        sender_type: :bot,
+        content: BotReplyGenerator.new(pending_order: pending_order).content
+      )
     end
 
     render json: {
       conversation: serialize_conversation(conversation),
       message: serialize_message(message),
+      bot_reply: serialize_message(bot_reply),
       pending_order: serialize_pending_order(pending_order)
     }, status: :created
   rescue ActiveRecord::RecordInvalid => error
@@ -55,6 +62,12 @@ class ConversationMessagesController < ApplicationController
     {
       id: pending_order.id,
       status: pending_order.status,
+      product_id: pending_order.product_id,
+      quantity: pending_order.quantity,
+      customer_name: pending_order.customer_name,
+      phone: pending_order.phone,
+      address: pending_order.address,
+      total_price: pending_order.total_price.to_s,
       ready_for_confirmation: pending_order.ready_for_confirmation?
     }
   end
