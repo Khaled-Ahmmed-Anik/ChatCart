@@ -595,3 +595,36 @@ Processing by Webhooks::MessengerController#show as HTML
 Completed 200 OK in 5ms (Views: 0.1ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.5ms)
 
 
+Started POST "/webhooks/messenger" for 127.0.0.1 at 2026-06-07 01:51:44 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by Webhooks::MessengerController#create as JSON
+  Parameters: {"object" => "page", "entry" => [{"id" => "page-1", "messaging" => [{"sender" => {"id" => "send-api-smoke-1780775504"}, "recipient" => {"id" => "page-1"}, "timestamp" => 1780000000000, "message" => {"mid" => "8465cd7b-88a8-4c22-b5b5-abcf16990b76", "text" => "I want Fresh Musk"}}]}], "messenger" => {"object" => "page", "entry" => [{"id" => "page-1", "messaging" => [{"sender" => {"id" => "send-api-smoke-1780775504"}, "recipient" => {"id" => "page-1"}, "timestamp" => 1780000000000, "message" => {"mid" => "8465cd7b-88a8-4c22-b5b5-abcf16990b76", "text" => "I want Fresh Musk"}}]}]}}
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:46:in 'CustomerMessageRecorder#find_or_create_conversation'
+  [1m[36mConversation Load (0.8ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'send-api-smoke-1780775504' LIMIT 1 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:46:in 'CustomerMessageRecorder#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:46:in 'CustomerMessageRecorder#find_or_create_conversation'
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("external_customer_id", "channel", "status", "last_message_at", "created_at", "updated_at") VALUES ('send-api-smoke-1780775504', 'facebook', 0, NULL, '2026-06-06 19:51:44.672882', '2026-06-06 19:51:44.672882') RETURNING "id" /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:46:in 'CustomerMessageRecorder#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:46:in 'CustomerMessageRecorder#find_or_create_conversation'
+  [1m[36mConversation Update (0.4ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:51:44.674415', "updated_at" = '2026-06-06 19:51:44.674520' WHERE "conversations"."id" = 8 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:19:in 'block in CustomerMessageRecorder#record'
+  [1m[36mMessage Create (0.6ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (8, 0, 'I want Fresh Musk', '{"sender":{"id":"send-api-smoke-1780775504"},"recipient":{"id":"page-1"},"timestamp":1780000000000,"message":{"mid":"8465cd7b-88a8-4c22-b5b5-abcf16990b76","text":"I want Fresh Musk"}}', '2026-06-06 19:51:44.681310', '2026-06-06 19:51:44.681310') RETURNING "id" /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:20:in 'block in CustomerMessageRecorder#record'
+  [1m[36mPendingOrder Load (1.0ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 8 LIMIT 1 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:25:in 'block in CustomerMessageRecorder#record'
+  [1m[36mPendingOrder Create (0.5ms)[0m  [1m[32mINSERT INTO "pending_orders" ("conversation_id", "product_id", "quantity", "customer_name", "phone", "address", "status", "woo_commerce_order_id", "created_at", "updated_at") VALUES (8, NULL, NULL, NULL, NULL, NULL, 0, NULL, '2026-06-06 19:51:44.688967', '2026-06-06 19:51:44.688967') RETURNING "id" /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:25:in 'block in CustomerMessageRecorder#record'
+  [1m[36mProduct Load (0.8ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = TRUE AND (stock_quantity > 0) /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/conversation_message_processor.rb:86:in 'ConversationMessageProcessor#matching_product'
+  [1m[36mPendingOrder Update (0.4ms)[0m  [1m[33mUPDATE "pending_orders" SET "product_id" = 1, "status" = 1, "updated_at" = '2026-06-06 19:51:44.695574' WHERE "pending_orders"."id" = 8 /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/conversation_message_processor.rb:39:in 'ConversationMessageProcessor#collect_product'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (8, 1, 'Great choice. How many bottles of Fresh Musk would you like?', '{}', '2026-06-06 19:51:44.696782', '2026-06-06 19:51:44.696782') RETURNING "id" /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:27:in 'block in CustomerMessageRecorder#record'
+  [1m[36mTRANSACTION (0.9ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='messenger'*/[0m
+  ↳ app/services/customer_message_recorder.rb:17:in 'CustomerMessageRecorder#record'
+Completed 201 Created in 62ms (Views: 0.1ms | ActiveRecord: 20.4ms (9 queries, 0 cached) | GC: 0.2ms)
+
+

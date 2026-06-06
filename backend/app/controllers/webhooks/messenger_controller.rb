@@ -31,12 +31,17 @@ module Webhooks
         content: content,
         metadata: event.to_unsafe_h
       ).record
+      delivery = MessengerReplySender.new(
+        recipient_id: sender_id,
+        content: result.bot_reply.content
+      ).deliver
 
       render json: {
         recipient_id: sender_id,
         bot_reply: {
           content: result.bot_reply.content
         },
+        delivery: serialize_delivery(delivery),
         conversation: serialize_conversation(result.conversation),
         pending_order: serialize_pending_order(result.pending_order)
       }, status: :created
@@ -78,6 +83,15 @@ module Webhooks
         quantity: pending_order.quantity,
         total_price: pending_order.total_price.to_s,
         ready_for_confirmation: pending_order.ready_for_confirmation?
+      }
+    end
+
+    def serialize_delivery(delivery)
+      {
+        delivered: delivery.delivered,
+        skipped: delivery.skipped,
+        status: delivery.status,
+        error: delivery.error
       }
     end
   end

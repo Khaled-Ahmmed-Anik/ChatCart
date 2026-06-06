@@ -60,6 +60,9 @@ module Webhooks
       assert_equal "fb-user-123", response_body.dig("conversation", "external_customer_id")
       assert_equal "collecting_quantity", response_body.dig("pending_order", "status")
       assert_equal "Great choice. How many bottles of Fresh Musk would you like?", response_body.dig("bot_reply", "content")
+      assert_equal false, response_body.dig("delivery", "delivered")
+      assert_equal true, response_body.dig("delivery", "skipped")
+      assert_equal "MESSENGER_PAGE_ACCESS_TOKEN is not configured", response_body.dig("delivery", "error")
       assert_equal "I want Fresh Musk", customer_message.content
       assert_equal "fb-user-123", customer_message.metadata.dig("sender", "id")
       assert_equal response_body.dig("bot_reply", "content"), bot_message.content
@@ -86,6 +89,7 @@ module Webhooks
       assert_equal "collecting_name", response_body.dig("pending_order", "status")
       assert_equal 2, response_body.dig("pending_order", "quantity")
       assert_equal "Perfect. Please share your name for the order.", response_body.dig("bot_reply", "content")
+      assert_equal true, response_body.dig("delivery", "skipped")
     end
 
     test "create returns validation errors when sender or text is missing" do
