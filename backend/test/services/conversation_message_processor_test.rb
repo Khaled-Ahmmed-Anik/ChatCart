@@ -82,6 +82,30 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_nil pending_order.reload.product
   end
 
+  test "confirms an order awaiting confirmation" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    process_message(pending_order, "confirm")
+
+    assert_predicate pending_order.reload, :confirmed?
+  end
+
+  test "cancels an order awaiting confirmation" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    process_message(pending_order, "cancel")
+
+    assert_predicate pending_order.reload, :cancelled?
+  end
+
+  test "keeps awaiting confirmation for unclear confirmation reply" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    process_message(pending_order, "maybe later")
+
+    assert_predicate pending_order.reload, :awaiting_confirmation?
+  end
+
   private
 
   def process_message(pending_order, content)
@@ -100,6 +124,18 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
         name: "Fresh Musk",
         price: 750,
         stock_quantity: 10
+      }.merge(attributes)
+    )
+  end
+
+  def create_ready_pending_order(attributes = {})
+    create_pending_order(
+      {
+        product: create_product,
+        quantity: 1,
+        customer_name: "Khaled",
+        phone: "+8801712345678",
+        address: "Dhaka"
       }.merge(attributes)
     )
   end

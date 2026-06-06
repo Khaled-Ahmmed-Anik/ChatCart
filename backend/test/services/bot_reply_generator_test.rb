@@ -82,6 +82,24 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "Address: Dhaka"
   end
 
+  test "confirms submitted order message" do
+    pending_order = create_pending_order(status: :confirmed)
+
+    assert_equal(
+      "Your order is confirmed. We will submit it for processing shortly.",
+      BotReplyGenerator.new(pending_order: pending_order).content
+    )
+  end
+
+  test "confirms cancelled order message" do
+    pending_order = create_pending_order(status: :cancelled)
+
+    assert_equal(
+      "Your order has been cancelled. You can start again anytime.",
+      BotReplyGenerator.new(pending_order: pending_order).content
+    )
+  end
+
   private
 
   def create_pending_order(attributes = {})

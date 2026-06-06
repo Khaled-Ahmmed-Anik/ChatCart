@@ -142,6 +142,60 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_includes response_body.dig("bot_reply", "content"), "Reply confirm to place it, or cancel to stop."
   end
 
+  test "create confirms an order awaiting confirmation" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    conversation.create_pending_order!(
+      product: product,
+      quantity: 2,
+      customer_name: "Khaled",
+      phone: "+8801712345678",
+      address: "Dhaka",
+      status: :awaiting_confirmation
+    )
+
+    post conversation_messages_url, params: {
+      conversation_message: {
+        channel: "facebook",
+        external_customer_id: "fb-user-123",
+        content: "confirm"
+      }
+    }, as: :json
+
+    assert_response :created
+
+    response_body = JSON.parse(response.body)
+    assert_equal "confirmed", response_body.dig("pending_order", "status")
+    assert_equal "Your order is confirmed. We will submit it for processing shortly.", response_body.dig("bot_reply", "content")
+  end
+
+  test "create cancels an order awaiting confirmation" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    conversation.create_pending_order!(
+      product: product,
+      quantity: 2,
+      customer_name: "Khaled",
+      phone: "+8801712345678",
+      address: "Dhaka",
+      status: :awaiting_confirmation
+    )
+
+    post conversation_messages_url, params: {
+      conversation_message: {
+        channel: "facebook",
+        external_customer_id: "fb-user-123",
+        content: "cancel"
+      }
+    }, as: :json
+
+    assert_response :created
+
+    response_body = JSON.parse(response.body)
+    assert_equal "cancelled", response_body.dig("pending_order", "status")
+    assert_equal "Your order has been cancelled. You can start again anytime.", response_body.dig("bot_reply", "content")
+  end
+
   test "create returns validation errors for missing content" do
     assert_no_difference -> { Message.count } do
       post conversation_messages_url, params: {

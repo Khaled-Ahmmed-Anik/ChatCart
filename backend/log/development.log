@@ -323,3 +323,162 @@ Processing by ConversationMessagesController#create as JSON
 Completed 201 Created in 7ms (Views: 0.0ms | ActiveRecord: 2.7ms (7 queries, 0 cached) | GC: 0.0ms)
 
 
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "I want Fresh Musk"}}
+  [1m[36mConversation Load (0.9ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("external_customer_id", "channel", "status", "last_message_at", "created_at", "updated_at") VALUES ('confirm-smoke-1780773647', 'facebook', 0, NULL, '2026-06-06 19:20:47.120270', '2026-06-06 19:20:47.120270') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (1.0ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.8ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.122844', "updated_at" = '2026-06-06 19:20:47.122943' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.7ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, 'I want Fresh Musk', '{}', '2026-06-06 19:20:47.130308', '2026-06-06 19:20:47.130308') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (1.3ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Create (0.4ms)[0m  [1m[32mINSERT INTO "pending_orders" ("conversation_id", "product_id", "quantity", "customer_name", "phone", "address", "status", "woo_commerce_order_id", "created_at", "updated_at") VALUES (5, NULL, NULL, NULL, NULL, NULL, 0, NULL, '2026-06-06 19:20:47.138417', '2026-06-06 19:20:47.138417') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mProduct Load (0.8ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = TRUE AND (stock_quantity > 0) /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:86:in 'ConversationMessageProcessor#matching_product'
+  [1m[36mPendingOrder Update (0.4ms)[0m  [1m[33mUPDATE "pending_orders" SET "product_id" = 1, "status" = 1, "updated_at" = '2026-06-06 19:20:47.144795' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:39:in 'ConversationMessageProcessor#collect_product'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Great choice. How many bottles of Fresh Musk would you like?', '{}', '2026-06-06 19:20:47.145975', '2026-06-06 19:20:47.145975') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+Completed 201 Created in 59ms (Views: 0.1ms | ActiveRecord: 22.7ms (9 queries, 0 cached) | GC: 0.4ms)
+
+
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "2"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.7ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.150600', "updated_at" = '2026-06-06 19:20:47.150724' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, '2', '{}', '2026-06-06 19:20:47.152124', '2026-06-06 19:20:47.152124') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mProduct Load (0.1ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."id" = 1 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:45:in 'ConversationMessageProcessor#collect_quantity'
+  [1m[36mPendingOrder Update (0.2ms)[0m  [1m[33mUPDATE "pending_orders" SET "quantity" = 2, "status" = 2, "updated_at" = '2026-06-06 19:20:47.154262' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:82:in 'ConversationMessageProcessor#advance_after_collection'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Perfect. Please share your name for the order.', '{}', '2026-06-06 19:20:47.155046', '2026-06-06 19:20:47.155046') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+Completed 201 Created in 6ms (Views: 0.0ms | ActiveRecord: 2.0ms (7 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "Khaled Ahmed"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.6ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.158054', "updated_at" = '2026-06-06 19:20:47.158162' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, 'Khaled Ahmed', '{}', '2026-06-06 19:20:47.159507', '2026-06-06 19:20:47.159507') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mProduct Load (0.1ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."id" = 1 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/models/pending_order.rb:20:in 'PendingOrder#ready_for_confirmation?'
+  [1m[36mPendingOrder Update (0.2ms)[0m  [1m[33mUPDATE "pending_orders" SET "customer_name" = 'Khaled Ahmed', "status" = 3, "updated_at" = '2026-06-06 19:20:47.161395' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:82:in 'ConversationMessageProcessor#advance_after_collection'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Thanks, Khaled Ahmed. Please share your phone number.', '{}', '2026-06-06 19:20:47.162165', '2026-06-06 19:20:47.162165') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+Completed 201 Created in 6ms (Views: 0.0ms | ActiveRecord: 1.9ms (7 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "+8801712345678"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.6ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.165104', "updated_at" = '2026-06-06 19:20:47.165215' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, '+8801712345678', '{}', '2026-06-06 19:20:47.166553', '2026-06-06 19:20:47.166553') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mProduct Load (0.1ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."id" = 1 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/models/pending_order.rb:20:in 'PendingOrder#ready_for_confirmation?'
+  [1m[36mPendingOrder Update (0.2ms)[0m  [1m[33mUPDATE "pending_orders" SET "phone" = '+8801712345678', "status" = 4, "updated_at" = '2026-06-06 19:20:47.168607' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:82:in 'ConversationMessageProcessor#advance_after_collection'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Got it. Please share your delivery address.', '{}', '2026-06-06 19:20:47.169492', '2026-06-06 19:20:47.169492') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+Completed 201 Created in 6ms (Views: 0.0ms | ActiveRecord: 1.9ms (7 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "Dhaka"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.6ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.172621', "updated_at" = '2026-06-06 19:20:47.172732' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, 'Dhaka', '{}', '2026-06-06 19:20:47.174109', '2026-06-06 19:20:47.174109') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mProduct Load (0.1ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."id" = 1 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/models/pending_order.rb:20:in 'PendingOrder#ready_for_confirmation?'
+  [1m[36mPendingOrder Update (0.2ms)[0m  [1m[33mUPDATE "pending_orders" SET "address" = 'Dhaka', "status" = 5, "updated_at" = '2026-06-06 19:20:47.176015' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:82:in 'ConversationMessageProcessor#advance_after_collection'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Please confirm your order:
+2 x Fresh Musk
+Total: 1500.0
+Name: Khaled Ahmed
+Phone: +8801712345678
+Address: Dhaka
+Reply confirm to place it, or cancel to stop.', '{}', '2026-06-06 19:20:47.176780', '2026-06-06 19:20:47.176780') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+Completed 201 Created in 6ms (Views: 0.0ms | ActiveRecord: 1.9ms (7 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:20:47 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "confirm-smoke-1780773647", "content" => "confirm"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'confirm-smoke-1780773647' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:32:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (0.6ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:20:47.179635', "updated_at" = '2026-06-06 19:20:47.179737' WHERE "conversations"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 0, 'confirm', '{}', '2026-06-06 19:20:47.181047', '2026-06-06 19:20:47.181047') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 5 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:11:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Update (0.2ms)[0m  [1m[33mUPDATE "pending_orders" SET "status" = 6, "updated_at" = '2026-06-06 19:20:47.182397' WHERE "pending_orders"."id" = 5 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/services/conversation_message_processor.rb:74:in 'ConversationMessageProcessor#collect_confirmation'
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (5, 1, 'Your order is confirmed. We will submit it for processing shortly.', '{}', '2026-06-06 19:20:47.183217', '2026-06-06 19:20:47.183217') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:13:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'ConversationMessagesController#create'
+  [1m[36mProduct Load (0.2ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."id" = 1 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/models/pending_order.rb:28:in 'PendingOrder#total_price'
+Completed 201 Created in 6ms (Views: 0.0ms | ActiveRecord: 1.8ms (7 queries, 0 cached) | GC: 0.0ms)
+
+

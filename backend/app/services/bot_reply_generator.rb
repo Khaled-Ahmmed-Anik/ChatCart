@@ -19,6 +19,10 @@ class BotReplyGenerator
       "Got it. Please share your delivery address."
     when "awaiting_confirmation"
       confirmation_prompt
+    when "confirmed"
+      "Your order is confirmed. We will submit it for processing shortly."
+    when "cancelled"
+      "Your order has been cancelled. You can start again anytime."
     else
       "Thanks. We have your order update."
     end

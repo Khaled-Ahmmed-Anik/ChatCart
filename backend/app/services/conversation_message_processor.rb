@@ -19,6 +19,8 @@ class ConversationMessageProcessor
       collect_phone
     when "collecting_address"
       collect_address
+    when "awaiting_confirmation"
+      collect_confirmation
     end
 
     pending_order
@@ -67,6 +69,14 @@ class ConversationMessageProcessor
     advance_after_collection(:awaiting_confirmation)
   end
 
+  def collect_confirmation
+    if confirmation?
+      pending_order.confirmed!
+    elsif cancellation?
+      pending_order.cancelled!
+    end
+  end
+
   def advance_after_collection(next_status)
     pending_order.status = pending_order.ready_for_confirmation? ? :awaiting_confirmation : next_status
     pending_order.save!
@@ -80,5 +90,17 @@ class ConversationMessageProcessor
 
   def phone_number?
     content.match?(/\A[+\d][\d\s().-]{6,}\z/)
+  end
+
+  def confirmation?
+    normalized_content.in?(%w[confirm confirmed yes y])
+  end
+
+  def cancellation?
+    normalized_content.in?(%w[cancel cancelled stop no n])
+  end
+
+  def normalized_content
+    content.downcase.gsub(/[^a-z]/, "")
   end
 end
