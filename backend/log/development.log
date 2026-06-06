@@ -169,3 +169,20 @@ FOREIGN KEY ("product_id")
   [1m[36mPendingOrder Load (0.4ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 1 LIMIT 1 /*application='Backend'*/[0m
   [1m[36mMessage Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages" WHERE "messages"."conversation_id" = 1 /*application='Backend'*/[0m
   [1m[36mTRANSACTION (0.5ms)[0m  [1m[31mROLLBACK /*application='Backend'*/[0m
+[ActionDispatch::HostAuthorization::DefaultResponseApp] Blocked hosts: www.example.com
+Started GET "/products" for 127.0.0.1 at 2026-06-06 18:05:40 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ProductsController#index as HTML
+  [1m[36mProduct Load (0.9ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = TRUE AND (stock_quantity > 0) ORDER BY "products"."name" ASC /*action='index',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:5:in 'Enumerable#map'
+Completed 200 OK in 31ms (Views: 0.1ms | ActiveRecord: 11.6ms (1 query, 0 cached) | GC: 0.4ms)
+
+
+Started GET "/products" for ::1 at 2026-06-06 18:06:59 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.6ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ProductsController#index as HTML
+  [1m[36mProduct Load (1.0ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = TRUE AND (stock_quantity > 0) ORDER BY "products"."name" ASC /*action='index',application='Backend',controller='products'*/[0m
+  ↳ app/controllers/products_controller.rb:5:in 'Enumerable#map'
+Completed 200 OK in 33ms (Views: 0.2ms | ActiveRecord: 9.1ms (1 query, 0 cached) | GC: 0.0ms)
+
+
