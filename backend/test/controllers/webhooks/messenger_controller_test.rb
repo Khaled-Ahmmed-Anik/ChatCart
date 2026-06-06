@@ -2,6 +2,38 @@ require "test_helper"
 
 module Webhooks
   class MessengerControllerTest < ActionDispatch::IntegrationTest
+    test "show verifies messenger webhook with matching token" do
+      get webhooks_messenger_url, params: {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "local-messenger-verify-token",
+        "hub.challenge": "challenge-123"
+      }
+
+      assert_response :success
+      assert_equal "challenge-123", response.body
+    end
+
+    test "show rejects messenger webhook with invalid token" do
+      get webhooks_messenger_url, params: {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "wrong-token",
+        "hub.challenge": "challenge-123"
+      }
+
+      assert_response :forbidden
+      assert_equal "Forbidden", response.body
+    end
+
+    test "show rejects messenger webhook without challenge" do
+      get webhooks_messenger_url, params: {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "local-messenger-verify-token"
+      }
+
+      assert_response :forbidden
+      assert_equal "Forbidden", response.body
+    end
+
     test "create records messenger text and returns bot reply" do
       Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
 

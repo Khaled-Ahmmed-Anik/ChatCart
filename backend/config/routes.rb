@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   namespace :webhooks do
+    get "messenger", to: "messenger#show"
     post "messenger", to: "messenger#create"
   end
 

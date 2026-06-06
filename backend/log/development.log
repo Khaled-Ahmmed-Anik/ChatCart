@@ -588,3 +588,10 @@ Processing by Webhooks::MessengerController#create as JSON
 Completed 201 Created in 61ms (Views: 0.1ms | ActiveRecord: 21.6ms (9 queries, 0 cached) | GC: 0.2ms)
 
 
+Started GET "/webhooks/messenger?hub.mode=subscribe&hub.verify_token=[FILTERED]&hub.challenge=challenge-123" for 127.0.0.1 at 2026-06-07 01:45:24 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.5ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by Webhooks::MessengerController#show as HTML
+  Parameters: {"hub.mode" => "subscribe", "hub.verify_token" => "[FILTERED]", "hub.challenge" => "challenge-123"}
+Completed 200 OK in 5ms (Views: 0.1ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.5ms)
+
+

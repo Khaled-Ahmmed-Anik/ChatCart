@@ -1,6 +1,15 @@
 module Webhooks
   class MessengerController < ApplicationController
     CHANNEL = "facebook"
+    DEFAULT_VERIFY_TOKEN = "local-messenger-verify-token"
+
+    def show
+      if valid_verification_request?
+        render plain: params["hub.challenge"], status: :ok
+      else
+        render plain: "Forbidden", status: :forbidden
+      end
+    end
 
     def create
       event = first_messaging_event
@@ -36,6 +45,16 @@ module Webhooks
     end
 
     private
+
+    def valid_verification_request?
+      params["hub.mode"] == "subscribe" &&
+        params["hub.verify_token"] == verify_token &&
+        params["hub.challenge"].present?
+    end
+
+    def verify_token
+      ENV.fetch("MESSENGER_VERIFY_TOKEN", DEFAULT_VERIFY_TOKEN)
+    end
 
     def first_messaging_event
       params.fetch(:entry, []).first&.fetch(:messaging, [])&.first || {}
