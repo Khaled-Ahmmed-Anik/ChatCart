@@ -186,3 +186,30 @@ Processing by ProductsController#index as HTML
 Completed 200 OK in 33ms (Views: 0.2ms | ActiveRecord: 9.1ms (1 query, 0 cached) | GC: 0.0ms)
 
 
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:09:00 +0600
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Backend'*/[0m
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "manual-smoke-user", "content" => "Hi, I want a perfume"}}
+  [1m[36mConversation Load (0.9ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = 'facebook' AND "conversations"."external_customer_id" = 'manual-smoke-user' LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:25:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:25:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mConversation Create (0.4ms)[0m  [1m[32mINSERT INTO "conversations" ("external_customer_id", "channel", "status", "last_message_at", "created_at", "updated_at") VALUES ('manual-smoke-user', 'facebook', 0, NULL, '2026-06-06 19:09:00.693275', '2026-06-06 19:09:00.693275') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:25:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:25:in 'ConversationMessagesController#find_or_create_conversation'
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'block in ConversationMessagesController#create'
+  [1m[36mConversation Update (1.3ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = '2026-06-06 19:09:00.695466', "updated_at" = '2026-06-06 19:09:00.695584' WHERE "conversations"."id" = 2 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:8:in 'block in ConversationMessagesController#create'
+  [1m[36mMessage Create (0.8ms)[0m  [1m[32mINSERT INTO "messages" ("conversation_id", "sender_type", "content", "metadata", "created_at", "updated_at") VALUES (2, 0, 'Hi, I want a perfume', '{}', '2026-06-06 19:09:00.704724', '2026-06-06 19:09:00.704724') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:9:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Load (1.0ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = 2 LIMIT 1 /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mPendingOrder Create (0.4ms)[0m  [1m[32mINSERT INTO "pending_orders" ("conversation_id", "product_id", "quantity", "customer_name", "phone", "address", "status", "woo_commerce_order_id", "created_at", "updated_at") VALUES (2, NULL, NULL, NULL, NULL, NULL, 0, NULL, '2026-06-06 19:09:00.712714', '2026-06-06 19:09:00.712714') RETURNING "id" /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:10:in 'block in ConversationMessagesController#create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mCOMMIT /*action='create',application='Backend',controller='conversation_messages'*/[0m
+  ↳ app/controllers/conversation_messages_controller.rb:7:in 'ConversationMessagesController#create'
+Completed 201 Created in 53ms (Views: 0.1ms | ActiveRecord: 19.1ms (6 queries, 0 cached) | GC: 0.4ms)
+
+

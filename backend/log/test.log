@@ -527,3 +527,394 @@ ConversationTest: test_requires_unique_customer_per_channel
 ConversationTest: test_validates_required_external_customer_and_channel
 -----------------------------------------------------------------------
   [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.2ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = $1 ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1[0m  [[nil, "schema_sha1"]]
+  [1m[36mActiveRecord::SchemaMigration Load (0.5ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+---------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_returns_validation_errors_for_missing_content
+---------------------------------------------------------------------------------------------
+  [1m[36mMessage Count (1.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:27 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => nil}}
+  [1m[36mConversation Load (0.7ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.4ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:27.555291"], ["external_customer_id", "fb-user-123"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:27.555291"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.6ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:27.556590"], ["updated_at", "2026-06-06 19:08:27.556693"], ["id", 29]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK TO SAVEPOINT active_record_1[0m
+Completed 422 Unprocessable Content in 28ms (Views: 0.1ms | ActiveRecord: 7.6ms (3 queries, 0 cached) | GC: 1.2ms)
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+----------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_reuses_existing_conversation_and_pending_order
+----------------------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:27.571750"], ["external_customer_id", "fb-user-123"], ["last_message_at", "2026-06-05 19:08:27.571566"], ["status", 0], ["updated_at", "2026-06-06 19:08:27.571750"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Create (1.0ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 30], ["created_at", "2026-06-06 19:08:27.578571"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 1], ["updated_at", "2026-06-06 19:08:27.578571"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Load (0.7ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 30], ["LIMIT", 1]]
+  [1m[36mConversation Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mPendingOrder Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:27 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => "I want Fresh Musk"}}
+  [1m[36mConversation Load (1.3ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.3ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:27.584631"], ["updated_at", "2026-06-06 19:08:27.584810"], ["id", 30]]
+  [1m[36mMessage Create (0.3ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "I want Fresh Musk"], ["conversation_id", 30], ["created_at", "2026-06-06 19:08:27.585704"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:27.585704"]]
+  [1m[36mPendingOrder Load (0.1ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 30], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Completed 201 Created in 5ms (Views: 0.1ms | ActiveRecord: 2.6ms (4 queries, 0 cached) | GC: 0.0ms)
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mMessage Load (0.5ms)[0m  [1m[34mSELECT "messages".* FROM "messages" WHERE "messages"."conversation_id" = $1 ORDER BY "messages"."created_at" DESC LIMIT $2[0m  [["conversation_id", 30], ["LIMIT", 1]]
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."id" = $1 LIMIT $2[0m  [["id", 30], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_records_an_incoming_customer_message_for_a_new_conversation
+-----------------------------------------------------------------------------------------------------------
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:27 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => "Hi, I want a perfume"}}
+  [1m[36mConversation Load (0.1ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:27.592986"], ["external_customer_id", "fb-user-123"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:27.592986"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.3ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:27.593585"], ["updated_at", "2026-06-06 19:08:27.593667"], ["id", 31]]
+  [1m[36mMessage Create (0.3ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "Hi, I want a perfume"], ["conversation_id", 31], ["created_at", "2026-06-06 19:08:27.594397"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:27.594397"]]
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 31], ["LIMIT", 1]]
+  [1m[36mPendingOrder Create (0.4ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 31], ["created_at", "2026-06-06 19:08:27.595385"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:27.595385"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Completed 201 Created in 4ms (Views: 0.0ms | ActiveRecord: 1.7ms (6 queries, 0 cached) | GC: 0.0ms)
+  [1m[36mPendingOrder Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mConversation Load (0.1ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."id" = $1 LIMIT $2[0m  [["id", 31], ["LIMIT", 1]]
+  [1m[36mMessage Load (0.3ms)[0m  [1m[34mSELECT "messages".* FROM "messages" WHERE "messages"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 31], ["LIMIT", 2]]
+  [1m[36mPendingOrder Load (0.4ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 31], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.4ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = $1 ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1[0m  [[nil, "schema_sha1"]]
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+---------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_returns_validation_errors_for_missing_content
+---------------------------------------------------------------------------------------------
+  [1m[36mMessage Count (1.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:49 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => nil}}
+  [1m[36mConversation Load (1.0ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.420381"], ["external_customer_id", "fb-user-123"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.420381"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.4ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:49.421475"], ["updated_at", "2026-06-06 19:08:49.421579"], ["id", 32]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK TO SAVEPOINT active_record_1[0m
+Completed 422 Unprocessable Content in 33ms (Views: 0.1ms | ActiveRecord: 8.6ms (3 queries, 0 cached) | GC: 8.1ms)
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mBEGIN[0m
+----------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_reuses_existing_conversation_and_pending_order
+----------------------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.4ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.442314"], ["external_customer_id", "fb-user-123"], ["last_message_at", "2026-06-05 19:08:49.442097"], ["status", 0], ["updated_at", "2026-06-06 19:08:49.442314"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Create (1.1ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 33], ["created_at", "2026-06-06 19:08:49.449204"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 1], ["updated_at", "2026-06-06 19:08:49.449204"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Load (0.6ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 33], ["LIMIT", 1]]
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:49 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => "I want Fresh Musk"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.3ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:49.455266"], ["updated_at", "2026-06-06 19:08:49.455431"], ["id", 33]]
+  [1m[36mMessage Create (0.4ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "I want Fresh Musk"], ["conversation_id", 33], ["created_at", "2026-06-06 19:08:49.456697"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:49.456697"]]
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 33], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Completed 201 Created in 7ms (Views: 0.1ms | ActiveRecord: 1.7ms (4 queries, 0 cached) | GC: 3.2ms)
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mMessage Load (0.4ms)[0m  [1m[34mSELECT "messages".* FROM "messages" WHERE "messages"."conversation_id" = $1 ORDER BY "messages"."created_at" DESC LIMIT $2[0m  [["conversation_id", 33], ["LIMIT", 1]]
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."id" = $1 LIMIT $2[0m  [["id", 33], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------------------------------------------
+ConversationMessagesControllerTest: test_create_records_an_incoming_customer_message_for_a_new_conversation
+-----------------------------------------------------------------------------------------------------------
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+Started POST "/conversation_messages" for 127.0.0.1 at 2026-06-07 01:08:49 +0600
+Processing by ConversationMessagesController#create as JSON
+  Parameters: {"conversation_message" => {"channel" => "facebook", "external_customer_id" => "fb-user-123", "content" => "Hi, I want a perfume"}}
+  [1m[36mConversation Load (0.2ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."channel" = $1 AND "conversations"."external_customer_id" = $2 LIMIT $3[0m  [["channel", "facebook"], ["external_customer_id", "fb-user-123"], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.470991"], ["external_customer_id", "fb-user-123"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.470991"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Update (0.2ms)[0m  [1m[33mUPDATE "conversations" SET "last_message_at" = $1, "updated_at" = $2 WHERE "conversations"."id" = $3[0m  [["last_message_at", "2026-06-06 19:08:49.472329"], ["updated_at", "2026-06-06 19:08:49.472421"], ["id", 34]]
+  [1m[36mMessage Create (0.2ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "Hi, I want a perfume"], ["conversation_id", 34], ["created_at", "2026-06-06 19:08:49.473567"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:49.473567"]]
+  [1m[36mPendingOrder Load (0.1ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 34], ["LIMIT", 1]]
+  [1m[36mPendingOrder Create (0.2ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 34], ["created_at", "2026-06-06 19:08:49.475019"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.475019"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Completed 201 Created in 7ms (Views: 0.1ms | ActiveRecord: 1.4ms (6 queries, 0 cached) | GC: 2.4ms)
+  [1m[36mPendingOrder Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mConversation Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "conversations"[0m
+  [1m[36mConversation Load (0.1ms)[0m  [1m[34mSELECT "conversations".* FROM "conversations" WHERE "conversations"."id" = $1 LIMIT $2[0m  [["id", 34], ["LIMIT", 1]]
+  [1m[36mMessage Load (0.2ms)[0m  [1m[34mSELECT "messages".* FROM "messages" WHERE "messages"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 34], ["LIMIT", 2]]
+  [1m[36mPendingOrder Load (0.2ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 34], ["LIMIT", 1]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+--------------------------------------------------------------------
+ConversationTest: test_destroys_dependent_messages_and_pending_order
+--------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.4ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.483944"], ["external_customer_id", "customer-1"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.483944"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mMessage Create (0.8ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "Hi"], ["conversation_id", 35], ["created_at", "2026-06-06 19:08:49.485506"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:49.485506"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Create (0.3ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 35], ["created_at", "2026-06-06 19:08:49.486914"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.486914"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Load (0.1ms)[0m  [1m[34mSELECT "pending_orders".* FROM "pending_orders" WHERE "pending_orders"."conversation_id" = $1 LIMIT $2[0m  [["conversation_id", 35], ["LIMIT", 1]]
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mMessage Load (0.7ms)[0m  [1m[34mSELECT "messages".* FROM "messages" WHERE "messages"."conversation_id" = $1[0m  [["conversation_id", 35]]
+  [1m[36mMessage Destroy (0.2ms)[0m  [1m[31mDELETE FROM "messages" WHERE "messages"."id" = $1[0m  [["id", 11]]
+  [1m[36mPendingOrder Destroy (0.2ms)[0m  [1m[31mDELETE FROM "pending_orders" WHERE "pending_orders"."id" = $1[0m  [["id", 9]]
+  [1m[36mConversation Destroy (0.5ms)[0m  [1m[31mDELETE FROM "conversations" WHERE "conversations"."id" = $1[0m  [["id", 35]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "pending_orders"[0m
+  [1m[36mMessage Count (0.1ms)[0m  [1m[34mSELECT COUNT(*) FROM "messages"[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------
+ConversationTest: test_requires_unique_customer_per_channel
+-----------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.495993"], ["external_customer_id", "customer-1"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.495993"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (2.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.496790"], ["external_customer_id", "customer-1"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.496790"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK TO SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------------
+ConversationTest: test_defaults_to_active_status
+------------------------------------------------
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.500702"], ["external_customer_id", "customer-1"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.500702"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------
+ConversationTest: test_validates_required_external_customer_and_channel
+-----------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+--------------------------------------------------------------------------
+ConversationTest: test_allows_same_external_customer_on_different_channels
+--------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.505078"], ["external_customer_id", "customer-1"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.505078"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------
+MessageTest: test_stores_sender_type_enum
+-----------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.506557"], ["external_customer_id", "c9994b4f-8324-4b4e-9ae3-bf087d424854"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.506557"]]
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mMessage Create (0.5ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "Hello"], ["conversation_id", 40], ["created_at", "2026-06-06 19:08:49.508041"], ["metadata", "{}"], ["sender_type", 1], ["updated_at", "2026-06-06 19:08:49.508041"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mBEGIN[0m
+----------------------------------------------------
+MessageTest: test_defaults_metadata_to_an_empty_hash
+----------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.510581"], ["external_customer_id", "87b6935c-90cd-4450-be08-af347608d63e"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.510581"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mMessage Create (0.3ms)[0m  [1m[32mINSERT INTO "messages" ("content", "conversation_id", "created_at", "metadata", "sender_type", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["content", "Hi"], ["conversation_id", 41], ["created_at", "2026-06-06 19:08:49.512458"], ["metadata", "{}"], ["sender_type", 0], ["updated_at", "2026-06-06 19:08:49.512458"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------
+MessageTest: test_validates_content
+-----------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.514163"], ["external_customer_id", "4703caab-d363-4efd-b2f9-5df14e632e27"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.514163"]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-------------------------------------------
+MessageTest: test_belongs_to_a_conversation
+-------------------------------------------
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------------------------------------------
+ProductsControllerTest: test_index_serializes_product_fields_for_the_bot_layer
+------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.7ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.522384"], ["description", "Clean daily musk."], ["name", "Fresh Musk"], ["price", "750.0"], ["stock_quantity", 10], ["tags", "fresh,office,daily,musk"], ["updated_at", "2026-06-06 19:08:49.522384"], ["woo_commerce_product_id", "woo-123"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Started GET "/products" for 127.0.0.1 at 2026-06-07 01:08:49 +0600
+Processing by ProductsController#index as HTML
+  [1m[36mProduct Load (0.6ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = $1 AND (stock_quantity > 0) ORDER BY "products"."name" ASC[0m  [["active", true]]
+Completed 200 OK in 2ms (Views: 0.3ms | ActiveRecord: 0.6ms (1 query, 0 cached) | GC: 0.2ms)
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mBEGIN[0m
+-------------------------------------------------------------------------------------
+ProductsControllerTest: test_index_returns_active_products_with_stock_ordered_by_name
+-------------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.529120"], ["description", nil], ["name", "Vanilla Night"], ["price", "750.0"], ["stock_quantity", 6], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.529120"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.530105"], ["description", nil], ["name", "Fresh Musk"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.530105"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", false], ["created_at", "2026-06-06 19:08:49.530864"], ["description", nil], ["name", "Inactive Product"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.530864"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.531551"], ["description", nil], ["name", "Out Of Stock"], ["price", "750.0"], ["stock_quantity", 0], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.531551"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+Started GET "/products" for 127.0.0.1 at 2026-06-07 01:08:49 +0600
+Processing by ProductsController#index as HTML
+  [1m[36mProduct Load (0.3ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = $1 AND (stock_quantity > 0) ORDER BY "products"."name" ASC[0m  [["active", true]]
+Completed 200 OK in 1ms (Views: 0.0ms | ActiveRecord: 0.3ms (1 query, 0 cached) | GC: 0.0ms)
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------------------------------------------------------
+ProductTest: test_available_for_quantity_returns_true_when_active_product_has_enough_stock
+------------------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.534393"], ["description", nil], ["name", "Fresh Musk"], ["price", "750.0"], ["stock_quantity", 3], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.534393"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------
+ProductTest: test_in_stock_scope_returns_only_products_with_stock
+-----------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.535780"], ["description", nil], ["name", "In Stock"], ["price", "750.0"], ["stock_quantity", 1], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.535780"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.536535"], ["description", nil], ["name", "Out Of Stock"], ["price", "750.0"], ["stock_quantity", 0], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.536535"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mProduct Load (0.1ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE (stock_quantity > 0)[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------
+ProductTest: test_available_for_quantity_returns_false_when_unavailable
+-----------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", false], ["created_at", "2026-06-06 19:08:49.538045"], ["description", nil], ["name", "Inactive"], ["price", "750.0"], ["stock_quantity", 3], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.538045"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.538833"], ["description", nil], ["name", "Low Stock"], ["price", "750.0"], ["stock_quantity", 1], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.538833"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+----------------------------------------------------------------
+ProductTest: test_validates_required_and_non-negative_attributes
+----------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------
+ProductTest: test_active_scope_returns_only_active_products
+-----------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.540995"], ["description", nil], ["name", "Active Product"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.540995"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", false], ["created_at", "2026-06-06 19:08:49.541790"], ["description", nil], ["name", "Inactive Product"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.541790"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mProduct Load (0.3ms)[0m  [1m[34mSELECT "products".* FROM "products" WHERE "products"."active" = $1[0m  [["active", true]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------------------------------------------
+PendingOrderTest: test_ready_for_confirmation_requires_product,_quantity,_customer_name,_phone,_and_address
+-----------------------------------------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.543549"], ["external_customer_id", "1d598ed9-bcb8-4ff4-abde-3d27f0517871"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.543549"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.544349"], ["description", nil], ["name", "Fresh Musk"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.544349"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+---------------------------------------------------------------------------
+PendingOrderTest: test_total_price_returns_zero_without_product_or_quantity
+---------------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.2ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.545745"], ["external_customer_id", "70dcd663-3a88-4a73-8496-810158d1bb2f"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.545745"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------
+PendingOrderTest: test_product_is_optional
+------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.547156"], ["external_customer_id", "3bf9c43e-7d1d-4e28-8d2b-885c6ac43525"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.547156"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+---------------------------------------------------------------
+PendingOrderTest: test_validates_positive_quantity_when_present
+---------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.548443"], ["external_customer_id", "56f5422e-7081-4bc3-a37a-34c46659d825"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.548443"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------------------------
+PendingOrderTest: test_defaults_to_collecting_product_status
+------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.549926"], ["external_customer_id", "e8a9a570-9229-4720-9127-30602154ab10"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.549926"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mPendingOrder Create (0.4ms)[0m  [1m[32mINSERT INTO "pending_orders" ("address", "conversation_id", "created_at", "customer_name", "phone", "product_id", "quantity", "status", "updated_at", "woo_commerce_order_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING "id"[0m  [["address", nil], ["conversation_id", 47], ["created_at", "2026-06-06 19:08:49.550620"], ["customer_name", nil], ["phone", nil], ["product_id", nil], ["quantity", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.550620"], ["woo_commerce_order_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+-----------------------------------------------------------------------
+PendingOrderTest: test_total_price_multiplies_product_price_by_quantity
+-----------------------------------------------------------------------
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mConversation Create (0.3ms)[0m  [1m[32mINSERT INTO "conversations" ("channel", "created_at", "external_customer_id", "last_message_at", "status", "updated_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id"[0m  [["channel", "facebook"], ["created_at", "2026-06-06 19:08:49.552026"], ["external_customer_id", "503d9d5c-18d4-4131-b609-ba3865e2bac9"], ["last_message_at", nil], ["status", 0], ["updated_at", "2026-06-06 19:08:49.552026"]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mSAVEPOINT active_record_1[0m
+  [1m[36mProduct Create (0.3ms)[0m  [1m[32mINSERT INTO "products" ("active", "created_at", "description", "name", "price", "stock_quantity", "tags", "updated_at", "woo_commerce_product_id") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING "id"[0m  [["active", true], ["created_at", "2026-06-06 19:08:49.552731"], ["description", nil], ["name", "Fresh Musk"], ["price", "750.0"], ["stock_quantity", 10], ["tags", nil], ["updated_at", "2026-06-06 19:08:49.552731"], ["woo_commerce_product_id", nil]]
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mRELEASE SAVEPOINT active_record_1[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[31mROLLBACK[0m
+  [1m[36mTRANSACTION (0.1ms)[0m  [1m[35mBEGIN[0m
+------------------------------------------------
+PendingOrderTest: test_belongs_to_a_conversation
+------------------------------------------------
+  [1m[36mTRANSACTION (0.0ms)[0m  [1m[31mROLLBACK[0m
