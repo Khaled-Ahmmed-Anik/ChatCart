@@ -8,20 +8,53 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
-Product.find_or_create_by!(name: "Fresh Musk") do |product|
-  product.price = 750
-  product.stock_quantity = 10
-  product.tags = "fresh,office,daily,musk"
+default_products = [
+  {
+    name: "The Blush",
+    price: 999,
+    stock_quantity: 10,
+    description: "A soft, sweet scent with a warm, skin-like finish. Gentle, comforting, and quietly magnetic.",
+    tags: "soft,sweet,warm,gentle,comforting",
+    active: true
+  },
+  {
+    name: "The Desire",
+    price: 999,
+    stock_quantity: 10,
+    description: "A smooth blend of soft sweetness and warm depth. Sensual, inviting, and quietly addictive.",
+    tags: "sweet,warm,sensual,inviting,evening",
+    active: true
+  },
+  {
+    name: "The Club",
+    price: 999,
+    stock_quantity: 10,
+    description: "Smells like rich tobacco blended with smooth vanilla. Bold yet refined, designed for long nights and strong presence.",
+    tags: "tobacco,vanilla,bold,refined,night",
+    active: true
+  },
+  {
+    name: "The Party",
+    price: 999,
+    stock_quantity: 10,
+    description: "A modern, vibrant scent with bold and sweet energy. Expressive and confident, made for standout moments.",
+    tags: "party,sweet,vibrant,bold,confident",
+    active: true
+  },
+  {
+    name: "The Office",
+    price: 920,
+    stock_quantity: 10,
+    description: "Inspired by fresh aquatic notes with a clean finish. Subtle, professional, and confident from morning to evening.",
+    tags: "fresh,aquatic,clean,professional,office",
+    active: true
+  }
+]
+
+default_products.each do |attributes|
+  product = Product.find_or_initialize_by(name: attributes[:name])
+  product.assign_attributes(attributes)
+  product.save!
 end
 
-Product.find_or_create_by!(name: "Vanilla Night") do |product|
-  product.price = 900
-  product.stock_quantity = 6
-  product.tags = "sweet,vanilla,evening,warm"
-end
-
-Product.find_or_create_by!(name: "Royal Oud") do |product|
-  product.price = 1200
-  product.stock_quantity = 4
-  product.tags = "oud,woody,premium,strong"
-end
+Product.where(name: [ "Fresh Musk", "Vanilla Night", "Royal Oud" ]).update_all(active: false)

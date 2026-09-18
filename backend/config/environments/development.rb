@@ -1,10 +1,18 @@
 require "active_support/core_ext/integer/time"
+require "dotenv"
+
+Dotenv.load(Rails.root.join(".env"))
+ENV["DOTENV_LOADED_IN_DEVELOPMENT"] = "true"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
+
+  if ENV["NGROK_HOST"].present?
+    config.hosts << ENV["NGROK_HOST"]
+  end
 
   # Do not eager load code on boot.
   config.eager_load = false

@@ -3,6 +3,8 @@ module Webhooks
     CHANNEL = "facebook"
     DEFAULT_VERIFY_TOKEN = "local-messenger-verify-token"
 
+    before_action :verify_webhook_signature, only: :create
+
     def show
       if valid_verification_request?
         render plain: params["hub.challenge"], status: :ok
@@ -19,8 +21,8 @@ module Webhooks
       if sender_id.blank? || content.blank?
         return render json: {
           errors: {
-            sender_id: ["can't be blank"],
-            content: ["can't be blank"]
+            sender_id: [ "can't be blank" ],
+            content: [ "can't be blank" ]
           }
         }, status: :unprocessable_entity
       end
@@ -50,6 +52,19 @@ module Webhooks
     end
 
     private
+
+    def verify_webhook_signature
+      app_secret = ENV["MESSENGER_APP_SECRET"]
+      signature = request.headers["X-Hub-Signature-256"]
+      signature_match = signature&.match(/\Asha256=([0-9a-f]{64})\z/i)
+
+      return head :forbidden if app_secret.blank? || signature_match.nil?
+
+      expected_signature = OpenSSL::HMAC.hexdigest("SHA256", app_secret, request.raw_post)
+      return if ActiveSupport::SecurityUtils.secure_compare(expected_signature, signature_match[1].downcase)
+
+      head :forbidden
+    end
 
     def valid_verification_request?
       params["hub.mode"] == "subscribe" &&
