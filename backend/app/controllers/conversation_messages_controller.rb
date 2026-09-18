@@ -19,7 +19,7 @@ class ConversationMessagesController < ApplicationController
   private
 
   def message_params
-    params.expect(conversation_message: [:channel, :external_customer_id, :content])
+    params.expect(conversation_message: [ :channel, :external_customer_id, :content ])
   end
 
   def serialize_conversation(conversation)

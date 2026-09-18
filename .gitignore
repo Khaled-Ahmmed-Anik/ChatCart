@@ -1,0 +1,10 @@
+# macOS metadata
+.DS_Store
+
+# Local Codex/generated artifacts
+/output/
+/tmp/
+
+# Editor settings
+/.idea/
+/.vscode/

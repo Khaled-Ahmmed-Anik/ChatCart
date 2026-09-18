@@ -13,7 +13,7 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
 
     response_body = JSON.parse(response.body)
     assert_equal 2, response_body.length
-    assert_equal ["Fresh Musk", "Vanilla Night"], response_body.map { |product| product["name"] }
+    assert_equal [ "Fresh Musk", "Vanilla Night" ], response_body.map { |product| product["name"] }
     assert_equal fresh.id, response_body.first["id"]
     assert_equal vanilla.id, response_body.second["id"]
   end
@@ -92,9 +92,9 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
 
     response_body = JSON.parse(response.body)
-    assert_equal ["Name can't be blank"], response_body.dig("errors", "name")
-    assert_equal ["Price must be greater than or equal to 0"], response_body.dig("errors", "price")
-    assert_equal ["Stock quantity must be greater than or equal to 0"], response_body.dig("errors", "stock_quantity")
+    assert_equal [ "Name can't be blank" ], response_body.dig("errors", "name")
+    assert_equal [ "Price must be greater than or equal to 0" ], response_body.dig("errors", "price")
+    assert_equal [ "Stock quantity must be greater than or equal to 0" ], response_body.dig("errors", "stock_quantity")
   end
 
   private

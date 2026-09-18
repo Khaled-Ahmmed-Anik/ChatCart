@@ -22,8 +22,8 @@ class ConversationsController < ApplicationController
   def render_missing_lookup_params
     render json: {
       errors: {
-        channel: ["can't be blank"],
-        external_customer_id: ["can't be blank"]
+        channel: [ "can't be blank" ],
+        external_customer_id: [ "can't be blank" ]
       }
     }, status: :unprocessable_entity
   end

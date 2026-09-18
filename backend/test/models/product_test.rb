@@ -5,14 +5,14 @@ class ProductTest < ActiveSupport::TestCase
     active_product = create_product(name: "Active Product", active: true)
     create_product(name: "Inactive Product", active: false)
 
-    assert_equal [active_product], Product.active.to_a
+    assert_equal [ active_product ], Product.active.to_a
   end
 
   test "in_stock scope returns only products with stock" do
     in_stock_product = create_product(name: "In Stock", stock_quantity: 1)
     create_product(name: "Out Of Stock", stock_quantity: 0)
 
-    assert_equal [in_stock_product], Product.in_stock.to_a
+    assert_equal [ in_stock_product ], Product.in_stock.to_a
   end
 
   test "validates required and non-negative attributes" do

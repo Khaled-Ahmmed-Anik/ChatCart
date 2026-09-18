@@ -210,6 +210,6 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
 
     response_body = JSON.parse(response.body)
-    assert_equal ["Content can't be blank"], response_body.dig("errors", "content")
+    assert_equal [ "Content can't be blank" ], response_body.dig("errors", "content")
   end
 end

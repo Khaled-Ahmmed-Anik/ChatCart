@@ -39,9 +39,9 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "active", response_body["status"]
     assert_equal conversation.last_message_at.iso8601, response_body["last_message_at"]
 
-    assert_equal [customer_message.id, bot_message.id], response_body["messages"].map { |message| message["id"] }
-    assert_equal ["customer", "bot"], response_body["messages"].map { |message| message["sender_type"] }
-    assert_equal ["I want Fresh Musk", "How many bottles?"], response_body["messages"].map { |message| message["content"] }
+    assert_equal [ customer_message.id, bot_message.id ], response_body["messages"].map { |message| message["id"] }
+    assert_equal [ "customer", "bot" ], response_body["messages"].map { |message| message["sender_type"] }
+    assert_equal [ "I want Fresh Musk", "How many bottles?" ], response_body["messages"].map { |message| message["content"] }
 
     serialized_pending_order = response_body["pending_order"]
     assert_equal pending_order.id, serialized_pending_order["id"]
@@ -95,7 +95,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
 
     response_body = JSON.parse(response.body)
-    assert_equal ["can't be blank"], response_body.dig("errors", "channel")
-    assert_equal ["can't be blank"], response_body.dig("errors", "external_customer_id")
+    assert_equal [ "can't be blank" ], response_body.dig("errors", "channel")
+    assert_equal [ "can't be blank" ], response_body.dig("errors", "external_customer_id")
   end
 end

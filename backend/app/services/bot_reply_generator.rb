@@ -43,7 +43,7 @@ class BotReplyGenerator
     [
       "Please confirm your order:",
       "#{pending_order.quantity} x #{pending_order.product.name}",
-      "Total: #{pending_order.total_price.to_s}",
+      "Total: #{pending_order.total_price}",
       "Name: #{pending_order.customer_name}",
       "Phone: #{pending_order.phone}",
       "Address: #{pending_order.address}",
