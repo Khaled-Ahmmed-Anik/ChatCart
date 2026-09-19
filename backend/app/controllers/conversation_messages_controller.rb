@@ -28,7 +28,8 @@ class ConversationMessagesController < ApplicationController
       channel: conversation.channel,
       external_customer_id: conversation.external_customer_id,
       status: conversation.status,
-      last_message_at: conversation.last_message_at&.iso8601
+      last_message_at: conversation.last_message_at&.iso8601,
+      conversation_state: conversation.conversation_state
     }
   end
 

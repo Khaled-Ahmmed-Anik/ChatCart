@@ -12,7 +12,8 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
         entities: {},
         language: "banglish",
         sentiment: "neutral",
-        needs_clarification: false
+        needs_clarification: false,
+        possible_intents: []
       }
     )
 
@@ -36,7 +37,8 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
         entities: {},
         language: "banglish",
         sentiment: "neutral",
-        needs_clarification: false
+        needs_clarification: false,
+        possible_intents: %w[select_product product_details]
       }
     )
 
@@ -45,6 +47,7 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
 
       assert result.present?
       assert result.needs_clarification
+      assert_equal %w[select_product product_details], result.possible_intents
     end
   end
 
@@ -62,7 +65,8 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
         entities: {},
         language: "english",
         sentiment: "neutral",
-        needs_clarification: false
+        needs_clarification: false,
+        possible_intents: []
       }
     )
 
@@ -82,7 +86,8 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
         entities: {},
         language: "banglish",
         sentiment: "neutral",
-        needs_clarification: false
+        needs_clarification: false,
+        possible_intents: []
       }
     )
 

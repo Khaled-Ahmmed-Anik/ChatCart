@@ -4,7 +4,7 @@ class AiIntentClassifier
   API_URL = "https://generativelanguage.googleapis.com/v1beta/models/%{model}:generateContent"
   DEFAULT_MODEL = "gemini-3.5-flash-lite"
   MINIMUM_CONFIDENCE = 0.65
-  Result = Data.define(:intent, :confidence, :entities, :language, :sentiment, :needs_clarification)
+  Result = Data.define(:intent, :confidence, :entities, :language, :sentiment, :needs_clarification, :possible_intents)
 
   def initialize(message:, pending_order:, recent_messages:, api_key: ENV["GEMINI_API_KEY"], model: ENV["GEMINI_MODEL"])
     @message = message
@@ -59,7 +59,8 @@ class AiIntentClassifier
       entities: parsed.fetch("entities", {}).to_h.with_indifferent_access,
       language: parsed.fetch("language", "english"),
       sentiment: parsed.fetch("sentiment", "neutral"),
-      needs_clarification: parsed.fetch("needs_clarification", false) || confidence < MINIMUM_CONFIDENCE
+      needs_clarification: parsed.fetch("needs_clarification", false) || confidence < MINIMUM_CONFIDENCE,
+      possible_intents: valid_possible_intents(parsed.fetch("possible_intents", []))
     )
   end
 
@@ -89,7 +90,9 @@ class AiIntentClassifier
       Classify messages for a Bangladesh online shop. Understand English, Bengali script, and Banglish.
       Choose exactly one registered intent. Extract only values explicitly stated by the customer.
       Never invent products, quantities, personal details, prices, policies, or order facts.
-      Set needs_clarification true when the request is ambiguous. Return only the requested JSON object.
+      Set needs_clarification true when the request is ambiguous. When it is true, provide the two or three
+      most likely registered intents in possible_intents; otherwise return an empty possible_intents array.
+      Return only the requested JSON object.
     PROMPT
   end
 
@@ -97,6 +100,7 @@ class AiIntentClassifier
     <<~CONTEXT
       Registered intents: #{ConversationIntentRegistry::INTENTS.join(", ")}
       Current order status: #{pending_order&.status || "none"}
+      Remembered conversation state: #{remembered_state.to_json}
       Available products: #{Product.active.in_stock.order(:name).pluck(:name).join(", ")}
       Recent conversation:
       #{sanitized_history}
@@ -108,6 +112,12 @@ class AiIntentClassifier
     recent_messages.last(6).map do |recent_message|
       "#{recent_message.sender_type}: #{sanitize(recent_message.content)}"
     end.join("\n")
+  end
+
+  def remembered_state
+    message.conversation.conversation_state.to_h.slice(
+      "preferred_language", "pending_question", "last_intent", "last_outcome"
+    )
   end
 
   def sanitize(value)
@@ -133,9 +143,17 @@ class AiIntentClassifier
         },
         language: { type: "STRING", enum: %w[english banglish bengali] },
         sentiment: { type: "STRING", enum: %w[positive neutral negative] },
-        needs_clarification: { type: "BOOLEAN" }
+        needs_clarification: { type: "BOOLEAN" },
+        possible_intents: {
+          type: "ARRAY",
+          items: { type: "STRING", enum: ConversationIntentRegistry::INTENTS }
+        }
       },
-      required: %w[intent confidence entities language sentiment needs_clarification]
+      required: %w[intent confidence entities language sentiment needs_clarification possible_intents]
     }
+  end
+
+  def valid_possible_intents(intents)
+    Array(intents).select { |intent| ConversationIntentRegistry.valid?(intent) }.first(3)
   end
 end

@@ -10,12 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_19_000300) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "conversations", force: :cascade do |t|
     t.string "channel", null: false
+    t.jsonb "conversation_state", default: {}, null: false
     t.datetime "created_at", null: false
     t.string "external_customer_id", null: false
     t.datetime "last_message_at"

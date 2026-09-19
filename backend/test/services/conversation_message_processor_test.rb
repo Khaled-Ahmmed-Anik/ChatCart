@@ -331,14 +331,15 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     )
   end
 
-  def ai_interpretation(intent:, entities: {}, confidence: 0.95, needs_clarification: false)
+  def ai_interpretation(intent:, entities: {}, confidence: 0.95, needs_clarification: false, possible_intents: [])
     AiIntentClassifier::Result.new(
       intent: intent,
       confidence: confidence,
       entities: entities.with_indifferent_access,
       language: "banglish",
       sentiment: "neutral",
-      needs_clarification: needs_clarification
+      needs_clarification: needs_clarification,
+      possible_intents: possible_intents
     )
   end
 end

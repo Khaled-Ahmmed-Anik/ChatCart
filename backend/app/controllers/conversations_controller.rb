@@ -35,6 +35,7 @@ class ConversationsController < ApplicationController
       external_customer_id: conversation.external_customer_id,
       status: conversation.status,
       last_message_at: conversation.last_message_at&.iso8601,
+      conversation_state: conversation.conversation_state,
       messages: conversation.messages.order(:created_at, :id).map { |message| serialize_message(message) },
       pending_order: serialize_pending_order(conversation.pending_order)
     }

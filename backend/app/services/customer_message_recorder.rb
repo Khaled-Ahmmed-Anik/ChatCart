@@ -1,5 +1,8 @@
 class CustomerMessageRecorder
-  Result = Struct.new(:conversation, :message, :bot_reply, :pending_order, :outcome, :interpretation, keyword_init: true)
+  Result = Struct.new(
+    :conversation, :message, :bot_reply, :pending_order, :outcome, :interpretation, :response_plan,
+    keyword_init: true
+  )
 
   def initialize(channel:, external_customer_id:, content:, metadata: {})
     @channel = channel
@@ -15,6 +18,7 @@ class CustomerMessageRecorder
     pending_order = nil
     outcome = nil
     interpretation = nil
+    response_plan = nil
 
     Conversation.transaction do
       conversation = find_or_create_conversation
@@ -34,19 +38,22 @@ class CustomerMessageRecorder
       )
       processor.process
       outcome = processor.outcome
-      fallback_reply = BotReplyGenerator.new(
+      response_plan = ConversationResponsePlanner.new(
+        conversation: conversation,
         pending_order: pending_order,
         customer_message: message,
         outcome: outcome,
         interpretation: interpretation
-      ).content
+      ).plan
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
         content: AiConversationAssistant.new(
           customer_message: message,
           pending_order: pending_order,
-          outcome: outcome
-        ).rewrite(fallback: fallback_reply)
+          outcome: outcome,
+          language: response_plan.language,
+          tone: response_plan.tone
+        ).rewrite(fallback: response_plan.content)
       )
     end
 
@@ -56,7 +63,8 @@ class CustomerMessageRecorder
       bot_reply: bot_reply,
       pending_order: pending_order,
       outcome: outcome,
-      interpretation: interpretation
+      interpretation: interpretation,
+      response_plan: response_plan
     )
   end
 

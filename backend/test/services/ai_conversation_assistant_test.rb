@@ -9,7 +9,7 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
   end
 
   test "rewrites an approved reply in the customer's conversational style" do
-    assistant = build_assistant(api_key: "gemini-key")
+    assistant = build_assistant(api_key: "gemini-key", language: "banglish", tone: "calm_and_helpful")
     response = fake_response(
       code: 200,
       body: gemini_response(reply: "Sure bhai 😊 Fresh Musk er koyta bottle niben?")
@@ -30,6 +30,8 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
     request_body = JSON.parse(captured_request.body)
     assert_equal "application/json", request_body.dig("generationConfig", "responseMimeType")
     assert_includes request_body.dig("contents", 0, "parts", 0, "text"), "Customer message"
+    assert_includes request_body.dig("contents", 0, "parts", 0, "text"), "Preferred language: banglish"
+    assert_includes request_body.dig("contents", 0, "parts", 0, "text"), "Response tone: calm_and_helpful"
   end
 
   test "rejects an AI reply that drops protected order facts" do
@@ -60,12 +62,16 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
 
   private
 
-  def build_assistant(api_key:, pending_order: create_pending_order(status: :collecting_product))
+  def build_assistant(
+    api_key:, pending_order: create_pending_order(status: :collecting_product), language: nil, tone: nil
+  )
     message = pending_order.conversation.messages.create!(sender_type: :customer, content: "Fresh Musk koyta ache bhai?")
     AiConversationAssistant.new(
       customer_message: message,
       pending_order: pending_order,
       outcome: :stock_inquiry,
+      language: language,
+      tone: tone,
       api_key: api_key,
       model: "gemini-2.5-flash-lite"
     )

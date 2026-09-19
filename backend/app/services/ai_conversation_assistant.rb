@@ -5,10 +5,15 @@ class AiConversationAssistant
   DEFAULT_MODEL = "gemini-3.5-flash-lite"
   MAX_REPLY_LENGTH = 1_200
 
-  def initialize(customer_message:, pending_order:, outcome:, api_key: ENV["GEMINI_API_KEY"], model: ENV["GEMINI_MODEL"])
+  def initialize(
+    customer_message:, pending_order:, outcome:, language: nil, tone: nil,
+    api_key: ENV["GEMINI_API_KEY"], model: ENV["GEMINI_MODEL"]
+  )
     @customer_message = customer_message
     @pending_order = pending_order
     @outcome = outcome
+    @language = language
+    @tone = tone
     @api_key = api_key
     @model = model.presence || DEFAULT_MODEL
   end
@@ -25,7 +30,7 @@ class AiConversationAssistant
 
   private
 
-  attr_reader :customer_message, :pending_order, :outcome, :api_key, :model
+  attr_reader :customer_message, :pending_order, :outcome, :language, :tone, :api_key, :model
 
   def request_reply(fallback)
     uri = URI(format(API_URL, model: model))
@@ -95,6 +100,8 @@ class AiConversationAssistant
       Customer message: #{customer_message.content.to_json}
       Order status: #{pending_order.status}
       Processing outcome: #{outcome}
+      Preferred language: #{language || "match the customer"}
+      Response tone: #{tone || "friendly"}
       Approved factual reply: #{fallback.to_json}
 
       Rewrite the approved reply in the customer's language and tone. Keep it under 600 characters unless it is an order summary.
