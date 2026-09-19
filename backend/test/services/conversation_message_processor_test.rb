@@ -137,6 +137,26 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :awaiting_confirmation?
   end
 
+  test "keeps the order pending when the customer will confirm later" do
+    [ "I will confirm later", "will confirm letter", "pore confirm korbo", "ekhon na" ].each do |content|
+      pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+      processor = process_message(pending_order, content)
+
+      assert_equal :confirmation_deferred, processor.outcome, content
+      assert_predicate pending_order.reload, :awaiting_confirmation?, content
+    end
+  end
+
+  test "recognizes change the order while awaiting confirmation" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    processor = process_message(pending_order, "change the order")
+
+    assert_equal :order_change_requested, processor.outcome
+    assert_predicate pending_order.reload, :awaiting_confirmation?
+  end
+
   test "updates order details using natural correction commands" do
     pending_order = create_ready_pending_order(status: :awaiting_confirmation)
 
@@ -210,6 +230,71 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_nil pending_order.customer_name
   end
 
+  test "collects multiple explicitly extracted details from one message" do
+    product = create_product(name: "Fresh Musk", stock_quantity: 10)
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(
+      sender_type: :customer,
+      content: "Fresh Musk 2 ta, name Khaled, phone 01712345678, address Dhaka"
+    )
+    interpretation = ai_interpretation(
+      intent: "select_product",
+      entities: {
+        product_name: product.name,
+        quantity: 2,
+        customer_name: "Khaled",
+        phone: "01712345678",
+        address: "Dhaka"
+      }
+    )
+
+    processor = ConversationMessageProcessor.new(
+      message: message,
+      pending_order: pending_order,
+      interpretation: interpretation
+    )
+    processor.process
+
+    pending_order.reload
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal product, pending_order.product
+    assert_equal 2, pending_order.quantity
+    assert_equal "Khaled", pending_order.customer_name
+    assert_equal "01712345678", pending_order.phone
+    assert_equal "Dhaka", pending_order.address
+    assert_predicate pending_order, :awaiting_confirmation?
+  end
+
+  test "routes a confident conversational AI intent without changing the order" do
+    pending_order = create_ready_pending_order(status: :confirmed)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "kemon asen?")
+    processor = ConversationMessageProcessor.new(
+      message: message,
+      pending_order: pending_order,
+      interpretation: ai_interpretation(intent: "wellbeing")
+    )
+
+    processor.process
+
+    assert_equal :wellbeing, processor.outcome
+    assert_predicate pending_order.reload, :confirmed?
+  end
+
+  test "asks for clarification when AI confidence is low" do
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "oi ta den")
+    processor = ConversationMessageProcessor.new(
+      message: message,
+      pending_order: pending_order,
+      interpretation: ai_interpretation(intent: "select_product", confidence: 0.4, needs_clarification: true)
+    )
+
+    processor.process
+
+    assert_equal :clarification_needed, processor.outcome
+    assert_nil pending_order.reload.product
+  end
+
   private
 
   def process_message(pending_order, content)
@@ -243,6 +328,17 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
         phone: "+8801712345678",
         address: "Dhaka"
       }.merge(attributes)
+    )
+  end
+
+  def ai_interpretation(intent:, entities: {}, confidence: 0.95, needs_clarification: false)
+    AiIntentClassifier::Result.new(
+      intent: intent,
+      confidence: confidence,
+      entities: entities.with_indifferent_access,
+      language: "banglish",
+      sentiment: "neutral",
+      needs_clarification: needs_clarification
     )
   end
 end

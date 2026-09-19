@@ -1,8 +1,9 @@
 class BotReplyGenerator
-  def initialize(pending_order:, customer_message: nil, outcome: nil)
+  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil)
     @pending_order = pending_order
     @customer_message = customer_message
     @outcome = outcome&.to_sym
+    @interpretation = interpretation
   end
 
   def content
@@ -11,7 +12,7 @@ class BotReplyGenerator
 
   private
 
-  attr_reader :pending_order, :customer_message, :outcome
+  attr_reader :pending_order, :customer_message, :outcome, :interpretation
 
   def outcome_reply
     case outcome
@@ -19,16 +20,60 @@ class BotReplyGenerator
       "Hi! 👋 Welcome to ChatCart. #{status_prompt}"
     when :help
       help_reply
+    when :wellbeing
+      "Alhamdulillah, I’m doing well 😊 How can I help with your order today?"
     when :thanks
       "You’re welcome! #{status_prompt}"
+    when :goodbye
+      "Thanks for chatting with ChatCart. Take care! 👋"
+    when :bot_identity
+      "I’m ChatCart’s automated shopping assistant. I can help with products, orders, delivery questions, and connect you with the seller when needed."
+    when :language_preference
+      "Of course—I can continue in English, বাংলা, or Banglish."
+    when :complaint
+      "I’m sorry you’ve had a frustrating experience. Please briefly describe the issue, and I’ll help route it to the seller."
+    when :human_agent
+      "I’ll mark this for seller assistance. Please leave a short description of what you need help with."
+    when :clarification_needed
+      clarification_reply
     when :price_inquiry
       product_information(:price)
     when :stock_inquiry
       product_information(:stock)
+    when :product_list_requested
+      product_selection_prompt
+    when :product_details_requested
+      product_details_reply
+    when :product_recommendation_requested, :alternative_product_requested
+      product_recommendation_reply
+    when :product_comparison_requested
+      product_comparison_reply
+    when :product_variants_requested, :product_images_requested
+      "I don’t have those product details configured yet. Please ask the seller, or choose from the available products: #{available_product_names}."
     when :restarted
       "No problem—we’ll start a fresh order. #{product_selection_prompt}"
     when :order_details_requested
       order_details_reply
+    when :order_history_requested
+      order_history_reply
+    when :resume_order_requested
+      "Let’s continue where we left off. #{status_prompt}"
+    when :payment_methods_requested
+      configured_policy("payment methods", ENV["SHOP_PAYMENT_METHODS"])
+    when :cash_on_delivery_requested
+      configured_policy("cash on delivery", ENV["SHOP_CASH_ON_DELIVERY"])
+    when :delivery_charge_requested
+      configured_policy("delivery charges", ENV["SHOP_DELIVERY_CHARGES"])
+    when :delivery_area_requested
+      configured_policy("delivery areas", ENV["SHOP_DELIVERY_AREAS"])
+    when :delivery_time_requested
+      configured_policy("delivery times", ENV["SHOP_DELIVERY_TIME"])
+    when :return_requested
+      after_sales_reply("return")
+    when :replacement_requested
+      after_sales_reply("replacement")
+    when :refund_requested
+      after_sales_reply("refund")
     when :product_selected
       "Nice choice! #{quantity_prompt}"
     when :product_unavailable
@@ -49,12 +94,16 @@ class BotReplyGenerator
       "Got it. What’s the full delivery address?"
     when :address_collected
       confirmation_prompt
+    when :multiple_details_collected
+      "Got it. #{status_prompt}"
     when :confirmation_unclear
       "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
+    when :confirmation_deferred
+      "No problem—your order is saved, but it isn’t confirmed yet. Send “confirm” whenever you’re ready, or say “change the order” to update it."
     when :order_updated
       "Done—I’ve updated it.\n\n#{confirmation_prompt}"
     when :confirmed_order_updated
-      "I’ve updated your confirmed order and reopened it for review.\n\n#{confirmation_prompt}"
+      "I’ve updated your confirmed order and reopened it for review. #{status_prompt}"
     when :order_change_requested
       order_change_help
     when :invalid_order_update
@@ -132,6 +181,66 @@ class BotReplyGenerator
 
     heading = pending_order.confirmed? ? "Here are your confirmed order details:" : "Here are your current order details:"
     confirmation_prompt.sub("Here’s your order summary:", heading)
+  end
+
+  def order_history_reply
+    orders = pending_order.conversation.pending_orders.order(created_at: :desc, id: :desc).limit(3)
+    return "You don’t have any previous orders yet." if orders.empty?
+
+    lines = orders.map do |order|
+      product = order.product&.name || "Product not selected"
+      quantity = order.quantity || "—"
+      "• Order ##{order.id}: #{quantity} × #{product} — #{order.status.humanize}"
+    end
+    ([ "Here are your latest orders:" ] + lines).join("\n")
+  end
+
+  def product_details_reply
+    product = mentioned_product
+    return product_selection_prompt if product.blank?
+
+    details = [ "#{product.name} costs #{formatted_price(product.price)}." ]
+    details << product.description if product.description.present?
+    details << "#{product.stock_quantity} currently in stock."
+    details.join(" ")
+  end
+
+  def product_recommendation_reply
+    products = Product.active.in_stock.order(stock_quantity: :desc, name: :asc).limit(3)
+    return "Sorry, no products are currently available." if products.empty?
+
+    "Popular available options are #{products.map { |product| "#{product.name} (#{formatted_price(product.price)})" }.to_sentence}."
+  end
+
+  def product_comparison_reply
+    products = Product.active.in_stock.order(:name).limit(4)
+    return "I need at least two available products to compare." if products.size < 2
+
+    products.map do |product|
+      "• #{product.name}: #{formatted_price(product.price)}, #{product.stock_quantity} in stock"
+    end.join("\n")
+  end
+
+  def clarification_reply
+    "I’m not fully sure what you’d like to do. You can ask about products, price, delivery, your order, or say “new order”."
+  end
+
+  def configured_policy(topic, value)
+    return value if value.present?
+
+    "The #{topic} information hasn’t been configured yet. Please ask the seller for confirmation."
+  end
+
+  def after_sales_reply(request_type)
+    policy = ENV["SHOP_RETURN_POLICY"]
+    introduction = "I can help send your #{request_type} request to the seller."
+    return "#{introduction} Please share your order number and what happened." if policy.blank?
+
+    "#{introduction} #{policy} Please share your order number and what happened."
+  end
+
+  def available_product_names
+    Product.active.in_stock.order(:name).pluck(:name).to_sentence.presence || "none right now"
   end
 
   def product_information(kind)

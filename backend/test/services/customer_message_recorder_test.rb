@@ -115,6 +115,25 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal 3, order.quantity
   end
 
+  test "acknowledges deferred confirmation without repeating the order summary" do
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
+    conversation.create_pending_order!(
+      product: product,
+      quantity: 2,
+      customer_name: "Khaled",
+      phone: "01712345678",
+      address: "Dhaka",
+      status: :awaiting_confirmation
+    )
+
+    result = record_message("I will confirm later")
+
+    assert_equal :confirmation_deferred, result.outcome
+    assert_includes result.bot_reply.content, "isn’t confirmed yet"
+    assert_not_includes result.bot_reply.content, "order summary"
+  end
+
   test "returns confirmed order details in response to a Banglish request" do
     product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
