@@ -1,6 +1,7 @@
 const state = {
   baseUrl: localStorage.getItem("chatcart_api_url") || "http://localhost:3000",
   token: localStorage.getItem("chatcart_api_token") || "",
+  actorType: localStorage.getItem("chatcart_actor_type") || "",
   business: null,
   view: "overview"
 };
@@ -33,21 +34,38 @@ function flash(message, error = false) {
 }
 
 async function connect() {
-  state.business = await api("/api/business");
+  if (state.actorType === "platform_administrator") {
+    await api("/admin/businesses");
+    state.business = { name: "ChatCart Platform" };
+    state.view = "businesses";
+  } else {
+    state.business = await api("/api/business");
+    state.view = "overview";
+  }
   localStorage.setItem("chatcart_api_url", state.baseUrl);
   localStorage.setItem("chatcart_api_token", state.token);
+  localStorage.setItem("chatcart_actor_type", state.actorType);
   $("#connection-panel").hidden = true;
   $("#workspace").hidden = false;
   $("#business-badge").textContent = state.business.name;
+  configureNavigation();
   await render();
+}
+
+function configureNavigation() {
+  const items = state.actorType === "platform_administrator"
+    ? [["businesses", "Businesses"]]
+    : [["overview", "Overview"], ["orders", "Orders"], ["conversations", "Conversations"], ["products", "Products"], ["settings", "Business setup"]];
+  const navigation = $("#navigation"); navigation.replaceChildren();
+  items.forEach(([view, label]) => { const button=el("button",label); button.dataset.view=view; button.classList.toggle("active",view===state.view); navigation.append(button); });
 }
 
 async function render() {
   $("#page-title").textContent = state.view[0].toUpperCase() + state.view.slice(1);
   $("#view").replaceChildren($("#loading").content.cloneNode(true));
   try {
-    await ({ overview: renderOverview, orders: renderOrders, conversations: renderConversations,
-      products: renderProducts, settings: renderSettings })[state.view]();
+    await ({ businesses: renderBusinesses, overview: renderOverview, orders: renderOrders,
+      conversations: renderConversations, products: renderProducts, settings: renderSettings })[state.view]();
   } catch (error) {
     $("#view").replaceChildren(el("div", error.message, "panel danger"));
   }
@@ -66,6 +84,23 @@ async function renderOverview() {
   const grid = el("div", undefined, "grid");
   grid.append(keyValuePanel("Orders by status", data.orders_by_status), keyValuePanel("Orders by channel", data.orders_by_channel), keyValuePanel("Top products", data.top_products));
   $("#view").replaceChildren(root, grid);
+}
+
+async function renderBusinesses() {
+  const businesses = await api("/admin/businesses");
+  const panel = el("div", undefined, "panel"); const toolbar = el("div", undefined, "toolbar"); toolbar.append(el("h2", "Businesses"));
+  const add = el("button", "Add business"); add.onclick = businessDialog; toolbar.append(add); panel.append(toolbar);
+  panel.append(table(["Business", "Slug", "Category", "Status", "Created"], businesses.map(business => [
+    business.name, business.slug, business.category || "—", business.status, new Date(business.created_at).toLocaleDateString()
+  ])));
+  $("#view").replaceChildren(panel);
+}
+
+function businessDialog() {
+  const dialog=document.createElement("dialog"); const body=el("div",undefined,"dialog-body"); body.append(el("h2","Add a business"));
+  const form=el("form"); form.innerHTML=`<div class="form-grid"><label>Business name<input name="name" required></label><label>Slug<input name="slug" pattern="[a-z0-9-]+" required></label><label>Category<input name="category" required></label><label>Default language<select name="default_language"><option>banglish</option><option>english</option><option>bengali</option></select></label></div><h3>Business owner</h3><div class="form-grid"><label>Name<input name="owner_name" required></label><label>Email<input name="owner_email" type="email" required></label><label class="wide">Temporary password<input name="owner_password" type="password" minlength="12" required></label></div><button>Create business</button>`;
+  form.onsubmit=async event=>{event.preventDefault(); const values=Object.fromEntries(new FormData(form)); const payload={business:{name:values.name,slug:values.slug,category:values.category,default_language:values.default_language,timezone:"Asia/Dhaka",currency:"BDT"},owner:{name:values.owner_name,email:values.owner_email,password:values.owner_password}}; await api("/admin/businesses",{method:"POST",body:JSON.stringify(payload)}); dialog.close();dialog.remove();flash("Business and owner created");render();};
+  body.append(form);dialog.append(body);document.body.append(dialog);dialog.showModal();
 }
 
 function keyValuePanel(title, values) {
@@ -154,7 +189,13 @@ function table(headers, rows) {
 }
 function actionButton(label, handler) { const button=el("button",label,"secondary"); button.onclick=handler; return button; }
 
-$("#connection-form").onsubmit = async event => { event.preventDefault(); state.baseUrl=$("#api-url").value.replace(/\/$/,""); state.token=$("#api-token").value; try { await connect(); } catch(error) { flash(error.message,true); } };
+$("#connection-form").onsubmit = async event => {
+  event.preventDefault(); state.baseUrl=$("#api-url").value.replace(/\/$/,"");
+  try {
+    const level=$("#account-level").value; const response=await fetch(`${state.baseUrl}/auth/${level === "admin" ? "admin/" : ""}login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("#login-email").value,password:$("#login-password").value})});
+    const result=await response.json(); if(!response.ok) throw new Error(result.error || "Sign in failed"); state.token=result.token; state.actorType=result.actor_type; await connect();
+  } catch(error) { flash(error.message,true); }
+};
 $("#navigation").onclick = event => { const button=event.target.closest("button[data-view]"); if(!button)return; state.view=button.dataset.view; document.querySelectorAll("nav button").forEach(item=>item.classList.toggle("active",item===button)); render(); };
-$("#disconnect").onclick = () => { localStorage.removeItem("chatcart_api_token"); location.reload(); };
-$("#api-url").value=state.baseUrl; if(state.token){ $("#api-token").value=state.token; connect().catch(()=>localStorage.removeItem("chatcart_api_token")); }
+$("#disconnect").onclick = async () => { await api("/auth/logout",{method:"DELETE"}).catch(()=>{}); localStorage.removeItem("chatcart_api_token");localStorage.removeItem("chatcart_actor_type");location.reload(); };
+$("#api-url").value=state.baseUrl; if(state.token){ connect().catch(()=>{localStorage.removeItem("chatcart_api_token");localStorage.removeItem("chatcart_actor_type");}); }

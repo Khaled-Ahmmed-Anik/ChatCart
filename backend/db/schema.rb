@@ -10,9 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_20_000300) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "auth_sessions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "ip_address"
+    t.datetime "last_used_at"
+    t.bigint "platform_administrator_id"
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.string "user_agent"
+    t.bigint "user_id"
+    t.index ["expires_at"], name: "index_auth_sessions_on_expires_at"
+    t.index ["platform_administrator_id"], name: "index_auth_sessions_on_platform_administrator_id"
+    t.index ["token_digest"], name: "index_auth_sessions_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_auth_sessions_on_user_id"
+    t.check_constraint "user_id IS NOT NULL AND platform_administrator_id IS NULL OR user_id IS NULL AND platform_administrator_id IS NOT NULL", name: "auth_sessions_exactly_one_actor"
+  end
 
   create_table "business_policies", force: :cascade do |t|
     t.text "additional_information"
@@ -199,6 +216,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000300) do
     t.index ["woo_commerce_order_id"], name: "index_pending_orders_on_woo_commerce_order_id"
   end
 
+  create_table "platform_administrators", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.datetime "last_seen_at"
+    t.string "name", null: false
+    t.string "password_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_platform_administrators_on_email", unique: true
+  end
+
   create_table "products", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.bigint "business_id", null: false
@@ -223,6 +251,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000300) do
     t.string "email", null: false
     t.datetime "last_seen_at"
     t.string "name", null: false
+    t.string "password_digest"
     t.string "role", default: "owner", null: false
     t.datetime "updated_at", null: false
     t.index ["api_token_digest"], name: "index_users_on_api_token_digest", unique: true
@@ -230,6 +259,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000300) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "auth_sessions", "platform_administrators"
+  add_foreign_key "auth_sessions", "users"
   add_foreign_key "business_policies", "businesses"
   add_foreign_key "channel_connections", "businesses"
   add_foreign_key "conversations", "businesses"

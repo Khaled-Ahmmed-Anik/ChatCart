@@ -36,7 +36,7 @@ module Admin
     end
 
     def owner_params
-      params.expect(owner: %i[name email])
+      params.expect(owner: %i[name email password])
     end
   end
 end

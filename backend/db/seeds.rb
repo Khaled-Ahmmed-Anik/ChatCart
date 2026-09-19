@@ -12,6 +12,27 @@ business = Business.default
 business.create_business_policy! unless business.business_policy
 business.create_delivery_integration! unless business.delivery_integration
 
+if ENV["PLATFORM_ADMIN_EMAIL"].present? && ENV["PLATFORM_ADMIN_PASSWORD"].present?
+  administrator = PlatformAdministrator.find_or_initialize_by(email: ENV["PLATFORM_ADMIN_EMAIL"])
+  administrator.name = "ChatCart Platform Administrator"
+  administrator.password = ENV["PLATFORM_ADMIN_PASSWORD"]
+  administrator.active = true
+  administrator.save!
+end
+
+if ENV["CHATCART_OWNER_EMAIL"].present? && ENV["CHATCART_OWNER_PASSWORD"].present?
+  owner = business.users.find_or_initialize_by(email: ENV["CHATCART_OWNER_EMAIL"])
+  _token, token_digest = User.issue_token if owner.api_token_digest.blank?
+  owner.assign_attributes(
+    name: "ChatCart Business Owner",
+    role: "owner",
+    active: true,
+    api_token_digest: owner.api_token_digest.presence || token_digest
+  )
+  owner.password = ENV["CHATCART_OWNER_PASSWORD"]
+  owner.save!
+end
+
 default_products = [
   {
     name: "The Blush",

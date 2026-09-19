@@ -1,5 +1,11 @@
 Rails.application.routes.draw do
   match "*path", to: "application#options", via: :options
+
+  namespace :auth do
+    post "login", to: "sessions#create"
+    delete "logout", to: "sessions#destroy"
+    post "admin/login", to: "admin_sessions#create"
+  end
   namespace :webhooks do
     get "messenger", to: "messenger#show"
     post "messenger", to: "messenger#create"

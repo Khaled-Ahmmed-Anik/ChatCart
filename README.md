@@ -76,7 +76,7 @@ cd frontend
 python3 -m http.server 4173
 ```
 
-Open `http://localhost:4173`, then enter the owner API token created during business onboarding.
+Open `http://localhost:4173`, select the account level, and sign in with email and password. Local seed accounts are configured through `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `CHATCART_OWNER_EMAIL`, and `CHATCART_OWNER_PASSWORD` in the ignored `backend/.env` file.
 
 Create a business and its first owner through the platform-admin API:
 
@@ -87,7 +87,7 @@ curl -X POST http://localhost:3000/admin/businesses \
   -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com"}}'
 ```
 
-The owner API token is returned once. Store it securely.
+The owner can immediately use the supplied email and password. Authentication returns an opaque 12-hour session token; passwords are stored only as salted PBKDF2 derivations.
 
 Check the application:
 
@@ -124,7 +124,7 @@ Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `
 | `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
 | `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
-All `/api` endpoints require `Authorization: Bearer <owner-or-staff-token>`. Platform administration uses the separately configured `PLATFORM_ADMIN_TOKEN`.
+Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. The original API-token path remains temporarily available for backward compatibility.
 
 ## Tests and code quality
 

@@ -27,11 +27,13 @@
 
       <section id="connection-panel" class="panel connection">
         <div><p class="eyebrow">Connect securely</p><h2>Open your business dashboard</h2>
-          <p>Enter the owner API token returned when the platform administrator creates your business.</p></div>
+          <p>Sign in as the ChatCart platform administrator or as a business owner/team member.</p></div>
         <form id="connection-form">
           <label>Backend URL<input id="api-url" value="http://localhost:3000" required></label>
-          <label>Owner API token<input id="api-token" type="password" required autocomplete="off"></label>
-          <button type="submit">Connect dashboard</button>
+          <label>Account level<select id="account-level"><option value="business">Business account</option><option value="admin">Platform administrator</option></select></label>
+          <label>Email<input id="login-email" type="email" required autocomplete="username"></label>
+          <label>Password<input id="login-password" type="password" required autocomplete="current-password"></label>
+          <button type="submit">Sign in</button>
         </form>
       </section>
 

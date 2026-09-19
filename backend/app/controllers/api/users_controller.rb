@@ -40,7 +40,7 @@ module Api
     end
 
     def user_params
-      params.expect(user: %i[name email role active])
+      params.expect(user: %i[name email password role active])
     end
   end
 end

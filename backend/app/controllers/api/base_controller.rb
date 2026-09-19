@@ -12,7 +12,8 @@ module Api
 
     def authenticate_user!
       token = request.authorization.to_s.delete_prefix("Bearer ")
-      @current_user = User.authenticate_token(token)
+      session = AuthSession.authenticate(token)
+      @current_user = session&.user || User.authenticate_token(token)
       return if current_user
 
       render json: { error: "Unauthorized" }, status: :unauthorized
