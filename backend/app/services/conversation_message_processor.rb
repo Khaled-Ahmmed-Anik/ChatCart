@@ -18,6 +18,7 @@ class ConversationMessageProcessor
       return pending_order
     end
 
+    return pending_order if handle_order_update_request
     return pending_order if handle_conversational_intent
 
     case pending_order.status
@@ -106,17 +107,43 @@ class ConversationMessageProcessor
     elsif cancellation?
       pending_order.cancelled!
       @outcome = :cancelled
-    elsif apply_correction
-      @outcome = :order_updated
     else
       @outcome = :confirmation_unclear
     end
+  end
+
+  def handle_order_update_request
+    return false unless order_change_request? || correction_command?
+    return false unless pending_order.status.in?(%w[awaiting_confirmation confirmed submitted_to_woocommerce cancelled])
+
+    @outcome = if pending_order.submitted_to_woocommerce?
+      :submitted_order_change_requested
+    elsif pending_order.cancelled?
+      :cancelled_order_change_requested
+    elsif order_change_request?
+      :order_change_requested
+    elsif apply_correction
+      reopen_confirmed_order
+    else
+      :invalid_order_update
+    end
+
+    true
+  end
+
+  def reopen_confirmed_order
+    return :order_updated unless pending_order.confirmed?
+
+    pending_order.update!(status: :awaiting_confirmation)
+    :confirmed_order_updated
   end
 
   def handle_conversational_intent
     @outcome = if restart_request?
       restart_order
       :restarted
+    elsif order_details_request?
+      :order_details_requested
     elsif greeting?
       :greeting
     elsif help_request?
@@ -150,11 +177,9 @@ class ConversationMessageProcessor
     when /\A(?:change|update)\s+(?:my\s+)?phone\s+(?:to\s+)?(.+)\z/i
       update_phone(Regexp.last_match(1))
     when /\A(?:change|update)\s+(?:my\s+)?name\s+(?:to\s+)?(.+)\z/i
-      pending_order.update!(customer_name: Regexp.last_match(1).strip)
-      true
+      record_change(:customer_name, Regexp.last_match(1).strip)
     when /\A(?:change|update)\s+(?:the\s+)?address\s+(?:to\s+)?(.+)\z/i
-      pending_order.update!(address: Regexp.last_match(1).strip)
-      true
+      record_change(:address, Regexp.last_match(1).strip)
     else
       false
     end
@@ -164,15 +189,31 @@ class ConversationMessageProcessor
     quantity = parse_quantity(value)
     return false if quantity.blank? || !pending_order.product.available_for_quantity?(quantity)
 
-    pending_order.update!(quantity: quantity)
-    true
+    record_change(:quantity, quantity)
   end
 
   def update_phone(value)
     phone = value.strip
     return false unless phone.match?(/\A[+\d][\d\s().-]{6,}\z/)
 
-    pending_order.update!(phone: phone)
+    record_change(:phone, phone)
+  end
+
+  def record_change(field, new_value)
+    return false if new_value.blank?
+
+    previous_value = pending_order.public_send(field)
+    return true if previous_value.to_s == new_value.to_s
+
+    history = pending_order.change_history.dup
+    history << {
+      "field" => field.to_s,
+      "from" => previous_value&.to_s,
+      "to" => new_value.to_s,
+      "changed_at" => Time.current.iso8601,
+      "message_id" => message.id
+    }
+    pending_order.update!(field => new_value, change_history: history)
     true
   end
 
@@ -231,7 +272,11 @@ class ConversationMessageProcessor
   end
 
   def restart_request?
-    content.downcase.strip.match?(/\A(restart|start over|new order|order again)[!. ]*\z/)
+    intent_detector.new_order?
+  end
+
+  def order_details_request?
+    intent_detector.order_details?
   end
 
   def price_question?
@@ -240,5 +285,17 @@ class ConversationMessageProcessor
 
   def stock_question?
     content.downcase.match?(/\b(stock|available|availability)\b/)
+  end
+
+  def order_change_request?
+    content.downcase.strip.match?(/\A(change|update|edit)\s+(my\s+)?(previous\s+|last\s+)?order[!. ]*\z/)
+  end
+
+  def correction_command?
+    content.match?(/\A(?:change|update)\s+(?:the\s+quantity|quantity|my\s+phone|phone|my\s+name|name|the\s+address|address)\b/i)
+  end
+
+  def intent_detector
+    @intent_detector ||= ConversationIntentDetector.new(content)
   end
 end

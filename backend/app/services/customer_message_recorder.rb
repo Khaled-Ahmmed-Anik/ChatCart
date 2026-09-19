@@ -23,7 +23,7 @@ class CustomerMessageRecorder
         content: content,
         metadata: metadata
       )
-      pending_order = conversation.pending_order || conversation.create_pending_order!
+      pending_order = pending_order_for(conversation)
       processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
       processor.process
       outcome = processor.outcome
@@ -60,5 +60,20 @@ class CustomerMessageRecorder
       channel: channel,
       external_customer_id: external_customer_id
     )
+  end
+
+  def pending_order_for(conversation)
+    current_order = conversation.pending_order
+    return conversation.create_pending_order! if current_order.blank?
+    return conversation.create_pending_order! if current_order.status.in?(%w[confirmed cancelled]) && starts_new_order?
+
+    current_order
+  end
+
+  def starts_new_order?
+    normalized_content = content.to_s.downcase.strip
+    return true if ConversationIntentDetector.new(normalized_content).new_order?
+
+    Product.find_each.any? { |product| normalized_content.include?(product.name.downcase) }
   end
 end

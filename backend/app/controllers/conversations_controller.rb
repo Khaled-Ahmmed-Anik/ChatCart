@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
     return render_missing_lookup_params if lookup_params_missing?
 
     conversation = Conversation
-      .includes(:messages, pending_order: :product)
+      .includes(:messages, pending_orders: :product)
       .find_by(channel: params[:channel], external_customer_id: params[:external_customer_id])
 
     if conversation.present?
@@ -62,6 +62,7 @@ class ConversationsController < ApplicationController
       phone: pending_order.phone,
       address: pending_order.address,
       woo_commerce_order_id: pending_order.woo_commerce_order_id,
+      change_history: pending_order.change_history,
       total_price: pending_order.total_price.to_s,
       ready_for_confirmation: pending_order.ready_for_confirmation?
     }

@@ -145,6 +145,56 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal :order_updated, processor.outcome
     assert_equal 3, pending_order.reload.quantity
     assert_predicate pending_order, :awaiting_confirmation?
+    assert_equal "quantity", pending_order.change_history.sole.fetch("field")
+    assert_equal "1", pending_order.change_history.sole.fetch("from")
+    assert_equal "3", pending_order.change_history.sole.fetch("to")
+    assert pending_order.change_history.sole.fetch("changed_at").present?
+    assert pending_order.change_history.sole.fetch("message_id").present?
+  end
+
+  test "explains how to update a confirmed order" do
+    pending_order = create_ready_pending_order(status: :confirmed)
+
+    processor = process_message(pending_order, "change my previous order")
+
+    assert_equal :order_change_requested, processor.outcome
+    assert_predicate pending_order.reload, :confirmed?
+    assert_empty pending_order.change_history
+  end
+
+  test "updates and reopens a confirmed order for confirmation" do
+    pending_order = create_ready_pending_order(status: :confirmed)
+
+    processor = process_message(pending_order, "change phone to 01812345678")
+
+    pending_order.reload
+    assert_equal :confirmed_order_updated, processor.outcome
+    assert_equal "01812345678", pending_order.phone
+    assert_predicate pending_order, :awaiting_confirmation?
+    assert_equal(
+      { "field" => "phone", "from" => "+8801712345678", "to" => "01812345678" },
+      pending_order.change_history.sole.slice("field", "from", "to")
+    )
+  end
+
+  test "does not update an order submitted to WooCommerce" do
+    pending_order = create_ready_pending_order(status: :submitted_to_woocommerce)
+
+    processor = process_message(pending_order, "change quantity to 3")
+
+    assert_equal :submitted_order_change_requested, processor.outcome
+    assert_equal 1, pending_order.reload.quantity
+    assert_empty pending_order.change_history
+  end
+
+  test "does not update a cancelled order" do
+    pending_order = create_ready_pending_order(status: :cancelled)
+
+    processor = process_message(pending_order, "change address to Chattogram")
+
+    assert_equal :cancelled_order_change_requested, processor.outcome
+    assert_equal "Dhaka", pending_order.reload.address
+    assert_empty pending_order.change_history
   end
 
   test "restarts an order without creating a new conversation" do

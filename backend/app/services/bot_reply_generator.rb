@@ -27,6 +27,8 @@ class BotReplyGenerator
       product_information(:stock)
     when :restarted
       "No problem—we’ll start a fresh order. #{product_selection_prompt}"
+    when :order_details_requested
+      order_details_reply
     when :product_selected
       "Nice choice! #{quantity_prompt}"
     when :product_unavailable
@@ -51,6 +53,16 @@ class BotReplyGenerator
       "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
     when :order_updated
       "Done—I’ve updated it.\n\n#{confirmation_prompt}"
+    when :confirmed_order_updated
+      "I’ve updated your confirmed order and reopened it for review.\n\n#{confirmation_prompt}"
+    when :order_change_requested
+      order_change_help
+    when :invalid_order_update
+      "I couldn’t apply that change. #{order_change_help}"
+    when :submitted_order_change_requested
+      "That order has already been submitted for processing, so I can’t change it automatically. Please contact the seller for help."
+    when :cancelled_order_change_requested
+      "That order was cancelled, so it can’t be edited. Send “new order” to start again."
     when :confirmed
       "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly."
     when :cancelled
@@ -109,6 +121,17 @@ class BotReplyGenerator
   def help_reply
     intro = "I can help you choose a product and place an order."
     "#{intro} #{status_prompt} You can send “new order” at any time to start over."
+  end
+
+  def order_change_help
+    "You can say “change quantity to 3”, “change phone to 01712345678”, “change name to Anik”, or “change address to Dhaka”."
+  end
+
+  def order_details_reply
+    return "You don’t have an order yet. #{product_selection_prompt}" if pending_order.product.blank?
+
+    heading = pending_order.confirmed? ? "Here are your confirmed order details:" : "Here are your current order details:"
+    confirmation_prompt.sub("Here’s your order summary:", heading)
   end
 
   def product_information(kind)

@@ -32,13 +32,23 @@ class ConversationTest < ActiveSupport::TestCase
     assert conversation.valid?
   end
 
-  test "destroys dependent messages and pending order" do
+  test "returns the latest pending order" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: "customer-1")
+    previous_order = conversation.create_pending_order!(status: :confirmed)
+    current_order = conversation.create_pending_order!
+
+    assert_equal current_order, conversation.pending_order
+    assert_not_equal previous_order, conversation.pending_order
+  end
+
+  test "destroys dependent messages and pending orders" do
     conversation = Conversation.create!(channel: "facebook", external_customer_id: "customer-1")
     conversation.messages.create!(sender_type: :customer, content: "Hi")
     conversation.create_pending_order!
+    conversation.create_pending_order!(status: :cancelled)
 
     assert_difference -> { Message.count }, -1 do
-      assert_difference -> { PendingOrder.count }, -1 do
+      assert_difference -> { PendingOrder.count }, -2 do
         conversation.destroy!
       end
     end
