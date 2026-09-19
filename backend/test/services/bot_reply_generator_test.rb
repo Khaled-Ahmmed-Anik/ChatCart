@@ -9,7 +9,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order).content
 
-    assert_includes reply, "Which product would you like?"
+    assert_includes reply, "What would you like to order?"
     assert_includes reply, "Fresh Musk"
     assert_includes reply, "Royal Oud"
     assert_not_includes reply, "Inactive Product"
@@ -20,7 +20,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(product: product, status: :collecting_quantity)
 
     assert_equal(
-      "Great choice. How many bottles of Fresh Musk would you like?",
+      "Fresh Musk is ৳750 per bottle. How many would you like?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -31,7 +31,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order).content
 
-    assert_includes reply, "Which product would you like?"
+    assert_includes reply, "What would you like to order?"
     assert_includes reply, "Fresh Musk"
   end
 
@@ -39,7 +39,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :collecting_name)
 
     assert_equal(
-      "Perfect. Please share your name for the order.",
+      "What name should I put on the order?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -48,7 +48,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :collecting_phone, customer_name: "Khaled")
 
     assert_equal(
-      "Thanks, Khaled. Please share your phone number.",
+      "What phone number should we use for the delivery?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -57,7 +57,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :collecting_address)
 
     assert_equal(
-      "Got it. Please share your delivery address.",
+      "What’s the full delivery address?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -74,9 +74,9 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order).content
 
-    assert_includes reply, "Please confirm your order:"
-    assert_includes reply, "2 x Fresh Musk"
-    assert_includes reply, "Total: 1500.0"
+    assert_includes reply, "Here’s your order summary:"
+    assert_includes reply, "2 × Fresh Musk"
+    assert_includes reply, "Total: ৳1500"
     assert_includes reply, "Name: Khaled"
     assert_includes reply, "Phone: +8801712345678"
     assert_includes reply, "Address: Dhaka"
@@ -86,7 +86,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :confirmed)
 
     assert_equal(
-      "Your order is confirmed. We will submit it for processing shortly.",
+      "Your order is already confirmed ✅",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -95,9 +95,44 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :cancelled)
 
     assert_equal(
-      "Your order has been cancelled. You can start again anytime.",
+      "This order is cancelled. Send “new order” whenever you’d like to begin again.",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
+  end
+
+  test "greets the customer and keeps the current prompt" do
+    Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    pending_order = create_pending_order(status: :collecting_product)
+
+    reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
+
+    assert_includes reply, "Hi! 👋 Welcome to ChatCart."
+    assert_includes reply, "Fresh Musk (৳750)"
+  end
+
+  test "explains invalid phone input" do
+    pending_order = create_pending_order(status: :collecting_phone)
+
+    reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :invalid_phone).content
+
+    assert_includes reply, "doesn’t look like a complete phone number"
+    assert_includes reply, "01712345678"
+  end
+
+  test "answers a product price question without changing the order" do
+    product = create_product(name: "Fresh Musk", price: 750)
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "Price of Fresh Musk?")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: :price_inquiry
+    ).content
+
+    assert_includes reply, "Fresh Musk is ৳750 per bottle."
+    assert_nil pending_order.reload.product
+    assert product.persisted?
   end
 
   private

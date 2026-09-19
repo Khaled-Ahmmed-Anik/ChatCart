@@ -17,6 +17,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal({ "source" => "messenger" }, result.message.metadata)
     assert_equal product, result.pending_order.product
     assert_predicate result.pending_order, :collecting_quantity?
-    assert_equal "Great choice. How many bottles of Fresh Musk would you like?", result.bot_reply.content
+    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", result.bot_reply.content
+    assert_equal :product_selected, result.outcome
   end
 end

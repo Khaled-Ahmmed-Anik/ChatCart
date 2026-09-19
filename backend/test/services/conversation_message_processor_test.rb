@@ -41,6 +41,17 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order, :collecting_name?
   end
 
+  test "collects a naturally written quantity" do
+    product = create_product(stock_quantity: 5)
+    pending_order = create_pending_order(product: product, status: :collecting_quantity)
+
+    processor = process_message(pending_order, "I would like two bottles please")
+
+    assert_equal 2, pending_order.reload.quantity
+    assert_predicate pending_order, :collecting_name?
+    assert_equal :quantity_collected, processor.outcome
+  end
+
   test "does not collect quantity beyond stock" do
     product = create_product(stock_quantity: 1)
     pending_order = create_pending_order(product: product, status: :collecting_quantity)
@@ -50,6 +61,26 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
 
     assert_nil pending_order.reload.quantity
     assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "explains invalid and unavailable quantities through outcomes" do
+    product = create_product(stock_quantity: 2)
+    pending_order = create_pending_order(product: product, status: :collecting_quantity)
+
+    assert_equal :invalid_quantity, process_message(pending_order, "a few").outcome
+    assert_equal :quantity_unavailable, process_message(pending_order, "5").outcome
+    assert_nil pending_order.reload.quantity
+  end
+
+  test "answers conversational intents without advancing the order" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    assert_equal :greeting, process_message(pending_order, "Hello!").outcome
+    assert_equal :help, process_message(pending_order, "Can you help me?").outcome
+    assert_equal :thanks, process_message(pending_order, "Thank you").outcome
+    assert_equal :price_inquiry, process_message(pending_order, "What is the price of Fresh Musk?").outcome
+    assert_equal :stock_inquiry, process_message(pending_order, "Is Fresh Musk available?").outcome
+    assert_predicate pending_order.reload, :collecting_product?
   end
 
   test "collects name, phone, and address then awaits confirmation" do
@@ -106,11 +137,36 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :awaiting_confirmation?
   end
 
+  test "updates order details using natural correction commands" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    processor = process_message(pending_order, "change quantity to 3")
+
+    assert_equal :order_updated, processor.outcome
+    assert_equal 3, pending_order.reload.quantity
+    assert_predicate pending_order, :awaiting_confirmation?
+  end
+
+  test "restarts an order without creating a new conversation" do
+    pending_order = create_ready_pending_order(status: :awaiting_confirmation)
+
+    processor = process_message(pending_order, "new order")
+
+    pending_order.reload
+    assert_equal :restarted, processor.outcome
+    assert_predicate pending_order, :collecting_product?
+    assert_nil pending_order.product
+    assert_nil pending_order.quantity
+    assert_nil pending_order.customer_name
+  end
+
   private
 
   def process_message(pending_order, content)
     message = pending_order.conversation.messages.create!(sender_type: :customer, content: content)
-    ConversationMessageProcessor.new(message: message, pending_order: pending_order).process
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
+    processor.process
+    processor
   end
 
   def create_pending_order(attributes = {})

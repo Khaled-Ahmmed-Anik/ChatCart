@@ -1,5 +1,5 @@
 class CustomerMessageRecorder
-  Result = Struct.new(:conversation, :message, :bot_reply, :pending_order, keyword_init: true)
+  Result = Struct.new(:conversation, :message, :bot_reply, :pending_order, :outcome, keyword_init: true)
 
   def initialize(channel:, external_customer_id:, content:, metadata: {})
     @channel = channel
@@ -13,6 +13,7 @@ class CustomerMessageRecorder
     message = nil
     bot_reply = nil
     pending_order = nil
+    outcome = nil
 
     Conversation.transaction do
       conversation = find_or_create_conversation
@@ -23,10 +24,16 @@ class CustomerMessageRecorder
         metadata: metadata
       )
       pending_order = conversation.pending_order || conversation.create_pending_order!
-      ConversationMessageProcessor.new(message: message, pending_order: pending_order).process
+      processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
+      processor.process
+      outcome = processor.outcome
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
-        content: BotReplyGenerator.new(pending_order: pending_order).content
+        content: BotReplyGenerator.new(
+          pending_order: pending_order,
+          customer_message: message,
+          outcome: outcome
+        ).content
       )
     end
 
@@ -34,7 +41,8 @@ class CustomerMessageRecorder
       conversation: conversation,
       message: message,
       bot_reply: bot_reply,
-      pending_order: pending_order
+      pending_order: pending_order,
+      outcome: outcome
     )
   end
 
