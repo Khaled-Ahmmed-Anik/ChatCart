@@ -123,7 +123,7 @@ class AiConversationAssistant
       pending_order.address,
       formatted_total
     ].compact
-    catalog_facts = Product.find_each.flat_map do |product|
+    catalog_facts = pending_order.conversation.business.products.find_each.flat_map do |product|
       [ product.name, formatted_price(product.price) ]
     end
 

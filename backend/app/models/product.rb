@@ -1,4 +1,6 @@
 class Product < ApplicationRecord
+  belongs_to :business, default: -> { Business.default }
+
   scope :active, -> { where(active: true) }
   scope :in_stock, -> { where("stock_quantity > 0") }
 

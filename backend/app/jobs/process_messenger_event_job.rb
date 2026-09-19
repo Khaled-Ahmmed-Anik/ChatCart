@@ -10,7 +10,7 @@ class ProcessMessengerEventJob < ApplicationJob
     webhook_event.update!(status: "processing", last_error: nil)
     result = process_event(webhook_event)
 
-    SendMessengerReplyJob.perform_later(result.fetch(:delivery))
+    SendMessengerReplyJob.perform_later(result.fetch(:delivery)) if result[:delivery]
     log_processed(webhook_event, result)
   rescue StandardError => error
     webhook_event.update!(status: "failed", last_error: error.message) if webhook_event&.persisted?
@@ -38,16 +38,19 @@ class ProcessMessengerEventJob < ApplicationJob
 
     MessengerWebhookEvent.transaction do
       result = CustomerMessageRecorder.new(
+        business: webhook_event.business,
         channel: "facebook",
         external_customer_id: webhook_event.sender_id,
         content: webhook_event.payload.dig("message", "text"),
         metadata: webhook_event.payload
       ).record
-      delivery = MessengerDelivery.create!(
-        messenger_webhook_event: webhook_event,
-        message: result.bot_reply,
-        recipient_id: webhook_event.sender_id
-      )
+      if result.bot_reply
+        delivery = MessengerDelivery.create!(
+          messenger_webhook_event: webhook_event,
+          message: result.bot_reply,
+          recipient_id: webhook_event.sender_id
+        )
+      end
       webhook_event.update!(status: "processed", processed_at: Time.current, last_error: nil)
     end
 

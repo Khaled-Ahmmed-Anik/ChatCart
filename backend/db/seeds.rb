@@ -8,6 +8,10 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
+business = Business.default
+business.create_business_policy! unless business.business_policy
+business.create_delivery_integration! unless business.delivery_integration
+
 default_products = [
   {
     name: "The Blush",
@@ -52,9 +56,9 @@ default_products = [
 ]
 
 default_products.each do |attributes|
-  product = Product.find_or_initialize_by(name: attributes[:name])
+  product = business.products.find_or_initialize_by(name: attributes[:name])
   product.assign_attributes(attributes)
   product.save!
 end
 
-Product.where(name: [ "Fresh Musk", "Vanilla Night", "Royal Oud" ]).update_all(active: false)
+business.products.where(name: [ "Fresh Musk", "Vanilla Night", "Royal Oud" ]).update_all(active: false)

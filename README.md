@@ -1,18 +1,23 @@
 # ChatCart Messenger Order Assistant
 
-ChatCart is a Rails API that receives Facebook Messenger webhooks, guides a customer through a simple product-ordering conversation, stores the conversation and pending order in PostgreSQL, and replies through the Messenger Send API.
+ChatCart is a multi-business conversational-commerce platform. It receives Messenger webhooks, conducts English/Bengali/Banglish sales conversations, confirms durable orders, exposes an authenticated business dashboard, exports orders, and can submit confirmed orders to a delivery provider.
 
 ## Current capabilities
 
 - Meta webhook verification and SHA-256 request-signature validation
 - Messenger text-message ingestion and replies
+- Strict business tenancy with per-business users, products, policies, channels, and delivery settings
+- Role-based owner, admin, sales, fulfilment, and analyst access
 - Product catalog with price, stock, tags, and active status
 - Persistent conversations and message history
 - Guided collection of product, quantity, name, phone, and address
-- Local order confirmation or cancellation
+- Durable confirmed orders with immutable item and price snapshots
+- Dashboard analytics, order CSV export, conversation transcript, and human takeover
+- Automatic or manual delivery submission with retryable background jobs
+- A dependency-free responsive owner dashboard in `frontend/`
 - Seed catalog for the current ChatCart products
 
-Confirmed orders remain in the local database. WooCommerce submission is not implemented yet.
+Messenger is the currently implemented customer channel. Instagram and WhatsApp are represented in the channel model but require their channel-specific webhook and send adapters.
 
 ## Requirements
 
@@ -41,7 +46,11 @@ MESSENGER_VERIFY_TOKEN=choose-a-private-verification-token
 MESSENGER_PAGE_ACCESS_TOKEN=your-facebook-page-access-token
 MESSENGER_APP_SECRET=your-meta-app-secret
 NGROK_HOST=your-assigned-domain.ngrok-free.dev
+PLATFORM_ADMIN_TOKEN=generate-a-long-random-token
+DASHBOARD_ORIGIN=http://localhost:4173
 ```
+
+For production, generate database-encryption keys with `bin/rails db:encryption:init` and add the three generated `ACTIVE_RECORD_ENCRYPTION_*` values to the environment. Development and test derive stable local keys from the Rails application secret.
 
 Never commit `backend/.env` or real credentials.
 
@@ -59,6 +68,26 @@ In another terminal, start the tunnel using the domain assigned to your ngrok ac
 ```bash
 ngrok http --url=https://your-assigned-domain.ngrok-free.dev 3000
 ```
+
+Start the business dashboard in a third terminal:
+
+```bash
+cd frontend
+python3 -m http.server 4173
+```
+
+Open `http://localhost:4173`, then enter the owner API token created during business onboarding.
+
+Create a business and its first owner through the platform-admin API:
+
+```bash
+curl -X POST http://localhost:3000/admin/businesses \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com"}}'
+```
+
+The owner API token is returned once. Store it securely.
 
 Check the application:
 
@@ -86,8 +115,16 @@ Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `
 | `POST` | `/conversation_messages` | Exercise the conversation flow without Messenger |
 | `GET` | `/webhooks/messenger` | Meta webhook verification |
 | `POST` | `/webhooks/messenger` | Receive Messenger events |
+| `GET` | `/api/analytics` | Business conversion and customer analytics |
+| `GET` | `/api/orders` | Authenticated business order dashboard |
+| `GET` | `/api/orders/export` | Export the business's orders as CSV |
+| `GET` | `/api/conversations` | Conversation inbox and transcripts |
+| `POST` | `/api/conversations/:id/handover` | Pause automation for human takeover |
+| `GET/POST` | `/api/products` | Manage the current business's catalog |
+| `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
+| `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
-Internal product and conversation endpoints are not authenticated yet and should not be exposed publicly without additional protection.
+All `/api` endpoints require `Authorization: Bearer <owner-or-staff-token>`. Platform administration uses the separately configured `PLATFORM_ADMIN_TOKEN`.
 
 ## Tests and code quality
 
@@ -102,7 +139,7 @@ mise exec -- bin/brakeman --no-pager
 
 ```text
 backend/   Rails API, database migrations, services, and tests
-frontend/  Reserved for a future seller/admin interface
+frontend/  Dependency-free seller/admin dashboard
 ```
 
 The main application flow is implemented in:
@@ -115,9 +152,8 @@ The main application flow is implemented in:
 
 ## Known next steps
 
-- Messenger event deduplication and multi-event payload handling
-- Background delivery jobs and retries
-- Authentication for internal APIs
-- Confirmed-order management endpoints
-- Stable production hosting and monitoring
-- WooCommerce product and order synchronization
+- Implement the Instagram messaging adapter
+- Implement the WhatsApp Cloud API adapter
+- Add password/OAuth login and API-token rotation UX
+- Add delivery-provider-specific adapters and WooCommerce synchronization
+- Deploy the backend and dashboard to permanent HTTPS hosting

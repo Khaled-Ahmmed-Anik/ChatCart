@@ -1,6 +1,7 @@
 class PendingOrder < ApplicationRecord
   belongs_to :conversation
   belongs_to :product, optional: true
+  has_one :order, dependent: :restrict_with_error
 
   enum :status, {
     collecting_product: 0,

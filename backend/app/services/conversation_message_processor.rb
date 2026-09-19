@@ -187,6 +187,7 @@ class ConversationMessageProcessor
     return :order_updated unless was_confirmed
 
     pending_order.update!(status: :awaiting_confirmation) if pending_order.ready_for_confirmation?
+    pending_order.order&.update!(status: "revision_pending")
     :confirmed_order_updated
   end
 
@@ -259,7 +260,7 @@ class ConversationMessageProcessor
   end
 
   def update_product(name)
-    product = Product.active.in_stock.find_by("LOWER(name) = ?", name.downcase)
+    product = catalog.active.in_stock.find_by("LOWER(name) = ?", name.downcase)
     return false if product.blank?
 
     previous_product = pending_order.product
@@ -364,17 +365,21 @@ class ConversationMessageProcessor
   def matching_product
     interpreted_name = interpreted_entity(:product_name, for_intent: "select_product")
     if interpreted_name.present?
-      interpreted_product = Product.active.in_stock.find_by("LOWER(name) = ?", interpreted_name.downcase)
+      interpreted_product = catalog.active.in_stock.find_by("LOWER(name) = ?", interpreted_name.downcase)
       return interpreted_product if interpreted_product.present?
     end
 
-    Product.active.in_stock.find do |product|
+    catalog.active.in_stock.find do |product|
       content.downcase.include?(product.name.downcase)
     end
   end
 
   def named_unavailable_product?
-    Product.find_each.any? { |product| content.downcase.include?(product.name.downcase) }
+    catalog.find_each.any? { |product| content.downcase.include?(product.name.downcase) }
+  end
+
+  def catalog
+    pending_order.conversation.business.products
   end
 
   def parsed_quantity

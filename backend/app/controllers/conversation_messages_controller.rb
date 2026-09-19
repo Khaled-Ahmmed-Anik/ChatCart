@@ -1,6 +1,7 @@
 class ConversationMessagesController < ApplicationController
   def create
     result = CustomerMessageRecorder.new(
+      business: requested_business,
       channel: message_params[:channel],
       external_customer_id: message_params[:external_customer_id],
       content: message_params[:content]
@@ -9,7 +10,7 @@ class ConversationMessagesController < ApplicationController
     render json: {
       conversation: serialize_conversation(result.conversation),
       message: serialize_message(result.message),
-      bot_reply: serialize_message(result.bot_reply),
+      bot_reply: result.bot_reply && serialize_message(result.bot_reply),
       pending_order: serialize_pending_order(result.pending_order)
     }, status: :created
   rescue ActiveRecord::RecordInvalid => error

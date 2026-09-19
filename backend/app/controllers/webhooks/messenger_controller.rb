@@ -13,7 +13,7 @@ module Webhooks
     end
 
     def create
-      event_results = messaging_events.map { |event| record_messaging_event(event) }
+      event_results = messaging_events.map { |entry_id, event| record_messaging_event(entry_id, event) }
 
       render json: serialize_webhook_response(event_results), status: :ok
     rescue ActiveRecord::RecordInvalid => error
@@ -22,9 +22,10 @@ module Webhooks
 
     private
 
-    def record_messaging_event(event)
+    def record_messaging_event(entry_id, event)
       event_type = MessengerEventClassifier.new(event).type
-      result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type).record
+      business = ChannelConnection.find_by(channel: "facebook", external_account_id: entry_id)&.business || Business.default
+      result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
 
       ProcessMessengerEventJob.perform_later(result.event) if result.created && event_type == :customer_text
       log_received(result.event, result.created)
@@ -67,7 +68,9 @@ module Webhooks
     end
 
     def messaging_events
-      params.fetch(:entry, []).flat_map { |entry| entry.fetch(:messaging, []) }
+      params.fetch(:entry, []).flat_map do |entry|
+        entry.fetch(:messaging, []).map { |event| [ entry[:id].to_s, event ] }
+      end
     end
 
     def log_received(event, created)

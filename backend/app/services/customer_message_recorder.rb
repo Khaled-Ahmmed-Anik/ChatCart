@@ -4,11 +4,12 @@ class CustomerMessageRecorder
     keyword_init: true
   )
 
-  def initialize(channel:, external_customer_id:, content:, metadata: {})
+  def initialize(channel:, external_customer_id:, content:, metadata: {}, business: Business.default)
     @channel = channel
     @external_customer_id = external_customer_id
     @content = content
     @metadata = metadata
+    @business = business
   end
 
   def record
@@ -28,6 +29,10 @@ class CustomerMessageRecorder
         content: content,
         metadata: metadata
       )
+      if conversation.handed_over?
+        outcome = :awaiting_human
+        next
+      end
       current_order = conversation.pending_order
       interpretation = classify_intent(message, current_order, conversation)
       pending_order = pending_order_for(conversation, interpretation)
@@ -38,6 +43,10 @@ class CustomerMessageRecorder
       )
       processor.process
       outcome = processor.outcome
+      if pending_order.confirmed? && pending_order.ready_for_confirmation?
+        captured_order = OrderCaptureService.new(pending_order).capture
+        enqueue_delivery(captured_order)
+      end
       response_plan = ConversationResponsePlanner.new(
         conversation: conversation,
         pending_order: pending_order,
@@ -70,10 +79,10 @@ class CustomerMessageRecorder
 
   private
 
-  attr_reader :channel, :external_customer_id, :content, :metadata
+  attr_reader :channel, :external_customer_id, :content, :metadata, :business
 
   def find_or_create_conversation
-    Conversation.find_or_create_by!(
+    business.conversations.find_or_create_by!(
       channel: channel,
       external_customer_id: external_customer_id
     )
@@ -95,7 +104,7 @@ class CustomerMessageRecorder
     normalized_content = content.to_s.downcase.strip
     return true if ConversationIntentDetector.new(normalized_content).new_order?
 
-    Product.find_each.any? { |product| normalized_content.include?(product.name.downcase) }
+    business.products.find_each.any? { |product| normalized_content.include?(product.name.downcase) }
   end
 
   def classify_intent(message, pending_order, conversation)
@@ -104,5 +113,13 @@ class CustomerMessageRecorder
       pending_order: pending_order,
       recent_messages: conversation.messages.order(created_at: :desc, id: :desc).limit(6).reverse
     ).classify
+  end
+
+  def enqueue_delivery(order)
+    integration = business.delivery_integration
+    return unless integration&.active?
+
+    submission = order.delivery_submissions.find_or_create_by!(delivery_integration: integration)
+    SubmitDeliveryJob.perform_later(submission) unless submission.status == "submitted"
   end
 end

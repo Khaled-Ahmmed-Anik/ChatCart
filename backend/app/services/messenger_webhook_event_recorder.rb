@@ -1,13 +1,14 @@
 class MessengerWebhookEventRecorder
   Result = Data.define(:event, :created)
 
-  def initialize(payload:, event_type:)
+  def initialize(payload:, event_type:, business: Business.default)
     @payload = if payload.respond_to?(:to_unsafe_h)
       payload.to_unsafe_h.with_indifferent_access
     else
       payload.to_h.with_indifferent_access
     end
     @event_type = event_type.to_s
+    @business = business
   end
 
   def record
@@ -22,10 +23,11 @@ class MessengerWebhookEventRecorder
 
   private
 
-  attr_reader :payload, :event_type
+  attr_reader :payload, :event_type, :business
 
   def attributes
     {
+      business: business,
       event_type: event_type,
       external_event_id: external_event_id,
       sender_id: payload.dig(:sender, :id),

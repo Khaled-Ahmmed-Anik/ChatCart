@@ -2,7 +2,7 @@ class ConversationsController < ApplicationController
   def lookup
     return render_missing_lookup_params if lookup_params_missing?
 
-    conversation = Conversation
+    conversation = requested_business.conversations
       .includes(:messages, pending_orders: :product)
       .find_by(channel: params[:channel], external_customer_id: params[:external_customer_id])
 

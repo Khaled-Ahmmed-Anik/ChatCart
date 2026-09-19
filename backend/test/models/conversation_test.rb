@@ -18,7 +18,11 @@ class ConversationTest < ActiveSupport::TestCase
   test "requires unique customer per channel" do
     Conversation.create!(channel: "facebook", external_customer_id: "customer-1")
 
-    duplicate = Conversation.new(channel: "facebook", external_customer_id: "customer-1")
+    duplicate = Conversation.new(
+      business: Business.default,
+      channel: "facebook",
+      external_customer_id: "customer-1"
+    )
 
     assert_raises(ActiveRecord::RecordNotUnique) do
       duplicate.save!(validate: false)

@@ -59,15 +59,15 @@ class BotReplyGenerator
     when :resume_order_requested
       "Let’s continue where we left off. #{status_prompt}"
     when :payment_methods_requested
-      configured_policy("payment methods", ENV["SHOP_PAYMENT_METHODS"])
+      configured_policy("payment methods", policy.payment_methods || ENV["SHOP_PAYMENT_METHODS"])
     when :cash_on_delivery_requested
-      configured_policy("cash on delivery", ENV["SHOP_CASH_ON_DELIVERY"])
+      configured_policy("cash on delivery", policy.cash_on_delivery || ENV["SHOP_CASH_ON_DELIVERY"])
     when :delivery_charge_requested
-      configured_policy("delivery charges", ENV["SHOP_DELIVERY_CHARGES"])
+      configured_policy("delivery charges", policy.delivery_charges || ENV["SHOP_DELIVERY_CHARGES"])
     when :delivery_area_requested
-      configured_policy("delivery areas", ENV["SHOP_DELIVERY_AREAS"])
+      configured_policy("delivery areas", policy.delivery_areas || ENV["SHOP_DELIVERY_AREAS"])
     when :delivery_time_requested
-      configured_policy("delivery times", ENV["SHOP_DELIVERY_TIME"])
+      configured_policy("delivery times", policy.delivery_time || ENV["SHOP_DELIVERY_TIME"])
     when :return_requested
       after_sales_reply("return")
     when :replacement_requested
@@ -143,7 +143,7 @@ class BotReplyGenerator
   end
 
   def product_selection_prompt
-    products = Product.active.in_stock.order(:name)
+    products = catalog.active.in_stock.order(:name)
     return "What product would you like to order?" if products.empty?
 
     options = products.map { |product| "#{product.name} (#{formatted_price(product.price)})" }.to_sentence
@@ -206,14 +206,14 @@ class BotReplyGenerator
   end
 
   def product_recommendation_reply
-    products = Product.active.in_stock.order(stock_quantity: :desc, name: :asc).limit(3)
+    products = catalog.active.in_stock.order(stock_quantity: :desc, name: :asc).limit(3)
     return "Sorry, no products are currently available." if products.empty?
 
     "Popular available options are #{products.map { |product| "#{product.name} (#{formatted_price(product.price)})" }.to_sentence}."
   end
 
   def product_comparison_reply
-    products = Product.active.in_stock.order(:name).limit(4)
+    products = catalog.active.in_stock.order(:name).limit(4)
     return "I need at least two available products to compare." if products.size < 2
 
     products.map do |product|
@@ -232,15 +232,15 @@ class BotReplyGenerator
   end
 
   def after_sales_reply(request_type)
-    policy = ENV["SHOP_RETURN_POLICY"]
+    policy_text = policy.return_policy || ENV["SHOP_RETURN_POLICY"]
     introduction = "I can help send your #{request_type} request to the seller."
-    return "#{introduction} Please share your order number and what happened." if policy.blank?
+    return "#{introduction} Please share your order number and what happened." if policy_text.blank?
 
-    "#{introduction} #{policy} Please share your order number and what happened."
+    "#{introduction} #{policy_text} Please share your order number and what happened."
   end
 
   def available_product_names
-    Product.active.in_stock.order(:name).pluck(:name).to_sentence.presence || "none right now"
+    catalog.active.in_stock.order(:name).pluck(:name).to_sentence.presence || "none right now"
   end
 
   def product_information(kind)
@@ -260,7 +260,15 @@ class BotReplyGenerator
 
   def mentioned_product
     content = customer_message&.content.to_s.downcase
-    Product.find_each.find { |product| content.include?(product.name.downcase) }
+    catalog.find_each.find { |product| content.include?(product.name.downcase) }
+  end
+
+  def catalog
+    pending_order.conversation.business.products
+  end
+
+  def policy
+    pending_order.conversation.business.policy
   end
 
   def formatted_price(value)

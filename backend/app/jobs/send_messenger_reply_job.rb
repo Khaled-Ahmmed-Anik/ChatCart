@@ -25,7 +25,8 @@ class SendMessengerReplyJob < ApplicationJob
     delivery.increment!(:attempts)
     result = MessengerReplySender.new(
       recipient_id: delivery.recipient_id,
-      content: delivery.message.content
+      content: delivery.message.content,
+      page_access_token: page_access_token_for(delivery)
     ).deliver
 
     persist_result(delivery, result)
@@ -35,6 +36,11 @@ class SendMessengerReplyJob < ApplicationJob
   end
 
   private
+
+  def page_access_token_for(delivery)
+    business = delivery.messenger_webhook_event.business
+    business.channel_connections.active.find_by(channel: "facebook")&.access_token || ENV["MESSENGER_PAGE_ACCESS_TOKEN"]
+  end
 
   def persist_result(delivery, result)
     attributes = {

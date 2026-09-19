@@ -1,12 +1,12 @@
 class ProductsController < ApplicationController
   def index
-    products = Product.active.in_stock.order(:name)
+    products = business.products.active.in_stock.order(:name)
 
     render json: products.map { |product| serialize_product(product) }
   end
 
   def create
-    product = Product.create!(product_params)
+    product = business.products.create!(product_params)
 
     render json: serialize_product(product), status: :created
   rescue ActiveRecord::RecordInvalid => error
@@ -14,6 +14,10 @@ class ProductsController < ApplicationController
   end
 
   private
+
+  def business
+    @business ||= Business.find_by(slug: request.headers["X-Business-Slug"]) || Business.default
+  end
 
   def product_params
     params.expect(

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatCart Commerce Console</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand"><span>CC</span><div>ChatCart<small>Commerce console</small></div></div>
+      <nav id="navigation">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="orders">Orders</button>
+        <button data-view="conversations">Conversations</button>
+        <button data-view="products">Products</button>
+        <button data-view="settings">Business setup</button>
+      </nav>
+      <button id="disconnect" class="quiet">Disconnect</button>
+    </aside>
+
+    <main>
+      <header>
+        <div><p class="eyebrow">AI-assisted commerce</p><h1 id="page-title">Overview</h1></div>
+        <div id="business-badge" class="badge">Not connected</div>
+      </header>
+
+      <section id="connection-panel" class="panel connection">
+        <div><p class="eyebrow">Connect securely</p><h2>Open your business dashboard</h2>
+          <p>Enter the owner API token returned when the platform administrator creates your business.</p></div>
+        <form id="connection-form">
+          <label>Backend URL<input id="api-url" value="http://localhost:3000" required></label>
+          <label>Owner API token<input id="api-token" type="password" required autocomplete="off"></label>
+          <button type="submit">Connect dashboard</button>
+        </form>
+      </section>
+
+      <section id="workspace" hidden>
+        <div id="flash" role="status"></div>
+        <div id="view"></div>
+      </section>
+    </main>
+
+    <template id="loading"><div class="panel empty">Loading…</div></template>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -101,7 +101,7 @@ class AiIntentClassifier
       Registered intents: #{ConversationIntentRegistry::INTENTS.join(", ")}
       Current order status: #{pending_order&.status || "none"}
       Remembered conversation state: #{remembered_state.to_json}
-      Available products: #{Product.active.in_stock.order(:name).pluck(:name).join(", ")}
+      Available products: #{catalog.active.in_stock.order(:name).pluck(:name).join(", ")}
       Recent conversation:
       #{sanitized_history}
       Current customer message: #{sanitize(message.content)}
@@ -118,6 +118,10 @@ class AiIntentClassifier
     message.conversation.conversation_state.to_h.slice(
       "preferred_language", "pending_question", "last_intent", "last_outcome"
     )
+  end
+
+  def catalog
+    message.conversation.business.products
   end
 
   def sanitize(value)

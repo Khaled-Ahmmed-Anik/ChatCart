@@ -1,4 +1,5 @@
 class MessengerWebhookEvent < ApplicationRecord
+  belongs_to :business, default: -> { Business.default }
   EVENT_TYPES = %w[
     customer_text message_echo delivery read postback attachment malformed_message unknown
   ].freeze
