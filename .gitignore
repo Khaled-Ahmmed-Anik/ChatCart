@@ -8,3 +8,7 @@
 # Editor settings
 /.idea/
 /.vscode/
+
+# Frontend dependencies and production build
+/frontend/node_modules/
+/frontend/dist/

@@ -69,11 +69,12 @@ In another terminal, start the tunnel using the domain assigned to your ngrok ac
 ngrok http --url=https://your-assigned-domain.ngrok-free.dev 3000
 ```
 
-Start the business dashboard in a third terminal:
+Install and start the React business dashboard in a third terminal:
 
 ```bash
 cd frontend
-python3 -m http.server 4173
+npm install
+npm run dev
 ```
 
 Open `http://localhost:4173`, select the account level, and sign in with email and password. Local seed accounts are configured through `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `CHATCART_OWNER_EMAIL`, and `CHATCART_OWNER_PASSWORD` in the ignored `backend/.env` file.
@@ -139,7 +140,7 @@ mise exec -- bin/brakeman --no-pager
 
 ```text
 backend/   Rails API, database migrations, services, and tests
-frontend/  Dependency-free seller/admin dashboard
+frontend/  React/Vite multi-page seller and platform-admin dashboard
 ```
 
 The main application flow is implemented in:

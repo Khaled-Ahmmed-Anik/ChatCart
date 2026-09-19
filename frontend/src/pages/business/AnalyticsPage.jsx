@@ -1,0 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "../../lib/apiClient";
+import { ErrorState, LoadingState } from "../../components/ui/Feedback";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { Panel } from "../../components/ui/Panel";
+
+function Breakdown({title,data}){return <Panel title={title}><div className="breakdown">{Object.entries(data||{}).map(([key,value])=><div key={key}><span>{key.replaceAll("_"," ")}</span><strong>{value}</strong></div>)}{!Object.keys(data||{}).length&&<p className="muted">No data yet.</p>}</div></Panel>}
+export function AnalyticsPage(){const query=useQuery({queryKey:["analytics"],queryFn:()=>apiRequest("/api/analytics")});if(query.isLoading)return <LoadingState/>;if(query.isError)return <ErrorState error={query.error}/>;const d=query.data;const metrics=[["Conversations",d.conversations],["Confirmed orders",d.confirmed_orders],["Chat → order",`${d.conversation_to_order_rate}%`],["Revenue",`${d.revenue} BDT`],["Unique customers",d.unique_customers],["Repeat customers",d.repeat_customers],["Repeat rate",`${d.repeat_customer_rate}%`],["Average order",`${d.average_order_value} BDT`]];return <><PageHeader title="Overview" description="A clear view of conversations turning into revenue."/><div className="metrics">{metrics.map(([label,value])=><Panel className="metric" key={label}><span>{label}</span><strong>{value}</strong></Panel>)}</div><div className="content-grid"><Breakdown title="Orders by status" data={d.orders_by_status}/><Breakdown title="Orders by channel" data={d.orders_by_channel}/><Breakdown title="Top products" data={d.top_products}/></div></>}
