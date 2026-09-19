@@ -103,6 +103,64 @@ module Webhooks
       assert_equal true, response_body.dig("delivery", "skipped")
     end
 
+    test "create processes every messaging event across every entry" do
+      Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+      payload = {
+        object: "page",
+        entry: [
+          {
+            id: "page-1",
+            messaging: [
+              messaging_event(sender_id: "fb-user-1", text: "I want Fresh Musk"),
+              messaging_event(sender_id: "fb-user-2", text: "I want Fresh Musk")
+            ]
+          },
+          {
+            id: "page-1",
+            messaging: [
+              messaging_event(sender_id: "fb-user-3", text: "I want Fresh Musk")
+            ]
+          }
+        ]
+      }
+
+      assert_difference -> { Conversation.count }, 3 do
+        assert_difference -> { Message.count }, 6 do
+          assert_difference -> { PendingOrder.count }, 3 do
+            post_signed_payload payload
+          end
+        end
+      end
+
+      assert_response :created
+
+      response_body = JSON.parse(response.body)
+      assert_equal 3, response_body.fetch("events").size
+      assert_equal %w[fb-user-1 fb-user-2 fb-user-3], response_body.fetch("events").pluck("recipient_id")
+      assert_equal [ "collecting_quantity" ] * 3, response_body.fetch("events").map { |event| event.dig("pending_order", "status") }
+    end
+
+    test "create validates the complete batch before recording any event" do
+      payload = {
+        object: "page",
+        entry: [
+          {
+            id: "page-1",
+            messaging: [
+              messaging_event(sender_id: "fb-user-1", text: "Hello"),
+              { sender: {}, message: {} }
+            ]
+          }
+        ]
+      }
+
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload payload
+      end
+
+      assert_response :unprocessable_entity
+    end
+
     test "create returns validation errors when sender or text is missing" do
       post_signed_payload(entry: [ { messaging: [ { sender: {}, message: {} } ] } ])
 
@@ -166,18 +224,22 @@ module Webhooks
           {
             id: "page-1",
             messaging: [
-              {
-                sender: { id: sender_id },
-                recipient: { id: "page-1" },
-                timestamp: 1_780_000_000_000,
-                message: {
-                  mid: SecureRandom.uuid,
-                  text: text
-                }
-              }
+              messaging_event(sender_id: sender_id, text: text)
             ]
           }
         ]
+      }
+    end
+
+    def messaging_event(sender_id:, text:)
+      {
+        sender: { id: sender_id },
+        recipient: { id: "page-1" },
+        timestamp: 1_780_000_000_000,
+        message: {
+          mid: SecureRandom.uuid,
+          text: text
+        }
       }
     end
   end

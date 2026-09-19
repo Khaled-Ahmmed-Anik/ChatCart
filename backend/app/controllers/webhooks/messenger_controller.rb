@@ -14,19 +14,24 @@ module Webhooks
     end
 
     def create
-      event = first_messaging_event
+      events = messaging_events
+      invalid_event = events.find { |event| invalid_messaging_event?(event) }
+
+      return render_invalid_messaging_event if events.empty? || invalid_event.present?
+
+      event_results = events.map { |event| process_messaging_event(event) }
+      response_body = event_results.one? ? event_results.first : { events: event_results }
+
+      render json: response_body, status: :created
+    rescue ActiveRecord::RecordInvalid => error
+      render json: { errors: error.record.errors.to_hash(true) }, status: :unprocessable_entity
+    end
+
+    private
+
+    def process_messaging_event(event)
       sender_id = event.dig(:sender, :id)
       content = event.dig(:message, :text)
-
-      if sender_id.blank? || content.blank?
-        return render json: {
-          errors: {
-            sender_id: [ "can't be blank" ],
-            content: [ "can't be blank" ]
-          }
-        }, status: :unprocessable_entity
-      end
-
       result = CustomerMessageRecorder.new(
         channel: CHANNEL,
         external_customer_id: sender_id,
@@ -38,7 +43,7 @@ module Webhooks
         content: result.bot_reply.content
       ).deliver
 
-      render json: {
+      {
         recipient_id: sender_id,
         bot_reply: {
           content: result.bot_reply.content
@@ -46,12 +51,21 @@ module Webhooks
         delivery: serialize_delivery(delivery),
         conversation: serialize_conversation(result.conversation),
         pending_order: serialize_pending_order(result.pending_order)
-      }, status: :created
-    rescue ActiveRecord::RecordInvalid => error
-      render json: { errors: error.record.errors.to_hash(true) }, status: :unprocessable_entity
+      }
     end
 
-    private
+    def invalid_messaging_event?(event)
+      event.dig(:sender, :id).blank? || event.dig(:message, :text).blank?
+    end
+
+    def render_invalid_messaging_event
+      render json: {
+        errors: {
+          sender_id: [ "can't be blank" ],
+          content: [ "can't be blank" ]
+        }
+      }, status: :unprocessable_entity
+    end
 
     def verify_webhook_signature
       app_secret = ENV["MESSENGER_APP_SECRET"]
@@ -76,8 +90,8 @@ module Webhooks
       ENV.fetch("MESSENGER_VERIFY_TOKEN", DEFAULT_VERIFY_TOKEN)
     end
 
-    def first_messaging_event
-      params.fetch(:entry, []).first&.fetch(:messaging, [])&.first || {}
+    def messaging_events
+      params.fetch(:entry, []).flat_map { |entry| entry.fetch(:messaging, []) }
     end
 
     def serialize_conversation(conversation)
