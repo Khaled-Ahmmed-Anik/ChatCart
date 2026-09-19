@@ -11,6 +11,7 @@ class MessengerReplySenderTest < ActiveSupport::TestCase
 
     assert_not result.delivered
     assert result.skipped
+    assert_not result.retryable
     assert_equal "MESSENGER_PAGE_ACCESS_TOKEN is not configured", result.error
   end
 
@@ -26,6 +27,7 @@ class MessengerReplySenderTest < ActiveSupport::TestCase
 
       assert result.delivered
       assert_not result.skipped
+      assert_not result.retryable
       assert_equal 200, result.status
       assert_equal response.body, result.response_body
     end
@@ -71,6 +73,7 @@ class MessengerReplySenderTest < ActiveSupport::TestCase
 
       assert_not result.delivered
       assert_not result.skipped
+      assert_not result.retryable
       assert_equal 401, result.status
       assert_equal response.body, result.response_body
     end
@@ -86,7 +89,25 @@ class MessengerReplySenderTest < ActiveSupport::TestCase
 
       assert_not result.delivered
       assert_not result.skipped
+      assert result.retryable
       assert_equal "network unavailable", result.error
+    end
+  end
+
+  test "marks rate limits and server errors as retryable" do
+    [ 429, 500, 503 ].each do |status|
+      response = fake_response(success: false, code: status)
+
+      with_http_post_stub(->(*) { response }) do
+        result = MessengerReplySender.new(
+          recipient_id: "fb-user-123",
+          content: "Hello",
+          page_access_token: "token-123"
+        ).deliver
+
+        assert result.retryable
+        assert_equal status, result.status
+      end
     end
   end
 

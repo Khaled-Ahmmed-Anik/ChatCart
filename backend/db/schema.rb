@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_18_000400) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_19_000200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_18_000400) do
     t.datetime "updated_at", null: false
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["sender_type"], name: "index_messages_on_sender_type"
+  end
+
+  create_table "messenger_deliveries", force: :cascade do |t|
+    t.integer "attempts", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "delivered_at"
+    t.text "last_error"
+    t.bigint "message_id", null: false
+    t.bigint "messenger_webhook_event_id", null: false
+    t.string "recipient_id", null: false
+    t.integer "response_code"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_messenger_deliveries_on_message_id", unique: true
+    t.index ["messenger_webhook_event_id"], name: "index_messenger_deliveries_on_messenger_webhook_event_id"
+    t.index ["status"], name: "index_messenger_deliveries_on_status"
+  end
+
+  create_table "messenger_webhook_events", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "event_type", null: false
+    t.string "external_event_id"
+    t.text "last_error"
+    t.jsonb "payload", default: {}, null: false
+    t.datetime "processed_at"
+    t.string "sender_id"
+    t.string "status", default: "received", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_event_id"], name: "index_messenger_webhook_events_on_external_event_id", unique: true, where: "(external_event_id IS NOT NULL)"
+    t.index ["sender_id"], name: "index_messenger_webhook_events_on_sender_id"
+    t.index ["status"], name: "index_messenger_webhook_events_on_status"
   end
 
   create_table "pending_orders", force: :cascade do |t|
@@ -68,6 +99,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_18_000400) do
   end
 
   add_foreign_key "messages", "conversations"
+  add_foreign_key "messenger_deliveries", "messages"
+  add_foreign_key "messenger_deliveries", "messenger_webhook_events"
   add_foreign_key "pending_orders", "conversations"
   add_foreign_key "pending_orders", "products"
 end

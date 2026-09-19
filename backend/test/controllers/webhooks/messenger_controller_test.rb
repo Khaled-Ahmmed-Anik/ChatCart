@@ -2,6 +2,8 @@ require "test_helper"
 
 module Webhooks
   class MessengerControllerTest < ActionDispatch::IntegrationTest
+    include ActiveJob::TestHelper
+
     APP_SECRET = "test-messenger-app-secret"
 
     setup do
@@ -42,240 +44,115 @@ module Webhooks
       }
 
       assert_response :forbidden
-      assert_equal "Forbidden", response.body
     end
 
-    test "create records messenger text and returns bot reply" do
-      Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    test "create records customer text, enqueues processing, and immediately returns ok" do
+      payload = messenger_payload(sender_id: "fb-user-123", text: "I want Fresh Musk", message_id: "mid-123")
 
-      assert_difference -> { Conversation.count }, 1 do
-        assert_difference -> { Message.count }, 2 do
-          assert_difference -> { PendingOrder.count }, 1 do
-            post_signed_payload messenger_payload(
-              sender_id: "fb-user-123",
-              text: "I want Fresh Musk"
-            )
-          end
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        assert_enqueued_with(job: ProcessMessengerEventJob) do
+          post_signed_payload payload
         end
       end
 
-      assert_response :created
-
-      response_body = JSON.parse(response.body)
-      conversation = Conversation.find(response_body.dig("conversation", "id"))
-      customer_message = conversation.messages.customer.sole
-      bot_message = conversation.messages.bot.sole
-
-      assert_equal "fb-user-123", response_body["recipient_id"]
-      assert_equal "facebook", response_body.dig("conversation", "channel")
-      assert_equal "fb-user-123", response_body.dig("conversation", "external_customer_id")
-      assert_equal "collecting_quantity", response_body.dig("pending_order", "status")
-      assert_equal "Great choice. How many bottles of Fresh Musk would you like?", response_body.dig("bot_reply", "content")
-      assert_equal false, response_body.dig("delivery", "delivered")
-      assert_equal true, response_body.dig("delivery", "skipped")
-      assert_equal "MESSENGER_PAGE_ACCESS_TOKEN is not configured", response_body.dig("delivery", "error")
-      assert_equal "I want Fresh Musk", customer_message.content
-      assert_equal "fb-user-123", customer_message.metadata.dig("sender", "id")
-      assert_equal response_body.dig("bot_reply", "content"), bot_message.content
+      assert_response :ok
+      event = MessengerWebhookEvent.find_by!(external_event_id: "mid-123")
+      assert_equal "customer_text", event.event_type
+      assert_equal "received", event.status
+      assert_equal "fb-user-123", event.sender_id
+      assert_equal({ "type" => "customer_text", "status" => "received" }, JSON.parse(response.body))
     end
 
-    test "create reuses the same conversation for the sender" do
-      product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
-      conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
-      conversation.create_pending_order!(product: product, status: :collecting_quantity)
-
-      assert_no_difference -> { Conversation.count } do
-        assert_difference -> { Message.count }, 2 do
-          post_signed_payload messenger_payload(
-            sender_id: "fb-user-123",
-            text: "2"
-          )
-        end
-      end
-
-      assert_response :created
-
-      response_body = JSON.parse(response.body)
-      assert_equal conversation.id, response_body.dig("conversation", "id")
-      assert_equal "collecting_name", response_body.dig("pending_order", "status")
-      assert_equal 2, response_body.dig("pending_order", "quantity")
-      assert_equal "Perfect. Please share your name for the order.", response_body.dig("bot_reply", "content")
-      assert_equal true, response_body.dig("delivery", "skipped")
-    end
-
-    test "create processes every messaging event across every entry" do
-      Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    test "create records every event across entries and enqueues only customer text" do
       payload = {
         object: "page",
         entry: [
           {
-            id: "page-1",
             messaging: [
-              messaging_event(sender_id: "fb-user-1", text: "I want Fresh Musk"),
-              messaging_event(sender_id: "fb-user-2", text: "I want Fresh Musk")
+              messaging_event(sender_id: "fb-user-1", text: "Hello", message_id: "mid-1"),
+              { delivery: { mids: [ "sent-1" ] } },
+              { read: { watermark: 1_780_000_000_000 } }
             ]
           },
           {
-            id: "page-1",
             messaging: [
-              messaging_event(sender_id: "fb-user-3", text: "I want Fresh Musk")
+              messaging_event(sender_id: "fb-user-2", text: "Hi", message_id: "mid-2"),
+              { sender: { id: "page-1" }, message: { mid: "echo-1", is_echo: true, text: "Reply" } },
+              { sender: { id: "fb-user-2" }, message: { mid: "attachment-1", attachments: [ { type: "image" } ] } }
             ]
           }
         ]
       }
 
-      assert_difference -> { Conversation.count }, 3 do
-        assert_difference -> { Message.count }, 6 do
-          assert_difference -> { PendingOrder.count }, 3 do
-            post_signed_payload payload
-          end
+      assert_difference -> { MessengerWebhookEvent.count }, 6 do
+        assert_enqueued_jobs 2, only: ProcessMessengerEventJob do
+          post_signed_payload payload
         end
       end
 
-      assert_response :created
-
-      response_body = JSON.parse(response.body)
-      assert_equal 3, response_body.fetch("events").size
-      assert_equal %w[fb-user-1 fb-user-2 fb-user-3], response_body.fetch("events").pluck("recipient_id")
-      assert_equal 3, response_body.fetch("processed")
-      assert_equal 0, response_body.fetch("ignored")
-      assert_equal [ "collecting_quantity" ] * 3, response_body.fetch("events").map { |event| event.dig("pending_order", "status") }
+      assert_response :ok
+      body = JSON.parse(response.body)
+      assert_equal 2, body.fetch("accepted")
+      assert_equal 4, body.fetch("ignored")
+      assert_equal 0, body.fetch("duplicates")
+      assert_equal %w[customer_text delivery read customer_text message_echo attachment], body.fetch("events").pluck("type")
     end
 
-    test "create processes customer text and ignores unsupported events in the same batch" do
+    test "create does not enqueue or process a duplicate message ID" do
+      payload = messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "same-mid")
+
+      assert_enqueued_jobs 1, only: ProcessMessengerEventJob do
+        post_signed_payload payload
+        assert_response :ok
+        post_signed_payload payload
+      end
+
+      assert_response :ok
+      assert_equal 1, MessengerWebhookEvent.where(external_event_id: "same-mid").count
+      assert_equal "duplicate", JSON.parse(response.body).fetch("status")
+    end
+
+    test "create acknowledges unsupported and malformed events without jobs" do
       payload = {
         object: "page",
         entry: [
           {
-            id: "page-1",
             messaging: [
-              messaging_event(sender_id: "fb-user-1", text: "Hello"),
               { sender: {}, message: {} },
-              { delivery: { mids: [ "message-1" ] } },
-              { read: { watermark: 1_780_000_000_000 } },
-              { sender: { id: "page-1" }, message: { is_echo: true, text: "Our reply" } },
               { sender: { id: "fb-user-1" }, postback: { payload: "CONFIRM_ORDER" } },
-              { sender: { id: "fb-user-1" }, message: { attachments: [ { type: "image" } ] } },
               { sender: { id: "fb-user-1" }, reaction: { action: "react" } }
             ]
           }
         ]
       }
 
-      assert_difference -> { Conversation.count }, 1 do
-        assert_difference -> { Message.count }, 2 do
-          assert_difference -> { PendingOrder.count }, 1 do
-            post_signed_payload payload
-          end
-        end
-      end
-
-      assert_response :created
-
-      response_body = JSON.parse(response.body)
-      assert_equal 1, response_body.fetch("processed")
-      assert_equal 7, response_body.fetch("ignored")
-      assert_equal %w[customer_text malformed_message delivery read message_echo postback attachment unknown],
-        response_body.fetch("events").pluck("type")
-      assert_equal [ "processed", *([ "ignored" ] * 7) ], response_body.fetch("events").pluck("status")
-    end
-
-    test "create acknowledges a malformed message without recording it" do
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload(entry: [ { messaging: [ { sender: {}, message: {} } ] } ])
+      assert_no_enqueued_jobs only: ProcessMessengerEventJob do
+        post_signed_payload payload
       end
 
       assert_response :ok
-
-      response_body = JSON.parse(response.body)
-      assert_equal "malformed_message", response_body.fetch("type")
-      assert_equal "ignored", response_body.fetch("status")
+      assert_equal %w[malformed_message postback unknown], MessengerWebhookEvent.order(:id).pluck(:event_type)
+      assert MessengerWebhookEvent.all.all? { |event| event.status == "ignored" }
     end
 
     test "create acknowledges an empty payload" do
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload(object: "page", entry: [])
-      end
+      post_signed_payload(object: "page", entry: [])
 
       assert_response :ok
-
-      response_body = JSON.parse(response.body)
-      assert_equal 0, response_body.fetch("processed")
-      assert_equal 0, response_body.fetch("ignored")
-      assert_empty response_body.fetch("events")
+      assert_equal({ "accepted" => 0, "ignored" => 0, "duplicates" => 0, "events" => [] }, JSON.parse(response.body))
     end
 
-    test "create acknowledges a delivery receipt" do
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload(
-          object: "page",
-          entry: [ { messaging: [ { delivery: { mids: [ "message-1" ] } } ] } ]
-        )
-      end
-
-      assert_response :ok
-
-      response_body = JSON.parse(response.body)
-      assert_equal "delivery", response_body.fetch("type")
-      assert_equal "ignored", response_body.fetch("status")
-    end
-
-    test "create acknowledges a message echo without recording it" do
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload(
-          object: "page",
-          entry: [
-            {
-              messaging: [
-                { sender: { id: "page-1" }, message: { is_echo: true, text: "Our reply" } }
-              ]
-            }
-          ]
-        )
-      end
-
-      assert_response :ok
-
-      response_body = JSON.parse(response.body)
-      assert_equal "message_echo", response_body.fetch("type")
-      assert_equal "ignored", response_body.fetch("status")
-    end
-
-    test "create acknowledges an attachment without recording it" do
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload(
-          object: "page",
-          entry: [
-            {
-              messaging: [
-                {
-                  sender: { id: "fb-user-1" },
-                  message: { attachments: [ { type: "image" } ] }
-                }
-              ]
-            }
-          ]
-        )
-      end
-
-      assert_response :ok
-
-      response_body = JSON.parse(response.body)
-      assert_equal "attachment", response_body.fetch("type")
-      assert_equal "ignored", response_body.fetch("status")
-    end
-
-    test "create rejects a missing webhook signature" do
+    test "create rejects a missing webhook signature without recording events" do
       post webhooks_messenger_url,
-        params: messenger_payload(sender_id: "fb-user-123", text: "Hello").to_json,
+        params: messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "mid-1").to_json,
         headers: { "Content-Type" => "application/json" }
 
       assert_response :forbidden
-      assert_equal 0, Message.count
+      assert_equal 0, MessengerWebhookEvent.count
     end
 
-    test "create rejects an invalid webhook signature" do
-      payload = messenger_payload(sender_id: "fb-user-123", text: "Hello").to_json
+    test "create rejects an invalid webhook signature without recording events" do
+      payload = messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "mid-1").to_json
 
       post webhooks_messenger_url,
         params: payload,
@@ -285,16 +162,16 @@ module Webhooks
         }
 
       assert_response :forbidden
-      assert_equal 0, Message.count
+      assert_equal 0, MessengerWebhookEvent.count
     end
 
     test "create rejects requests when the app secret is not configured" do
       ENV.delete("MESSENGER_APP_SECRET")
 
-      post_signed_payload messenger_payload(sender_id: "fb-user-123", text: "Hello")
+      post_signed_payload messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "mid-1")
 
       assert_response :forbidden
-      assert_equal 0, Message.count
+      assert_equal 0, MessengerWebhookEvent.count
     end
 
     private
@@ -311,29 +188,19 @@ module Webhooks
         }
     end
 
-    def messenger_payload(sender_id:, text:)
+    def messenger_payload(sender_id:, text:, message_id:)
       {
         object: "page",
-        entry: [
-          {
-            id: "page-1",
-            messaging: [
-              messaging_event(sender_id: sender_id, text: text)
-            ]
-          }
-        ]
+        entry: [ { id: "page-1", messaging: [ messaging_event(sender_id: sender_id, text: text, message_id: message_id) ] } ]
       }
     end
 
-    def messaging_event(sender_id:, text:)
+    def messaging_event(sender_id:, text:, message_id:)
       {
         sender: { id: sender_id },
         recipient: { id: "page-1" },
         timestamp: 1_780_000_000_000,
-        message: {
-          mid: SecureRandom.uuid,
-          text: text
-        }
+        message: { mid: message_id, text: text }
       }
     end
   end
