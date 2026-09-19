@@ -137,10 +137,12 @@ module Webhooks
       response_body = JSON.parse(response.body)
       assert_equal 3, response_body.fetch("events").size
       assert_equal %w[fb-user-1 fb-user-2 fb-user-3], response_body.fetch("events").pluck("recipient_id")
+      assert_equal 3, response_body.fetch("processed")
+      assert_equal 0, response_body.fetch("ignored")
       assert_equal [ "collecting_quantity" ] * 3, response_body.fetch("events").map { |event| event.dig("pending_order", "status") }
     end
 
-    test "create validates the complete batch before recording any event" do
+    test "create processes customer text and ignores unsupported events in the same batch" do
       payload = {
         object: "page",
         entry: [
@@ -148,27 +150,119 @@ module Webhooks
             id: "page-1",
             messaging: [
               messaging_event(sender_id: "fb-user-1", text: "Hello"),
-              { sender: {}, message: {} }
+              { sender: {}, message: {} },
+              { delivery: { mids: [ "message-1" ] } },
+              { read: { watermark: 1_780_000_000_000 } },
+              { sender: { id: "page-1" }, message: { is_echo: true, text: "Our reply" } },
+              { sender: { id: "fb-user-1" }, postback: { payload: "CONFIRM_ORDER" } },
+              { sender: { id: "fb-user-1" }, message: { attachments: [ { type: "image" } ] } },
+              { sender: { id: "fb-user-1" }, reaction: { action: "react" } }
             ]
           }
         ]
       }
 
-      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
-        post_signed_payload payload
+      assert_difference -> { Conversation.count }, 1 do
+        assert_difference -> { Message.count }, 2 do
+          assert_difference -> { PendingOrder.count }, 1 do
+            post_signed_payload payload
+          end
+        end
       end
 
-      assert_response :unprocessable_entity
-    end
-
-    test "create returns validation errors when sender or text is missing" do
-      post_signed_payload(entry: [ { messaging: [ { sender: {}, message: {} } ] } ])
-
-      assert_response :unprocessable_entity
+      assert_response :created
 
       response_body = JSON.parse(response.body)
-      assert_equal [ "can't be blank" ], response_body.dig("errors", "sender_id")
-      assert_equal [ "can't be blank" ], response_body.dig("errors", "content")
+      assert_equal 1, response_body.fetch("processed")
+      assert_equal 7, response_body.fetch("ignored")
+      assert_equal %w[customer_text malformed_message delivery read message_echo postback attachment unknown],
+        response_body.fetch("events").pluck("type")
+      assert_equal [ "processed", *([ "ignored" ] * 7) ], response_body.fetch("events").pluck("status")
+    end
+
+    test "create acknowledges a malformed message without recording it" do
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload(entry: [ { messaging: [ { sender: {}, message: {} } ] } ])
+      end
+
+      assert_response :ok
+
+      response_body = JSON.parse(response.body)
+      assert_equal "malformed_message", response_body.fetch("type")
+      assert_equal "ignored", response_body.fetch("status")
+    end
+
+    test "create acknowledges an empty payload" do
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload(object: "page", entry: [])
+      end
+
+      assert_response :ok
+
+      response_body = JSON.parse(response.body)
+      assert_equal 0, response_body.fetch("processed")
+      assert_equal 0, response_body.fetch("ignored")
+      assert_empty response_body.fetch("events")
+    end
+
+    test "create acknowledges a delivery receipt" do
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload(
+          object: "page",
+          entry: [ { messaging: [ { delivery: { mids: [ "message-1" ] } } ] } ]
+        )
+      end
+
+      assert_response :ok
+
+      response_body = JSON.parse(response.body)
+      assert_equal "delivery", response_body.fetch("type")
+      assert_equal "ignored", response_body.fetch("status")
+    end
+
+    test "create acknowledges a message echo without recording it" do
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload(
+          object: "page",
+          entry: [
+            {
+              messaging: [
+                { sender: { id: "page-1" }, message: { is_echo: true, text: "Our reply" } }
+              ]
+            }
+          ]
+        )
+      end
+
+      assert_response :ok
+
+      response_body = JSON.parse(response.body)
+      assert_equal "message_echo", response_body.fetch("type")
+      assert_equal "ignored", response_body.fetch("status")
+    end
+
+    test "create acknowledges an attachment without recording it" do
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { PendingOrder.count } ] do
+        post_signed_payload(
+          object: "page",
+          entry: [
+            {
+              messaging: [
+                {
+                  sender: { id: "fb-user-1" },
+                  message: { attachments: [ { type: "image" } ] }
+                }
+              ]
+            }
+          ]
+        )
+      end
+
+      assert_response :ok
+
+      response_body = JSON.parse(response.body)
+      assert_equal "attachment", response_body.fetch("type")
+      assert_equal "ignored", response_body.fetch("status")
     end
 
     test "create rejects a missing webhook signature" do

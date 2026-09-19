@@ -14,20 +14,26 @@ module Webhooks
     end
 
     def create
-      events = messaging_events
-      invalid_event = events.find { |event| invalid_messaging_event?(event) }
+      event_results = messaging_events.map { |event| handle_messaging_event(event) }
+      response_body = serialize_webhook_response(event_results)
+      response_status = event_results.any? { |result| result[:status] == "processed" } ? :created : :ok
 
-      return render_invalid_messaging_event if events.empty? || invalid_event.present?
-
-      event_results = events.map { |event| process_messaging_event(event) }
-      response_body = event_results.one? ? event_results.first : { events: event_results }
-
-      render json: response_body, status: :created
+      render json: response_body, status: response_status
     rescue ActiveRecord::RecordInvalid => error
       render json: { errors: error.record.errors.to_hash(true) }, status: :unprocessable_entity
     end
 
     private
+
+    def handle_messaging_event(event)
+      event_type = MessengerEventClassifier.new(event).type
+
+      if event_type == :customer_text
+        process_messaging_event(event).merge(type: event_type, status: "processed")
+      else
+        { type: event_type, status: "ignored" }
+      end
+    end
 
     def process_messaging_event(event)
       sender_id = event.dig(:sender, :id)
@@ -54,17 +60,14 @@ module Webhooks
       }
     end
 
-    def invalid_messaging_event?(event)
-      event.dig(:sender, :id).blank? || event.dig(:message, :text).blank?
-    end
+    def serialize_webhook_response(event_results)
+      return event_results.first if event_results.one?
 
-    def render_invalid_messaging_event
-      render json: {
-        errors: {
-          sender_id: [ "can't be blank" ],
-          content: [ "can't be blank" ]
-        }
-      }, status: :unprocessable_entity
+      {
+        processed: event_results.count { |result| result[:status] == "processed" },
+        ignored: event_results.count { |result| result[:status] == "ignored" },
+        events: event_results
+      }
     end
 
     def verify_webhook_signature
