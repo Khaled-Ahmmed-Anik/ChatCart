@@ -27,13 +27,18 @@ class CustomerMessageRecorder
       processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
       processor.process
       outcome = processor.outcome
+      fallback_reply = BotReplyGenerator.new(
+        pending_order: pending_order,
+        customer_message: message,
+        outcome: outcome
+      ).content
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
-        content: BotReplyGenerator.new(
-          pending_order: pending_order,
+        content: AiConversationAssistant.new(
           customer_message: message,
+          pending_order: pending_order,
           outcome: outcome
-        ).content
+        ).rewrite(fallback: fallback_reply)
       )
     end
 
