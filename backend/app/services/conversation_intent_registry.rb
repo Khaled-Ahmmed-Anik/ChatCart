@@ -22,6 +22,12 @@ class ConversationIntentRegistry
   }.freeze
 
   INTENTS = GROUPS.values.flatten.freeze
+  MUTATING_INTENTS = %w[
+    new_order repeat_order select_product select_quantity provide_name provide_phone provide_address
+    confirm_order cancel_order change_product change_quantity change_name change_phone change_address
+    change_confirmed_order
+  ].freeze
+  INFORMATIONAL_INTENTS = (INTENTS - MUTATING_INTENTS).freeze
 
   def self.valid?(intent)
     intent.to_s.in?(INTENTS)

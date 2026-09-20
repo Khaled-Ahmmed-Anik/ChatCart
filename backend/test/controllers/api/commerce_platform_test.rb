@@ -63,6 +63,7 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
 
     post handover_api_conversation_path(conversation), headers: authorization(@token)
     assert_response :success
+    assert_equal "seller_takeover", JSON.parse(response.body).dig("handover_summary", "reason")
 
     result = CustomerMessageRecorder.new(
       business: @business, channel: "instagram", external_customer_id: "buyer-1", content: "hello?"

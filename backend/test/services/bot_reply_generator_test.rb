@@ -106,7 +106,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
 
-    assert_includes reply, "Hi! 👋 Welcome to ChatCart."
+    assert_includes reply, "Assalamu alaikum! 👋 Welcome to ChatCart."
     assert_includes reply, "Fresh Musk (৳750)"
   end
 

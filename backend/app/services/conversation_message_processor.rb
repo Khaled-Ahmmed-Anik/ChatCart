@@ -4,7 +4,7 @@ class ConversationMessageProcessor
     "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10
   }.freeze
 
-  attr_reader :outcome
+  attr_reader :outcome, :secondary_outcomes
 
   def initialize(message:, pending_order:, interpretation: nil)
     @message = message
@@ -41,6 +41,8 @@ class ConversationMessageProcessor
     apply_remaining_interpreted_details
     @outcome ||= :no_change
     pending_order
+  ensure
+    @secondary_outcomes = mapped_secondary_outcomes
   end
 
   private
@@ -92,6 +94,16 @@ class ConversationMessageProcessor
     outcome.present?
   end
 
+  def mapped_secondary_outcomes
+    return [] if interpretation.blank? || interpretation.needs_clarification
+
+    interpretation.secondary_intents.filter_map do |intent|
+      next unless intent.in?(ConversationIntentRegistry::INFORMATIONAL_INTENTS)
+
+      AI_OUTCOMES[intent]
+    end.uniq - [ outcome ]
+  end
+
   def collect_product
     product = matching_product
     if product.blank?
@@ -122,7 +134,7 @@ class ConversationMessageProcessor
   end
 
   def collect_name
-    name = interpreted_entity(:customer_name, for_intent: "provide_name") || content
+    name = interpreted_entity(:customer_name, for_intent: "provide_name") || remembered_value(:customer_name) || content
     return if name.blank?
 
     pending_order.customer_name = name
@@ -131,7 +143,7 @@ class ConversationMessageProcessor
   end
 
   def collect_phone
-    phone = interpreted_entity(:phone, for_intent: "provide_phone") || content
+    phone = interpreted_entity(:phone, for_intent: "provide_phone") || remembered_value(:phone) || content
     unless phone_number?(phone)
       @outcome = :invalid_phone
       return
@@ -143,7 +155,7 @@ class ConversationMessageProcessor
   end
 
   def collect_address
-    address = interpreted_entity(:address, for_intent: "provide_address") || content
+    address = interpreted_entity(:address, for_intent: "provide_address") || remembered_value(:address) || content
     return if address.blank?
 
     pending_order.address = address
@@ -192,7 +204,9 @@ class ConversationMessageProcessor
   end
 
   def handle_conversational_intent
-    @outcome = if restart_request?
+    @outcome = if repeat_order_request?
+      repeat_previous_order ? :repeat_order_prepared : :restarted
+    elsif restart_request?
       restart_order
       :restarted
     elsif defer_confirmation_request?
@@ -209,6 +223,8 @@ class ConversationMessageProcessor
       :price_inquiry
     elsif stock_question?
       :stock_inquiry
+    elsif human_agent_request?
+      :human_agent
     end
 
     outcome.present?
@@ -223,6 +239,24 @@ class ConversationMessageProcessor
       address: nil,
       status: :collecting_product
     )
+  end
+
+  def repeat_previous_order
+    previous = previous_completed_order
+    unless previous&.product&.available_for_quantity?(previous.quantity)
+      restart_order
+      return false
+    end
+
+    pending_order.update!(
+      product: previous.product,
+      quantity: previous.quantity,
+      customer_name: previous.customer_name,
+      phone: previous.phone,
+      address: previous.address,
+      status: :awaiting_confirmation
+    )
+    true
   end
 
   def apply_correction
@@ -428,6 +462,11 @@ class ConversationMessageProcessor
     intent_detector.new_order? || confident_ai_intent?(%w[new_order repeat_order])
   end
 
+  def repeat_order_request?
+    confident_ai_intent?(%w[repeat_order]) ||
+      content.downcase.match?(/\b(re-?order|order again|same order|ager order|আগের অর্ডার)\b/)
+  end
+
   def order_details_request?
     intent_detector.order_details? || confident_ai_intent?(%w[order_details review_order order_status])
   end
@@ -465,6 +504,25 @@ class ConversationMessageProcessor
       normalized.match?(/\b(will|i'll|i will)\s+confirm\b.*\b(later|letter)\b/) ||
       normalized.match?(/\b(pore|later)\s+confirm\s+(korbo|kore dibo)\b/) ||
       normalized.match?(/\bekhon\s+na\b|\bpore\s+korbo\b/)
+  end
+
+  def human_agent_request?
+    confident_ai_intent?(%w[human_agent]) || content.downcase.match?(
+      /\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b.*\b(talk|speak|connect|chai|kotha|কথা)\b|\b(talk|speak|connect|kotha|কথা)\b.*\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b/
+    )
+  end
+
+  def remembered_value(field)
+    return unless content.downcase.match?(/\b(same|previous|ager|আগের)\b/)
+
+    previous_completed_order&.public_send(field)
+  end
+
+  def previous_completed_order
+    @previous_completed_order ||= pending_order.conversation.pending_orders
+      .where.not(id: pending_order.id)
+      .where(status: %i[confirmed submitted_to_woocommerce])
+      .order(id: :desc).first
   end
 
   def confident_ai_intent?(intents)

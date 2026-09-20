@@ -70,6 +70,52 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     assert_equal "bengali", plan.language
   end
 
+  test "answers multiple requests and returns to the active order step" do
+    order = create_pending_order(status: :collecting_quantity)
+    product = order.conversation.business.products.create!(name: "Fresh Musk", price: 750, stock_quantity: 5)
+    order.update!(product: product)
+    order.conversation.business.create_business_policy!(delivery_charges: "Dhaka delivery is ৳80.")
+    message = order.conversation.messages.create!(sender_type: :customer, content: "price and delivery charge?")
+
+    plan = ConversationResponsePlanner.new(
+      conversation: order.conversation,
+      pending_order: order,
+      customer_message: message,
+      outcome: :price_inquiry,
+      secondary_outcomes: [ :delivery_charge_requested ],
+      interpretation: interpretation(intent: "product_price")
+    ).plan
+
+    assert_includes plan.content, "Fresh Musk is ৳750"
+    assert_includes plan.content, "Dhaka delivery is ৳80."
+    assert_includes plan.content, "To continue your order"
+  end
+
+  test "remembers and naturally mirrors the customer's form of address" do
+    order = create_pending_order
+    message = order.conversation.messages.create!(sender_type: :customer, content: "Bhai, hello")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :greeting,
+      interpretation: interpretation(intent: "greeting", language: "banglish")
+    ).plan
+
+    assert_equal "bhai", plan.address_preference
+    assert_includes plan.content, "Assalamu alaikum, bhai!"
+    assert_equal "bhai", order.conversation.reload.conversation_state["address_preference"]
+
+    follow_up = order.conversation.messages.create!(sender_type: :customer, content: "thanks")
+    next_plan = build_planner(
+      order: order,
+      message: follow_up,
+      outcome: :thanks,
+      interpretation: interpretation(intent: "thanks", language: "banglish")
+    ).plan
+    assert_includes next_plan.content, "welcome, bhai"
+  end
+
   private
 
   def build_planner(order:, message:, outcome:, interpretation:)

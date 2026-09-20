@@ -6,14 +6,15 @@ class ConversationResponsePlanner
     delivery_area_requested delivery_time_requested
   ].freeze
 
-  Plan = Data.define(:content, :language, :tone, :pending_question, :interrupted)
+  Plan = Data.define(:content, :language, :tone, :address_preference, :pending_question, :interrupted)
 
-  def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil)
+  def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil, secondary_outcomes: [])
     @conversation = conversation
     @pending_order = pending_order
     @customer_message = customer_message
     @outcome = outcome.to_sym
     @interpretation = interpretation
+    @secondary_outcomes = secondary_outcomes.map(&:to_sym)
   end
 
   def plan
@@ -25,6 +26,7 @@ class ConversationResponsePlanner
       content: content,
       language: state.fetch("preferred_language", "english"),
       tone: state.fetch("preferred_tone", "friendly"),
+      address_preference: state["address_preference"],
       pending_question: state["pending_question"],
       interrupted: interruption?
     )
@@ -32,12 +34,12 @@ class ConversationResponsePlanner
 
   private
 
-  attr_reader :conversation, :pending_order, :customer_message, :outcome, :interpretation
+  attr_reader :conversation, :pending_order, :customer_message, :outcome, :interpretation, :secondary_outcomes
 
   def planned_content
     return focused_clarification if outcome == :clarification_needed
 
-    content = base_reply
+    content = combined_reply
     return content unless interruption?
     return content if pending_prompt.blank? || content.include?(pending_prompt)
 
@@ -49,8 +51,22 @@ class ConversationResponsePlanner
       pending_order: pending_order,
       customer_message: customer_message,
       outcome: outcome,
-      interpretation: interpretation
+      interpretation: interpretation,
+      address_preference: address_preference
     ).content
+  end
+
+  def combined_reply
+    replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
+      BotReplyGenerator.new(
+        pending_order: pending_order,
+        customer_message: customer_message,
+        outcome: secondary_outcome,
+        interpretation: interpretation,
+        address_preference: address_preference
+      ).content
+    end
+    replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
   end
 
   def focused_clarification
@@ -63,7 +79,7 @@ class ConversationResponsePlanner
   end
 
   def interruption?
-    outcome.in?(INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
+    ([ outcome ] + secondary_outcomes).intersect?(INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
       collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
     ])
   end
@@ -82,6 +98,7 @@ class ConversationResponsePlanner
     previous_state.merge(
       "preferred_language" => preferred_language(previous_state),
       "preferred_tone" => preferred_tone,
+      "address_preference" => address_preference,
       "pending_question" => pending_question,
       "last_intent" => interpretation&.intent,
       "last_outcome" => outcome.to_s,
@@ -100,6 +117,11 @@ class ConversationResponsePlanner
 
   def preferred_tone
     interpretation&.sentiment == "negative" ? "calm_and_helpful" : "friendly"
+  end
+
+  def address_preference
+    @address_preference ||= ConversationAddressPreference.detect(customer_message.content) ||
+      conversation.conversation_state.to_h["address_preference"]
   end
 
   def pending_question

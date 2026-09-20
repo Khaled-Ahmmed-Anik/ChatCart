@@ -4,7 +4,18 @@ class AiIntentClassifier
   API_URL = "https://generativelanguage.googleapis.com/v1beta/models/%{model}:generateContent"
   DEFAULT_MODEL = "gemini-3.5-flash-lite"
   MINIMUM_CONFIDENCE = 0.65
-  Result = Data.define(:intent, :confidence, :entities, :language, :sentiment, :needs_clarification, :possible_intents)
+  Result = Data.define(
+    :intent, :secondary_intents, :confidence, :entities, :language, :sentiment,
+    :needs_clarification, :possible_intents
+  ) do
+    def initialize(secondary_intents: [], **attributes)
+      super(secondary_intents: secondary_intents, **attributes)
+    end
+
+    def intents
+      [ intent, *secondary_intents ].uniq
+    end
+  end
 
   def initialize(message:, pending_order:, recent_messages:, api_key: ENV["GEMINI_API_KEY"], model: ENV["GEMINI_MODEL"])
     @message = message
@@ -55,6 +66,7 @@ class AiIntentClassifier
     confidence = parsed.fetch("confidence").to_f.clamp(0.0, 1.0)
     Result.new(
       intent: intent,
+      secondary_intents: valid_secondary_intents(parsed.fetch("secondary_intents", []), primary: intent),
       confidence: confidence,
       entities: parsed.fetch("entities", {}).to_h.with_indifferent_access,
       language: parsed.fetch("language", "english"),
@@ -88,7 +100,9 @@ class AiIntentClassifier
   def system_prompt
     <<~PROMPT.squish
       Classify messages for a Bangladesh online shop. Understand English, Bengali script, and Banglish.
-      Choose exactly one registered intent. Extract only values explicitly stated by the customer.
+      Choose one primary registered intent and zero or more secondary intents when the message genuinely contains
+      multiple requests. Put the order-changing intent first. Never return more than one order-changing intent.
+      Extract only values explicitly stated by the customer.
       Never invent products, quantities, personal details, prices, policies, or order facts.
       Set needs_clarification true when the request is ambiguous. When it is true, provide the two or three
       most likely registered intents in possible_intents; otherwise return an empty possible_intents array.
@@ -100,7 +114,7 @@ class AiIntentClassifier
     <<~CONTEXT
       Registered intents: #{ConversationIntentRegistry::INTENTS.join(", ")}
       Current order status: #{pending_order&.status || "none"}
-      Remembered conversation state: #{remembered_state.to_json}
+      Remembered conversation state: #{conversation_memory.to_json}
       Available products: #{catalog.active.in_stock.order(:name).pluck(:name).join(", ")}
       Recent conversation:
       #{sanitized_history}
@@ -109,15 +123,13 @@ class AiIntentClassifier
   end
 
   def sanitized_history
-    recent_messages.last(6).map do |recent_message|
+    recent_messages.last(10).map do |recent_message|
       "#{recent_message.sender_type}: #{sanitize(recent_message.content)}"
     end.join("\n")
   end
 
-  def remembered_state
-    message.conversation.conversation_state.to_h.slice(
-      "preferred_language", "pending_question", "last_intent", "last_outcome"
-    )
+  def conversation_memory
+    ConversationMemory.new(message.conversation).context
   end
 
   def catalog
@@ -133,6 +145,10 @@ class AiIntentClassifier
       type: "OBJECT",
       properties: {
         intent: { type: "STRING", enum: ConversationIntentRegistry::INTENTS },
+        secondary_intents: {
+          type: "ARRAY",
+          items: { type: "STRING", enum: ConversationIntentRegistry::INTENTS }
+        },
         confidence: { type: "NUMBER" },
         entities: {
           type: "OBJECT",
@@ -153,11 +169,19 @@ class AiIntentClassifier
           items: { type: "STRING", enum: ConversationIntentRegistry::INTENTS }
         }
       },
-      required: %w[intent confidence entities language sentiment needs_clarification possible_intents]
+      required: %w[intent secondary_intents confidence entities language sentiment needs_clarification possible_intents]
     }
   end
 
   def valid_possible_intents(intents)
     Array(intents).select { |intent| ConversationIntentRegistry.valid?(intent) }.first(3)
+  end
+
+  def valid_secondary_intents(intents, primary:)
+    valid = Array(intents).select { |intent| ConversationIntentRegistry.valid?(intent) }.uniq - [ primary ]
+    mutating = valid.select { |intent| intent.in?(ConversationIntentRegistry::MUTATING_INTENTS) }
+    informational = valid.select { |intent| intent.in?(ConversationIntentRegistry::INFORMATIONAL_INTENTS) }
+    allowed_mutating = primary.in?(ConversationIntentRegistry::MUTATING_INTENTS) ? [] : mutating.first(1)
+    (allowed_mutating + informational).first(3)
   end
 end

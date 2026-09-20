@@ -2,6 +2,28 @@ require "test_helper"
 require "net/http"
 
 class AiConversationAssistantTest < ActiveSupport::TestCase
+  test "includes only the explicitly remembered form of address in the rewrite prompt" do
+    order = create_pending_order(product: create_product, status: :collecting_quantity)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "Bhai, eta nibo")
+    assistant = AiConversationAssistant.new(
+      customer_message: message,
+      pending_order: order,
+      outcome: :product_selected,
+      address_preference: "bhai",
+      api_key: "gemini-key",
+      model: "gemini-3.5-flash-lite"
+    )
+    captured_request = nil
+    response = fake_response(code: 200, body: gemini_response(reply: "Ji bhai, Fresh Musk ৳750. Koyta niben?"))
+
+    with_http_stub(->(request) { captured_request = request; response }) do
+      assistant.rewrite(fallback: "Fresh Musk is ৳750. How many would you like?")
+    end
+
+    assert_includes captured_request.body, "Customer's preferred form of address: bhai"
+    assert_includes captured_request.body, "Never infer gender"
+  end
+
   test "uses the deterministic reply when no API key is configured" do
     assistant = build_assistant(api_key: nil)
 

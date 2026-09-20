@@ -51,6 +51,31 @@ class AiIntentClassifierTest < ActiveSupport::TestCase
     end
   end
 
+  test "returns one safe primary action with informational secondary intents" do
+    classifier = build_classifier(content: "Fresh Musk 2 ta, delivery charge koto?", api_key: "gemini-key")
+    response = fake_response(
+      code: 200,
+      result: {
+        intent: "select_product",
+        secondary_intents: %w[change_quantity delivery_charge product_price],
+        confidence: 0.97,
+        entities: { product_name: "Fresh Musk", quantity: 2 },
+        language: "banglish",
+        sentiment: "neutral",
+        needs_clarification: false,
+        possible_intents: []
+      }
+    )
+
+    with_http_stub(->(*) { response }) do
+      result = classifier.classify
+
+      assert_equal "select_product", result.intent
+      assert_equal %w[delivery_charge product_price], result.secondary_intents
+      assert_equal %w[select_product delivery_charge product_price], result.intents
+    end
+  end
+
   test "does not call Gemini without an API key" do
     assert_nil build_classifier(content: "hello", api_key: nil).classify
   end

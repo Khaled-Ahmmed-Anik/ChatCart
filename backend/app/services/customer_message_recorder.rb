@@ -35,6 +35,7 @@ class CustomerMessageRecorder
       end
       current_order = conversation.pending_order
       interpretation = classify_intent(message, current_order, conversation)
+      record_intelligence(message, interpretation)
       pending_order = pending_order_for(conversation, interpretation)
       processor = ConversationMessageProcessor.new(
         message: message,
@@ -43,6 +44,20 @@ class CustomerMessageRecorder
       )
       processor.process
       outcome = processor.outcome
+      escalation = ConversationEscalationPolicy.new(
+        conversation: conversation,
+        interpretation: interpretation,
+        outcome: outcome
+      )
+      if escalation.handover?
+        conversation.update!(status: :handed_over)
+        outcome = :human_handover_started
+        message.update!(metadata: message.metadata.merge("handover_reason" => escalation.reason))
+        ConversationHandoverSummary.new(
+          conversation: conversation,
+          reason: escalation.reason
+        ).generate!
+      end
       if pending_order.confirmed? && pending_order.ready_for_confirmation?
         captured_order = OrderCaptureService.new(pending_order).capture
         enqueue_delivery(captured_order)
@@ -52,8 +67,15 @@ class CustomerMessageRecorder
         pending_order: pending_order,
         customer_message: message,
         outcome: outcome,
-        interpretation: interpretation
+        interpretation: interpretation,
+        secondary_outcomes: processor.secondary_outcomes
       ).plan
+      ConversationMemory.new(conversation).remember!(
+        interpretation: interpretation,
+        pending_order: pending_order,
+        outcome: outcome
+      )
+      log_decision(conversation, message, interpretation, outcome, processor.secondary_outcomes)
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
         content: AiConversationAssistant.new(
@@ -61,7 +83,8 @@ class CustomerMessageRecorder
           pending_order: pending_order,
           outcome: outcome,
           language: response_plan.language,
-          tone: response_plan.tone
+          tone: response_plan.tone,
+          address_preference: response_plan.address_preference
         ).rewrite(fallback: response_plan.content)
       )
     end
@@ -111,7 +134,7 @@ class CustomerMessageRecorder
     AiIntentClassifier.new(
       message: message,
       pending_order: pending_order,
-      recent_messages: conversation.messages.order(created_at: :desc, id: :desc).limit(6).reverse
+      recent_messages: conversation.messages.order(created_at: :desc, id: :desc).limit(10).reverse
     ).classify
   end
 
@@ -121,5 +144,33 @@ class CustomerMessageRecorder
 
     submission = order.delivery_submissions.find_or_create_by!(delivery_integration: integration)
     SubmitDeliveryJob.perform_later(submission) unless submission.status == "submitted"
+  end
+
+  def record_intelligence(message, interpretation)
+    return if interpretation.blank?
+
+    safe_decision = {
+      "intent" => interpretation.intent,
+      "secondary_intents" => interpretation.secondary_intents,
+      "confidence" => interpretation.confidence,
+      "language" => interpretation.language,
+      "sentiment" => interpretation.sentiment,
+      "needs_clarification" => interpretation.needs_clarification
+    }
+    message.update!(metadata: message.metadata.merge("conversation_intelligence" => safe_decision))
+  end
+
+  def log_decision(conversation, message, interpretation, outcome, secondary_outcomes)
+    MessengerSafeLogger.info(
+      "conversation_decision",
+      conversation_id: conversation.id,
+      message_id: message.id,
+      intent: interpretation&.intent,
+      secondary_intents: interpretation&.secondary_intents,
+      confidence: interpretation&.confidence,
+      outcome: outcome,
+      secondary_outcomes: secondary_outcomes,
+      handed_over: conversation.handed_over?
+    )
   end
 end

@@ -21,6 +21,7 @@ module Api
       return if performed?
 
       @conversation.handed_over!
+      ConversationHandoverSummary.new(conversation: @conversation, reason: "seller_takeover").generate!
       render json: summary(@conversation)
     end
 
@@ -54,7 +55,8 @@ module Api
         external_customer_id: conversation.external_customer_id,
         status: conversation.status,
         last_message_at: conversation.last_message_at,
-        message_count: conversation.messages.size
+        message_count: conversation.messages.size,
+        handover_summary: conversation.conversation_state.to_h["handover_summary"]
       }
     end
 

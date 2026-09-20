@@ -5,4 +5,5 @@
 /* Keep conversation identity/actions and composer visible while the transcript scrolls. */
 .conversation-list .panel-header,.transcript .panel-header{position:sticky;top:-21px;z-index:3;background:var(--card);padding:21px 0 14px;border-bottom:1px solid var(--line)}
 .messages{min-height:calc(100% - 70px);padding-top:4px}
+.handover-summary{display:grid;gap:4px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff7df;border:1px solid #efd99c;color:var(--warning);font-size:13px}.handover-summary span{text-transform:none}.handover-summary strong{color:var(--ink)}
 .reply-form{bottom:-21px;z-index:3;padding:15px 0 21px;border-top:1px solid var(--line)}

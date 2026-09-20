@@ -1,9 +1,10 @@
 class BotReplyGenerator
-  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil)
+  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil)
     @pending_order = pending_order
     @customer_message = customer_message
     @outcome = outcome&.to_sym
     @interpretation = interpretation
+    @address_preference = address_preference
   end
 
   def content
@@ -12,18 +13,18 @@ class BotReplyGenerator
 
   private
 
-  attr_reader :pending_order, :customer_message, :outcome, :interpretation
+  attr_reader :pending_order, :customer_message, :outcome, :interpretation, :address_preference
 
   def outcome_reply
     case outcome
     when :greeting
-      "Hi! 👋 Welcome to ChatCart. #{status_prompt}"
+      "Assalamu alaikum#{address_suffix}! 👋 Welcome to ChatCart. #{status_prompt}"
     when :help
       help_reply
     when :wellbeing
-      "Alhamdulillah, I’m doing well 😊 How can I help with your order today?"
+      "Alhamdulillah, I’m doing well#{address_suffix} 😊 How can I help with your order today?"
     when :thanks
-      "You’re welcome! #{status_prompt}"
+      "You’re very welcome#{address_suffix}! #{status_prompt}"
     when :goodbye
       "Thanks for chatting with ChatCart. Take care! 👋"
     when :bot_identity
@@ -34,6 +35,8 @@ class BotReplyGenerator
       "I’m sorry you’ve had a frustrating experience. Please briefly describe the issue, and I’ll help route it to the seller."
     when :human_agent
       "I’ll mark this for seller assistance. Please leave a short description of what you need help with."
+    when :human_handover_started
+      "I’ve passed this conversation to the seller so they can help properly. They’ll continue with you here as soon as possible."
     when :clarification_needed
       clarification_reply
     when :price_inquiry
@@ -52,6 +55,8 @@ class BotReplyGenerator
       "I don’t have those product details configured yet. Please ask the seller, or choose from the available products: #{available_product_names}."
     when :restarted
       "No problem—we’ll start a fresh order. #{product_selection_prompt}"
+    when :repeat_order_prepared
+      "I’ve prepared the same order again for you. #{confirmation_prompt}"
     when :order_details_requested
       order_details_reply
     when :order_history_requested
@@ -279,5 +284,10 @@ class BotReplyGenerator
 
   def bottle_word(quantity)
     quantity == 1 ? "bottle" : "bottles"
+  end
+
+  def address_suffix
+    display = ConversationAddressPreference.display(address_preference)
+    display.present? ? ", #{display}" : ""
   end
 end

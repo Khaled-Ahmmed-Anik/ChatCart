@@ -6,7 +6,7 @@ class AiConversationAssistant
   MAX_REPLY_LENGTH = 1_200
 
   def initialize(
-    customer_message:, pending_order:, outcome:, language: nil, tone: nil,
+    customer_message:, pending_order:, outcome:, language: nil, tone: nil, address_preference: nil,
     api_key: ENV["GEMINI_API_KEY"], model: ENV["GEMINI_MODEL"]
   )
     @customer_message = customer_message
@@ -14,6 +14,7 @@ class AiConversationAssistant
     @outcome = outcome
     @language = language
     @tone = tone
+    @address_preference = address_preference
     @api_key = api_key
     @model = model.presence || DEFAULT_MODEL
   end
@@ -30,7 +31,7 @@ class AiConversationAssistant
 
   private
 
-  attr_reader :customer_message, :pending_order, :outcome, :language, :tone, :api_key, :model
+  attr_reader :customer_message, :pending_order, :outcome, :language, :tone, :address_preference, :api_key, :model
 
   def request_reply(fallback)
     uri = URI(format(API_URL, model: model))
@@ -89,6 +90,8 @@ class AiConversationAssistant
       You rewrite customer-service replies for ChatCart, a Bangladesh Messenger shop.
       Match the customer's language: natural English, Bengali script, or Banglish written in Latin characters.
       Be warm, concise, and conversational, but do not claim to be human.
+      Respect the supplied form of address naturally, but do not repeat it in every sentence.
+      Never infer gender or invent a title that was not supplied.
       Preserve every product name, quantity, price, phone number, address, and instruction exactly as provided.
       Never add discounts, promises, products, prices, stock, delivery times, or order facts.
       Do not change the meaning or next requested order field. Return only the requested JSON object.
@@ -102,6 +105,7 @@ class AiConversationAssistant
       Processing outcome: #{outcome}
       Preferred language: #{language || "match the customer"}
       Response tone: #{tone || "friendly"}
+      Customer's preferred form of address: #{ConversationAddressPreference.display(address_preference) || "not specified"}
       Approved factual reply: #{fallback.to_json}
 
       Rewrite the approved reply in the customer's language and tone. Keep it under 600 characters unless it is an order summary.

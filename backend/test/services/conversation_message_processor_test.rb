@@ -295,6 +295,49 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_nil pending_order.reload.product
   end
 
+  test "exposes informational secondary outcomes without executing another order action" do
+    product = create_product(name: "Fresh Musk")
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(
+      sender_type: :customer, content: "Fresh Musk, delivery charge koto?"
+    )
+    interpretation = ai_interpretation(
+      intent: "select_product",
+      entities: { product_name: product.name },
+      secondary_intents: %w[delivery_charge change_quantity]
+    )
+    processor = ConversationMessageProcessor.new(
+      message: message, pending_order: pending_order, interpretation: interpretation
+    )
+
+    processor.process
+
+    assert_equal :product_selected, processor.outcome
+    assert_equal [ :delivery_charge_requested ], processor.secondary_outcomes
+    assert_equal product, pending_order.reload.product
+    assert_nil pending_order.quantity
+  end
+
+  test "reuses remembered customer details only when explicitly requested" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    product = create_product
+    conversation.create_pending_order!(
+      product: product, quantity: 1, customer_name: "Khaled", phone: "01712345678",
+      address: "Badda, Dhaka", status: :confirmed
+    )
+    current = conversation.create_pending_order!(product: product, quantity: 2, status: :collecting_name)
+
+    process_message(current, "same name")
+    process_message(current, "same phone")
+    process_message(current, "same address")
+
+    current.reload
+    assert_equal "Khaled", current.customer_name
+    assert_equal "01712345678", current.phone
+    assert_equal "Badda, Dhaka", current.address
+    assert_predicate current, :awaiting_confirmation?
+  end
+
   private
 
   def process_message(pending_order, content)
@@ -331,9 +374,10 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     )
   end
 
-  def ai_interpretation(intent:, entities: {}, confidence: 0.95, needs_clarification: false, possible_intents: [])
+  def ai_interpretation(intent:, entities: {}, confidence: 0.95, needs_clarification: false, possible_intents: [], secondary_intents: [])
     AiIntentClassifier::Result.new(
       intent: intent,
+      secondary_intents: secondary_intents,
       confidence: confidence,
       entities: entities.with_indifferent_access,
       language: "banglish",

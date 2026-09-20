@@ -157,6 +157,40 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     end
   end
 
+  test "prepares a previous order again and requires fresh confirmation" do
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: "fb-user-123")
+    previous = conversation.create_pending_order!(
+      product: product, quantity: 2, customer_name: "Khaled", phone: "01712345678",
+      address: "Dhaka", status: :confirmed
+    )
+
+    result = record_message("re-order")
+
+    assert_not_equal previous, result.pending_order
+    assert_equal :repeat_order_prepared, result.outcome
+    assert_predicate result.pending_order, :awaiting_confirmation?
+    assert_equal previous.attributes.slice("product_id", "quantity", "customer_name", "phone", "address"),
+      result.pending_order.attributes.slice("product_id", "quantity", "customer_name", "phone", "address")
+    assert_includes result.bot_reply.content, "same order again"
+  end
+
+  test "hands the conversation to a seller when explicitly requested" do
+    result = record_message("I want to talk to a human agent")
+
+    assert_equal :human_handover_started, result.outcome
+    assert_predicate result.conversation.reload, :handed_over?
+    assert_equal "customer_requested_human", result.message.reload.metadata["handover_reason"]
+    assert_equal "customer_requested_human", result.conversation.conversation_state.dig("handover_summary", "reason")
+    assert_equal "I want to talk to a human agent",
+      result.conversation.conversation_state.dig("handover_summary", "last_customer_message")
+    assert_includes result.bot_reply.content, "passed this conversation to the seller"
+
+    follow_up = record_message("hello?")
+    assert_equal :awaiting_human, follow_up.outcome
+    assert_nil follow_up.bot_reply
+  end
+
   private
 
   def record_message(content)
