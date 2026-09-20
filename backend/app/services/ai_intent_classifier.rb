@@ -115,7 +115,7 @@ class AiIntentClassifier
       Registered intents: #{ConversationIntentRegistry::INTENTS.join(", ")}
       Current order status: #{pending_order&.status || "none"}
       Remembered conversation state: #{conversation_memory.to_json}
-      Available products: #{catalog.active.in_stock.order(:name).pluck(:name).join(", ")}
+      Available products: #{catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }.map(&:name).join(", ")}
       Recent conversation:
       #{sanitized_history}
       Current customer message: #{sanitize(message.content)}
@@ -154,7 +154,12 @@ class AiIntentClassifier
           type: "OBJECT",
           properties: {
             product_name: { type: "STRING" },
+            variant_name: { type: "STRING" },
+            size: { type: "STRING" },
             quantity: { type: "INTEGER" },
+            minimum_price: { type: "NUMBER" },
+            maximum_price: { type: "NUMBER" },
+            budget: { type: "NUMBER" },
             customer_name: { type: "STRING" },
             phone: { type: "STRING" },
             address: { type: "STRING" },

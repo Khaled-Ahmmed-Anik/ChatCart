@@ -10,7 +10,17 @@ module Mutations
       require_management_role!
       product = id ? context[:current_business].products.find(id) : context[:current_business].products.new
 
-      if product.update(input.to_h)
+      attributes = input.to_h
+      variants = attributes.delete(:variants)
+      if variants
+        submitted_ids = variants.filter_map { |variant| variant[:id]&.to_i }
+        removed = product.product_variants.where.not(id: submitted_ids).map do |variant|
+          { id: variant.id, _destroy: true }
+        end
+        attributes[:product_variants_attributes] = variants + removed
+      end
+
+      if product.update(attributes)
         { product: product, errors: [] }
       else
         { product: nil, errors: product.errors.full_messages }

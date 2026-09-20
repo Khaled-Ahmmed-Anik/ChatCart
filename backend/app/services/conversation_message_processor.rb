@@ -28,6 +28,8 @@ class ConversationMessageProcessor
       collect_product
     when "collecting_quantity"
       collect_quantity
+    when "collecting_variant"
+      collect_variant
     when "collecting_name"
       collect_name
     when "collecting_phone"
@@ -112,9 +114,22 @@ class ConversationMessageProcessor
     end
 
     pending_order.product = product
-    pending_order.status = :collecting_quantity
+    pending_order.product_variant = matching_variant(product)
+    pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
+      :collecting_variant : :collecting_quantity
     pending_order.save!
     @outcome = :product_selected
+  end
+
+  def collect_variant
+    variant = matching_variant(pending_order.product)
+    if variant.blank?
+      @outcome = :variant_not_found
+      return
+    end
+
+    pending_order.update!(product_variant: variant, status: :collecting_quantity)
+    @outcome = :variant_selected
   end
 
   def collect_quantity
@@ -123,7 +138,7 @@ class ConversationMessageProcessor
       @outcome = :invalid_quantity
       return
     end
-    if pending_order.product.present? && !pending_order.product.available_for_quantity?(quantity)
+    if selected_inventory.present? && !selected_inventory.available_for_quantity?(quantity)
       @outcome = :quantity_unavailable
       return
     end
@@ -219,6 +234,8 @@ class ConversationMessageProcessor
       :help
     elsif thanks?
       :thanks
+    elsif budget_recommendation_request?
+      :product_recommendation_requested
     elsif price_question?
       :price_inquiry
     elsif stock_question?
@@ -233,6 +250,7 @@ class ConversationMessageProcessor
   def restart_order
     pending_order.update!(
       product: nil,
+      product_variant: nil,
       quantity: nil,
       customer_name: nil,
       phone: nil,
@@ -243,13 +261,15 @@ class ConversationMessageProcessor
 
   def repeat_previous_order
     previous = previous_completed_order
-    unless previous&.product&.available_for_quantity?(previous.quantity)
+    inventory = previous&.product_variant || previous&.product
+    unless inventory&.available_for_quantity?(previous.quantity)
       restart_order
       return false
     end
 
     pending_order.update!(
       product: previous.product,
+      product_variant: previous.product_variant,
       quantity: previous.quantity,
       customer_name: previous.customer_name,
       phone: previous.phone,
@@ -306,13 +326,17 @@ class ConversationMessageProcessor
       "changed_at" => Time.current.iso8601,
       "message_id" => message.id
     }
-    pending_order.update!(product: product, quantity: nil, status: :collecting_quantity, change_history: history)
+    pending_order.update!(
+      product: product, product_variant: nil, quantity: nil,
+      status: product.product_variants.any? ? :collecting_variant : :collecting_quantity,
+      change_history: history
+    )
     true
   end
 
   def update_quantity(value)
     quantity = parse_quantity(value)
-    return false if quantity.blank? || !pending_order.product.available_for_quantity?(quantity)
+    return false if quantity.blank? || selected_inventory.blank? || !selected_inventory.available_for_quantity?(quantity)
 
     record_change(:quantity, quantity)
   end
@@ -369,7 +393,7 @@ class ConversationMessageProcessor
 
   def collect_interpreted_quantity
     quantity = interpretation.entities[:quantity].to_i
-    return false unless quantity.positive? && pending_order.product&.available_for_quantity?(quantity)
+    return false unless quantity.positive? && selected_inventory&.available_for_quantity?(quantity)
 
     pending_order.update!(quantity: quantity, status: :collecting_name)
     true
@@ -399,13 +423,27 @@ class ConversationMessageProcessor
   def matching_product
     interpreted_name = interpreted_entity(:product_name, for_intent: "select_product")
     if interpreted_name.present?
-      interpreted_product = catalog.active.in_stock.find_by("LOWER(name) = ?", interpreted_name.downcase)
-      return interpreted_product if interpreted_product.present?
+      interpreted_product = catalog.active.includes(:product_variants).find_by("LOWER(name) = ?", interpreted_name.downcase)
+      return interpreted_product if interpreted_product&.total_available_stock.to_i.positive?
     end
 
-    catalog.active.in_stock.find do |product|
-      content.downcase.include?(product.name.downcase)
+    catalog.active.includes(:product_variants).find do |product|
+      product.total_available_stock.positive? && content.downcase.include?(product.name.downcase)
     end
+  end
+
+  def matching_variant(product)
+    return if product.blank? || product.product_variants.none?
+
+    requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
+    product.available_variants.find do |variant|
+      candidates = [ variant.name, variant.size ].compact.map(&:downcase)
+      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate| content.downcase.include?(candidate) }
+    end
+  end
+
+  def selected_inventory
+    pending_order.product_variant || pending_order.product
   end
 
   def named_unavailable_product?
@@ -473,6 +511,11 @@ class ConversationMessageProcessor
 
   def price_question?
     content.downcase.match?(/\b(price|cost)\b|how much/)
+  end
+
+  def budget_recommendation_request?
+    normalized = content.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
+    normalized.match?(/\b(under|below|within|budget|cheapest|lowest|starting price|price starts|kom dam|moddhe)\b|মধ্যে|নিচে|বাজেট|কম দাম/)
   end
 
   def stock_question?

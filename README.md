@@ -9,6 +9,7 @@ ChatCart is a multi-business conversational-commerce platform. It receives Messe
 - Strict business tenancy with per-business users, products, policies, channels, and delivery settings
 - Role-based owner, admin, sales, fulfilment, and analyst access
 - Product catalog with price, stock, tags, and active status
+- Rich product knowledge, size/price/stock variants, and verified budget-aware recommendations
 - Persistent conversations and message history
 - Contextual conversation memory with multi-intent English, Bengali, and Banglish understanding
 - Safe repeat orders, remembered-detail reuse, confidence-based clarification, and automatic seller handover

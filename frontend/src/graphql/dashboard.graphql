@@ -39,11 +39,27 @@ query DashboardProducts($first: Int = 50) {
     id
     name
     description
+    shortDescription
+    category
+    benefits
+    usageInstructions
+    suitableFor
+    productAttributes
     price
     stockQuantity
     tags
     active
     wooCommerceProductId
+    variants {
+      id
+      name
+      size
+      sku
+      price
+      stockQuantity
+      active
+      position
+    }
   }
 }
 
@@ -53,11 +69,27 @@ mutation SaveDashboardProduct($id: ID, $input: ProductInput!) {
       id
       name
       description
+      shortDescription
+      category
+      benefits
+      usageInstructions
+      suitableFor
+      productAttributes
       price
       stockQuantity
       tags
       active
       wooCommerceProductId
+      variants {
+        id
+        name
+        size
+        sku
+        price
+        stockQuantity
+        active
+        position
+      }
     }
     errors
   }

@@ -25,9 +25,11 @@ class OrderCaptureService
       order.order_items.destroy_all
       order.order_items.create!(
         product: pending_order.product,
+        product_variant: pending_order.product_variant,
         product_name: pending_order.product.name,
+        variant_name: pending_order.product_variant&.display_name,
         quantity: pending_order.quantity,
-        unit_price: pending_order.product.price,
+        unit_price: pending_order.unit_price,
         total: pending_order.total_price
       )
       order

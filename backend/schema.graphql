@@ -36,23 +36,59 @@ type Mutation {
 
 type Product {
   active: Boolean!
+  benefits: String
+  category: String
   description: String
   id: ID!
   name: String!
   price: String!
+  productAttributes: JSON!
+  shortDescription: String
   stockQuantity: Int!
+  suitableFor: String
   tags: String
+  usageInstructions: String
+  variants: [ProductVariant!]!
   wooCommerceProductId: String
 }
 
 input ProductInput {
   active: Boolean = true
+  benefits: String
+  category: String
   description: String
   name: String!
   price: String!
+  productAttributes: JSON
+  shortDescription: String
   stockQuantity: Int!
+  suitableFor: String
   tags: String
+  usageInstructions: String
+  variants: [ProductVariantInput!]
   wooCommerceProductId: String
+}
+
+type ProductVariant {
+  active: Boolean!
+  id: ID!
+  name: String!
+  position: Int!
+  price: String!
+  size: String
+  sku: String
+  stockQuantity: Int!
+}
+
+input ProductVariantInput {
+  active: Boolean = true
+  id: ID
+  name: String!
+  position: Int = 0
+  price: String!
+  size: String
+  sku: String
+  stockQuantity: Int!
 }
 
 type Query {

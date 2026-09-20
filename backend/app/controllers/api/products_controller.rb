@@ -4,11 +4,11 @@ module Api
     before_action :set_product, only: %i[show update destroy]
 
     def index
-      render json: current_business.products.order(:name)
+      render json: current_business.products.includes(:product_variants).order(:name), include: :product_variants
     end
 
     def show
-      render json: @product
+      render json: @product, include: :product_variants
     end
 
     def create
@@ -43,7 +43,11 @@ module Api
     end
 
     def product_params
-      params.expect(product: [ :name, :woo_commerce_product_id, :price, :stock_quantity, :description, :tags, :active ])
+      params.expect(product: [
+        :name, :woo_commerce_product_id, :price, :stock_quantity, :description, :short_description,
+        :category, :benefits, :usage_instructions, :suitable_for, :tags, :active, product_attributes: {},
+        product_variants_attributes: [ :id, :name, :size, :sku, :price, :stock_quantity, :active, :position, :_destroy ]
+      ])
     end
   end
 end

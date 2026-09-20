@@ -15,6 +15,26 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order, :collecting_quantity?
   end
 
+  test "collects a product variant before quantity and uses variant stock" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "3 ml", size: "3 ml", price: 250, stock_quantity: 2)
+    product.product_variants.create!(name: "6 ml", size: "6 ml", price: 450, stock_quantity: 5)
+    pending_order = create_pending_order(status: :collecting_product)
+
+    process_message(pending_order, "I want The Oud")
+    assert_predicate pending_order.reload, :collecting_variant?
+
+    processor = process_message(pending_order, "6 ml")
+    assert_equal :variant_selected, processor.outcome
+    assert_equal "6 ml", pending_order.reload.product_variant.size
+    assert_predicate pending_order, :collecting_quantity?
+
+    unavailable = process_message(pending_order, "6")
+    assert_equal :quantity_unavailable, unavailable.outcome
+    assert_predicate pending_order.reload, :collecting_quantity?
+    assert_equal 5, pending_order.product_variant.stock_quantity
+  end
+
   test "does not collect inactive or out of stock product" do
     create_product(name: "Fresh Musk", active: false, stock_quantity: 10)
     create_product(name: "Royal Oud", active: true, stock_quantity: 0)

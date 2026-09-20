@@ -81,6 +81,34 @@ class GraphqlControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Private", product.reload.name
   end
 
+  test "creates rich product knowledge and variants" do
+    mutation = <<~GRAPHQL
+      mutation SaveProduct($input: ProductInput!) {
+        saveProduct(input: $input) {
+          product { name category benefits variants { name size price stockQuantity } }
+          errors
+        }
+      }
+    GRAPHQL
+    input = {
+      name: "The Oud", price: "250", stockQuantity: 0, category: "Fragrance",
+      benefits: "Deep woody profile", productAttributes: { longevity: "8 hours" },
+      variants: [
+        { name: "3 ml", size: "3 ml", price: "250", stockQuantity: 10 },
+        { name: "6 ml", size: "6 ml", price: "450", stockQuantity: 5 }
+      ]
+    }
+
+    post graphql_path, params: { query: mutation, variables: { input: input } }, headers: authorization, as: :json
+
+    assert_response :success
+    payload = JSON.parse(response.body).dig("data", "saveProduct")
+    assert_empty payload["errors"]
+    assert_equal "Fragrance", payload.dig("product", "category")
+    assert_equal [ "3 ml", "6 ml" ], payload.dig("product", "variants").pluck("size")
+    assert_equal 2, @business.products.find_by!(name: "The Oud").product_variants.count
+  end
+
   private
 
   def authorization

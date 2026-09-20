@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -165,12 +165,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
     t.bigint "order_id", null: false
     t.bigint "product_id"
     t.string "product_name", null: false
+    t.bigint "product_variant_id"
     t.integer "quantity", null: false
     t.decimal "total", precision: 12, scale: 2, null: false
     t.decimal "unit_price", precision: 12, scale: 2, null: false
     t.datetime "updated_at", null: false
+    t.string "variant_name"
     t.index ["order_id"], name: "index_order_items_on_order_id"
     t.index ["product_id"], name: "index_order_items_on_product_id"
+    t.index ["product_variant_id"], name: "index_order_items_on_product_variant_id"
   end
 
   create_table "orders", force: :cascade do |t|
@@ -206,12 +209,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
     t.string "customer_name"
     t.string "phone"
     t.bigint "product_id"
+    t.bigint "product_variant_id"
     t.integer "quantity"
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.string "woo_commerce_order_id"
     t.index ["conversation_id"], name: "index_pending_orders_on_conversation_id"
     t.index ["product_id"], name: "index_pending_orders_on_product_id"
+    t.index ["product_variant_id"], name: "index_pending_orders_on_product_variant_id"
     t.index ["status"], name: "index_pending_orders_on_status"
     t.index ["woo_commerce_order_id"], name: "index_pending_orders_on_woo_commerce_order_id"
   end
@@ -227,16 +232,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
     t.index ["email"], name: "index_platform_administrators_on_email", unique: true
   end
 
+  create_table "product_variants", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.bigint "product_id", null: false
+    t.string "size"
+    t.string "sku"
+    t.integer "stock_quantity", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id", "sku"], name: "index_product_variants_on_product_id_and_sku", unique: true, where: "(sku IS NOT NULL)"
+    t.index ["product_id"], name: "index_product_variants_on_product_id"
+  end
+
   create_table "products", force: :cascade do |t|
     t.boolean "active", default: true, null: false
+    t.text "benefits"
     t.bigint "business_id", null: false
+    t.string "category"
     t.datetime "created_at", null: false
     t.text "description"
     t.string "name", null: false
     t.decimal "price", precision: 10, scale: 2, null: false
+    t.jsonb "product_attributes", default: {}, null: false
+    t.text "short_description"
     t.integer "stock_quantity", default: 0, null: false
+    t.text "suitable_for"
     t.string "tags"
     t.datetime "updated_at", null: false
+    t.text "usage_instructions"
     t.string "woo_commerce_product_id"
     t.index ["active"], name: "index_products_on_active"
     t.index ["business_id"], name: "index_products_on_business_id"
@@ -272,12 +298,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000400) do
   add_foreign_key "messenger_deliveries", "messenger_webhook_events"
   add_foreign_key "messenger_webhook_events", "businesses"
   add_foreign_key "order_items", "orders"
+  add_foreign_key "order_items", "product_variants"
   add_foreign_key "order_items", "products"
   add_foreign_key "orders", "businesses"
   add_foreign_key "orders", "conversations"
   add_foreign_key "orders", "pending_orders"
   add_foreign_key "pending_orders", "conversations"
+  add_foreign_key "pending_orders", "product_variants"
   add_foreign_key "pending_orders", "products"
+  add_foreign_key "product_variants", "products"
   add_foreign_key "products", "businesses"
   add_foreign_key "users", "businesses"
 end

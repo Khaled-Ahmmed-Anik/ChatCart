@@ -7,3 +7,5 @@
 .messages{min-height:calc(100% - 70px);padding-top:4px}
 .handover-summary{display:grid;gap:4px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff7df;border:1px solid #efd99c;color:var(--warning);font-size:13px}.handover-summary span{text-transform:none}.handover-summary strong{color:var(--ink)}
 .reply-form{bottom:-21px;z-index:3;padding:15px 0 21px;border-top:1px solid var(--line)}
+.variant-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-top:8px;border-top:1px solid var(--line)}.variant-heading small{display:block;color:var(--muted);margin-top:3px}.variant-list{display:grid;gap:8px}.variant-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .7fr auto;gap:8px;align-items:center}.variant-row input{min-width:0}
+@media(max-width:720px){.variant-row{grid-template-columns:1fr 1fr}.variant-row button{grid-column:1/-1}}

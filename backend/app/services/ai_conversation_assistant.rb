@@ -128,7 +128,10 @@ class AiConversationAssistant
       formatted_total
     ].compact
     catalog_facts = pending_order.conversation.business.products.find_each.flat_map do |product|
-      [ product.name, formatted_price(product.price) ]
+      variant_facts = product.product_variants.flat_map do |variant|
+        [ variant.display_name, formatted_price(variant.price) ]
+      end
+      [ product.name, formatted_price(product.price), *variant_facts ]
     end
 
     (order_facts + catalog_facts).uniq.select { |fact| fallback.include?(fact) }
