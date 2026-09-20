@@ -114,6 +114,6 @@ class GuidedSalesConversation
     return "confirm" if pending_order.awaiting_confirmation?
     return "checkout" if pending_order.status.in?(%w[collecting_name collecting_phone collecting_address])
     return "configure" if pending_order.status.in?(%w[collecting_variant collecting_quantity])
-    return "discover" if pending_order.collecting_product? && active?
+    "discover" if pending_order.collecting_product? && active?
   end
 end

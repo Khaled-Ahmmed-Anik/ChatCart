@@ -51,13 +51,13 @@ class FragrancePreferenceExtractor
 
   def detected_format
     return "combo" if message.match?(/\b(combo|bundle|set|collection|multiple|variety)\b/)
-    return "single" if message.match?(/\b(single|one perfume|one fragrance|specific one|ekta)\b|একটা/)
+    "single" if message.match?(/\b(single|one perfume|one fragrance|specific one|ekta)\b|একটা/)
   end
 
   def detected_audience
     return "women" if message.match?(/\b(for her|women|woman|female|ladies|girl|apu|apa)\b|মহিলা|মেয়েদের/)
     return "men" if message.match?(/\b(for him|men|man|male|gents|boy|bhai)\b|পুরুষ|ছেলেদের/)
-    return "unisex" if message.match?(/\bunisex\b/)
+    "unisex" if message.match?(/\bunisex\b/)
   end
 
   def detected_values(dictionary)

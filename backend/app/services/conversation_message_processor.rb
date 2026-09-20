@@ -505,7 +505,7 @@ class ConversationMessageProcessor
     normalized = content.downcase.squish
     return variants.first if normalized.match?(/\b(small|smallest|choto|trial|try)\b/)
     return variants.last if normalized.match?(/\b(large|largest|boro|big|best value|regular use)\b/)
-    return variants[variants.length / 2] if normalized.match?(/\b(medium|middle|majhari)\b/)
+    variants[variants.length / 2] if normalized.match?(/\b(medium|middle|majhari)\b/)
   end
 
   def variant_size_number(variant)
