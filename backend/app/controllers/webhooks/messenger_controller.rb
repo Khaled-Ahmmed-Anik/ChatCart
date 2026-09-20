@@ -27,7 +27,9 @@ module Webhooks
       business = ChannelConnection.find_by(channel: "facebook", external_account_id: entry_id)&.business || Business.default
       result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
 
-      ProcessMessengerEventJob.perform_later(result.event) if result.created && event_type == :customer_text
+      if result.created && event_type == :customer_text
+        ProcessMessengerEventJob.set(wait: messenger_message_debounce).perform_later(result.event)
+      end
       log_received(result.event, result.created)
 
       { type: event_type, status: result.created ? result.event.status : "duplicate" }
@@ -65,6 +67,10 @@ module Webhooks
 
     def verify_token
       ENV.fetch("MESSENGER_VERIFY_TOKEN", DEFAULT_VERIFY_TOKEN)
+    end
+
+    def messenger_message_debounce
+      ENV.fetch("MESSENGER_MESSAGE_DEBOUNCE_SECONDS", "2").to_f.seconds
     end
 
     def messaging_events

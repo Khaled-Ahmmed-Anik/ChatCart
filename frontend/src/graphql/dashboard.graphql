@@ -50,6 +50,12 @@ query DashboardProducts($first: Int = 50) {
     tags
     active
     wooCommerceProductId
+    productType
+    stockStrategy
+    aliases
+    imageUrls
+    sourceUrl
+    archivedAt
     variants {
       id
       name
@@ -59,6 +65,14 @@ query DashboardProducts($first: Int = 50) {
       stockQuantity
       active
       position
+    }
+    comboItems {
+      id
+      quantity
+      selectionGroup
+      required
+      position
+      componentProduct { id name }
     }
   }
 }
@@ -80,6 +94,12 @@ mutation SaveDashboardProduct($id: ID, $input: ProductInput!) {
       tags
       active
       wooCommerceProductId
+      productType
+      stockStrategy
+      aliases
+      imageUrls
+      sourceUrl
+      archivedAt
       variants {
         id
         name
@@ -90,7 +110,37 @@ mutation SaveDashboardProduct($id: ID, $input: ProductInput!) {
         active
         position
       }
+      comboItems {
+        id
+        quantity
+        selectionGroup
+        required
+        position
+        componentProduct { id name }
+      }
     }
+    errors
+  }
+}
+
+mutation ArchiveDashboardProduct($id: ID!, $permanent: Boolean = false) {
+  archiveProduct(id: $id, permanent: $permanent) {
+    deleted
+    product { id active archivedAt }
+    errors
+  }
+}
+
+mutation PreviewDashboardProductImport($url: String!) {
+  previewProductImport(url: $url) {
+    draft { id sourceUrl status extractedData error }
+    errors
+  }
+}
+
+mutation ApproveDashboardProductImport($draftId: ID!) {
+  approveProductImport(draftId: $draftId) {
+    product { id name active sourceUrl }
     errors
   }
 }

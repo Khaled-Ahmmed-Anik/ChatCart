@@ -3,6 +3,7 @@ class Business < ApplicationRecord
 
   has_many :users, dependent: :destroy
   has_many :products, dependent: :destroy
+  has_many :product_import_drafts, dependent: :destroy
   has_many :conversations, dependent: :destroy
   has_many :orders, dependent: :destroy
   has_many :channel_connections, dependent: :destroy

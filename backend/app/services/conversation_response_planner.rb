@@ -1,4 +1,8 @@
 class ConversationResponsePlanner
+  FOCUSED_OUTCOMES = %i[
+    product_recommendation_requested product_ambiguous variant_not_found clarification_needed
+  ].freeze
+
   INTERRUPTING_OUTCOMES = %i[
     price_inquiry stock_inquiry product_details_requested product_recommendation_requested
     product_comparison_requested product_variants_requested product_images_requested
@@ -57,6 +61,8 @@ class ConversationResponsePlanner
   end
 
   def combined_reply
+    return base_reply if outcome.in?(FOCUSED_OUTCOMES)
+
     replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
         pending_order: pending_order,

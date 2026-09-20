@@ -37,6 +37,32 @@ class ProductRecommendationServiceTest < ActiveSupport::TestCase
     assert_equal 250.to_d, result.minimum_price
   end
 
+  test "asks whether the customer wants a single fragrance or combo for a broad request" do
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "suggest something"
+    ).call
+
+    assert_includes result.clarification_question, "one perfume or a combo"
+  end
+
+  test "filters recommendations using a remembered product format" do
+    combo = @business.products.create!(
+      name: "Fresh Set", price: 900, stock_quantity: 5, product_type: "fixed_combo",
+      category: "combo", tags: "fresh office"
+    )
+
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "fresh office fragrance",
+      preferences: { format: "combo", scent_families: [ "fresh" ], occasions: [ "office" ] },
+      limit: 10
+    ).call
+
+    assert_equal [ combo ], result.offers.map(&:product).uniq
+    assert_nil result.clarification_question
+  end
+
   private
 
   def recommend(message)

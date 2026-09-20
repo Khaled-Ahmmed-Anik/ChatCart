@@ -109,7 +109,8 @@ class ConversationMessageProcessor
   def collect_product
     product = matching_product
     if product.blank?
-      @outcome = named_unavailable_product? ? :product_unavailable : :product_not_found
+      @outcome = product_resolution.ambiguous? ? :product_ambiguous :
+        (named_unavailable_product? ? :product_unavailable : :product_not_found)
       return
     end
 
@@ -228,18 +229,26 @@ class ConversationMessageProcessor
       :confirmation_deferred
     elsif order_details_request?
       :order_details_requested
+    elsif product_list_request?
+      :product_list_requested
     elsif greeting?
       :greeting
-    elsif help_request?
-      :help
-    elsif thanks?
-      :thanks
     elsif budget_recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
       :product_recommendation_requested
     elsif price_question?
       :price_inquiry
     elsif stock_question?
       :stock_inquiry
+    elsif recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
+    elsif help_request?
+      :help
+    elsif thanks?
+      :thanks
     elsif human_agent_request?
       :human_agent
     end
@@ -257,6 +266,8 @@ class ConversationMessageProcessor
       address: nil,
       status: :collecting_product
     )
+    state = pending_order.conversation.conversation_state.to_h.except("shopping_preferences")
+    pending_order.conversation.update!(conversation_state: state)
   end
 
   def repeat_previous_order
@@ -314,8 +325,9 @@ class ConversationMessageProcessor
   end
 
   def update_product(name)
-    product = catalog.active.in_stock.find_by("LOWER(name) = ?", name.downcase)
-    return false if product.blank?
+    resolution = ProductResolutionService.new(business: pending_order.conversation.business, query: name).resolve
+    product = resolution.product
+    return false unless resolution.matched?
 
     previous_product = pending_order.product
     history = pending_order.change_history.dup
@@ -421,15 +433,15 @@ class ConversationMessageProcessor
   end
 
   def matching_product
-    interpreted_name = interpreted_entity(:product_name, for_intent: "select_product")
-    if interpreted_name.present?
-      interpreted_product = catalog.active.includes(:product_variants).find_by("LOWER(name) = ?", interpreted_name.downcase)
-      return interpreted_product if interpreted_product&.total_available_stock.to_i.positive?
-    end
+    product_resolution.product if product_resolution.matched?
+  end
 
-    catalog.active.includes(:product_variants).find do |product|
-      product.total_available_stock.positive? && content.downcase.include?(product.name.downcase)
-    end
+  def product_resolution
+    @product_resolution ||= ProductResolutionService.new(
+      business: pending_order.conversation.business,
+      query: interpreted_entity(:product_name, for_intent: "select_product") || content,
+      recent_product_name: pending_order.conversation.conversation_state.to_h["last_referenced_product"]
+    ).resolve
   end
 
   def matching_variant(product)
@@ -492,6 +504,14 @@ class ConversationMessageProcessor
     content.downcase.match?(/\b(help|options|menu)\b/)
   end
 
+  def product_list_request?
+    normalized = content.downcase.squish
+    normalized.match?(/\b(show|see|list)\s+(all\s+)?products?\b/) ||
+      normalized.match?(/\b(available|all)\s+products?\b/) ||
+      normalized.match?(/\b(product|products)\s+(dekhao|dekhaw|list)\b/) ||
+      normalized.match?(/ki ki product|product ki ki/)
+  end
+
   def thanks?
     content.downcase.strip.match?(/\A(thanks|thank you|thx)[!. ]*\z/)
   end
@@ -516,6 +536,41 @@ class ConversationMessageProcessor
   def budget_recommendation_request?
     normalized = content.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
     normalized.match?(/\b(under|below|within|budget|cheapest|lowest|starting price|price starts|kom dam|moddhe)\b|মধ্যে|নিচে|বাজেট|কম দাম/)
+  end
+
+  def recommendation_request?
+    return true if budget_recommendation_request?
+    return true if discovery_follow_up?
+    return false if product_resolution.matched?
+
+    content.downcase.match?(
+      /\b(suggest|recommend|help me choose|(?:give|show)(?:\s+me)?(?:\s+some)?\s+options?|which (perfume|fragrance)|(?:want|need|looking for)(?:\s+\w+){0,3}\s+(?:perfume|fragrance)|combo|bundle|single(?: perfume)?|one perfume|fresh|sweet|fruity|floral|woody|oud|spicy|tobacco)\b/
+    )
+  end
+
+  def discovery_follow_up?
+    preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"]
+    return false unless content.downcase.squish.match?(/\A(ekta|ekta nibo|one|single|combo|একটা)[?!. ]*\z/)
+    return true if preferences.present?
+
+    pending_order.conversation.messages.bot.order(created_at: :desc, id: :desc).limit(5).any? do |recent_message|
+      recent_message.content.downcase.match?(/single.*combo|one perfume.*combo|ekta perfume.*combo/)
+    end
+  end
+
+  def enter_product_discovery!
+    return unless pending_order.status.in?(%w[collecting_variant collecting_quantity])
+
+    pending_order.update!(product: nil, product_variant: nil, quantity: nil, status: :collecting_product)
+  end
+
+  def remember_recommendation_preferences!
+    conversation = pending_order.conversation
+    state = conversation.conversation_state.to_h
+    state["shopping_preferences"] = FragrancePreferenceExtractor.new(content).call(
+      existing: state["shopping_preferences"]
+    )
+    conversation.update!(conversation_state: state)
   end
 
   def stock_question?

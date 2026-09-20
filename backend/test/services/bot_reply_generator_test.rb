@@ -9,9 +9,9 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order).content
 
-    assert_includes reply, "What would you like to order?"
-    assert_includes reply, "Fresh Musk"
-    assert_includes reply, "Royal Oud"
+    assert_includes reply, "Here are our available products:"
+    assert_includes reply, "• Fresh Musk — ৳750"
+    assert_includes reply, "• Royal Oud — ৳1200"
     assert_not_includes reply, "Inactive Product"
   end
 
@@ -31,7 +31,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order).content
 
-    assert_includes reply, "What would you like to order?"
+    assert_includes reply, "Here are our available products:"
     assert_includes reply, "Fresh Musk"
   end
 
@@ -107,7 +107,22 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
 
     assert_includes reply, "Assalamu alaikum! 👋 Welcome to ChatCart."
-    assert_includes reply, "Fresh Musk (৳750)"
+    assert_includes reply, "Here are a few products you can order:"
+    assert_includes reply, "• Fresh Musk — ৳750"
+    assert_includes reply, "single perfume or combo"
+  end
+
+  test "limits the greeting catalog and explains how to see the rest" do
+    8.times do |index|
+      Product.create!(name: "Product #{index + 1}", price: 500 + index, stock_quantity: 10)
+    end
+    pending_order = create_pending_order(status: :collecting_product)
+
+    reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
+
+    assert_equal 6, reply.lines.count { |line| line.start_with?("• Product") }
+    assert_includes reply, "• +2 more available"
+    assert_includes reply, "show all products"
   end
 
   test "explains invalid phone input" do

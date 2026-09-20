@@ -127,7 +127,7 @@ class CustomerMessageRecorder
     normalized_content = content.to_s.downcase.strip
     return true if ConversationIntentDetector.new(normalized_content).new_order?
 
-    business.products.find_each.any? { |product| normalized_content.include?(product.name.downcase) }
+    ProductResolutionService.new(business: business, query: normalized_content).resolve.matched?
   end
 
   def classify_intent(message, pending_order, conversation)

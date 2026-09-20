@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_21_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -72,6 +72,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
     t.string "verify_token"
     t.index ["business_id"], name: "index_channel_connections_on_business_id"
     t.index ["channel", "external_account_id"], name: "index_channel_connections_on_channel_and_external_account_id", unique: true
+  end
+
+  create_table "combo_items", force: :cascade do |t|
+    t.bigint "combo_product_id", null: false
+    t.bigint "component_product_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "position", default: 0, null: false
+    t.integer "quantity", default: 1, null: false
+    t.boolean "required", default: true, null: false
+    t.string "selection_group"
+    t.datetime "updated_at", null: false
+    t.index ["combo_product_id", "component_product_id", "selection_group"], name: "index_combo_items_on_product_component_group", unique: true
+    t.index ["combo_product_id"], name: "index_combo_items_on_combo_product_id"
+    t.index ["component_product_id"], name: "index_combo_items_on_component_product_id"
   end
 
   create_table "conversations", force: :cascade do |t|
@@ -161,6 +175,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
   end
 
   create_table "order_items", force: :cascade do |t|
+    t.jsonb "combo_components", default: [], null: false
     t.datetime "created_at", null: false
     t.bigint "order_id", null: false
     t.bigint "product_id"
@@ -232,6 +247,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
     t.index ["email"], name: "index_platform_administrators_on_email", unique: true
   end
 
+  create_table "product_import_drafts", force: :cascade do |t|
+    t.bigint "business_id", null: false
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.jsonb "extracted_data", default: {}, null: false
+    t.bigint "product_id"
+    t.string "source_url", null: false
+    t.string "status", default: "pending_review", null: false
+    t.datetime "updated_at", null: false
+    t.index ["business_id", "source_url", "status"], name: "index_product_import_drafts_for_review"
+    t.index ["business_id"], name: "index_product_import_drafts_on_business_id"
+    t.index ["product_id"], name: "index_product_import_drafts_on_product_id"
+  end
+
   create_table "product_variants", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
@@ -249,16 +278,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
 
   create_table "products", force: :cascade do |t|
     t.boolean "active", default: true, null: false
+    t.text "aliases", default: [], null: false, array: true
+    t.datetime "archived_at"
     t.text "benefits"
     t.bigint "business_id", null: false
     t.string "category"
     t.datetime "created_at", null: false
     t.text "description"
+    t.text "image_urls", default: [], null: false, array: true
+    t.text "import_error"
+    t.string "import_status"
+    t.datetime "imported_at"
     t.string "name", null: false
     t.decimal "price", precision: 10, scale: 2, null: false
     t.jsonb "product_attributes", default: {}, null: false
+    t.string "product_type", default: "standard", null: false
     t.text "short_description"
+    t.string "source_url"
     t.integer "stock_quantity", default: 0, null: false
+    t.string "stock_strategy", default: "independent", null: false
     t.text "suitable_for"
     t.string "tags"
     t.datetime "updated_at", null: false
@@ -289,6 +327,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
   add_foreign_key "auth_sessions", "users"
   add_foreign_key "business_policies", "businesses"
   add_foreign_key "channel_connections", "businesses"
+  add_foreign_key "combo_items", "products", column: "combo_product_id"
+  add_foreign_key "combo_items", "products", column: "component_product_id"
   add_foreign_key "conversations", "businesses"
   add_foreign_key "delivery_integrations", "businesses"
   add_foreign_key "delivery_submissions", "delivery_integrations"
@@ -306,6 +346,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_000500) do
   add_foreign_key "pending_orders", "conversations"
   add_foreign_key "pending_orders", "product_variants"
   add_foreign_key "pending_orders", "products"
+  add_foreign_key "product_import_drafts", "businesses"
+  add_foreign_key "product_import_drafts", "products"
   add_foreign_key "product_variants", "products"
   add_foreign_key "products", "businesses"
   add_foreign_key "users", "businesses"

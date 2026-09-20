@@ -103,6 +103,64 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :collecting_product?
   end
 
+  test "recognizes requests to show the full product list without AI" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    [ "show all products", "available products", "products dekhao", "ki ki product ache?" ].each do |content|
+      assert_equal :product_list_requested, process_message(pending_order, content).outcome, content
+    end
+
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
+  test "remembers guided fragrance preferences across messages" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    assert_equal :product_recommendation_requested, process_message(pending_order, "suggest a combo").outcome
+    assert_equal :product_recommendation_requested, process_message(pending_order, "for him, fresh and woody for office").outcome
+
+    preferences = pending_order.conversation.reload.conversation_state.fetch("shopping_preferences")
+    assert_equal "combo", preferences["format"]
+    assert_equal "men", preferences["audience"]
+    assert_equal %w[fresh woody], preferences["scent_families"]
+    assert_equal [ "office" ], preferences["occasions"]
+  end
+
+  test "leaves size selection when customer asks to browse and understands ekta as single perfume" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    browse = process_message(pending_order, "we will decide later, give me some options")
+
+    assert_equal :product_recommendation_requested, browse.outcome
+    assert_predicate pending_order.reload, :collecting_product?
+    assert_nil pending_order.product
+
+    choose_single = process_message(pending_order, "ekta")
+
+    assert_equal :product_recommendation_requested, choose_single.outcome
+    assert_equal "single", pending_order.conversation.reload.conversation_state.dig("shopping_preferences", "format")
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
+  test "recovers single-product context from an earlier bot prompt created before preference memory" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+    pending_order.conversation.messages.create!(
+      sender_type: :bot,
+      content: "Apni ki ekta perfume niben naki multiple fragrances er kono combo niben?"
+    )
+
+    processor = process_message(pending_order, "ekta nibo")
+
+    assert_equal :product_recommendation_requested, processor.outcome
+    assert_predicate pending_order.reload, :collecting_product?
+    assert_nil pending_order.product
+    assert_equal "single", pending_order.conversation.reload.conversation_state.dig("shopping_preferences", "format")
+  end
+
   test "collects name, phone, and address then awaits confirmation" do
     pending_order = create_pending_order(
       product: create_product,

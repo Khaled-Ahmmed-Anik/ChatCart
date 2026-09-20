@@ -1,4 +1,6 @@
 class BotReplyGenerator
+  INITIAL_CATALOG_LIMIT = 6
+
   def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil)
     @pending_order = pending_order
     @customer_message = customer_message
@@ -18,7 +20,7 @@ class BotReplyGenerator
   def outcome_reply
     case outcome
     when :greeting
-      "Assalamu alaikum#{address_suffix}! 👋 Welcome to ChatCart. #{status_prompt}"
+      greeting_reply
     when :help
       help_reply
     when :wellbeing
@@ -90,6 +92,8 @@ class BotReplyGenerator
       "Sorry, that product isn’t available right now. #{product_selection_prompt}"
     when :product_not_found
       "I couldn’t match that to one of our available products. #{product_selection_prompt}"
+    when :product_ambiguous
+      product_ambiguity_reply
     when :invalid_quantity
       "I didn’t catch the quantity. Please send a number, such as “2”, or write “two”."
     when :quantity_unavailable
@@ -155,14 +159,51 @@ class BotReplyGenerator
   end
 
   def product_selection_prompt
-    products = catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }
+    products = available_products
     return "What product would you like to order?" if products.empty?
 
-    options = products.map do |product|
+    [
+      "Here are our available products:",
+      *product_catalog_lines(products),
+      "",
+      "Which one would you like? You can also tell me your budget or what kind of product you prefer."
+    ].join("\n")
+  end
+
+  def greeting_reply
+    return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. #{status_prompt}" unless pending_order.collecting_product?
+
+    products = available_products
+    return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. How can I help you today?" if products.empty?
+
+    visible_products = products.first(INITIAL_CATALOG_LIMIT)
+    remaining_count = products.size - visible_products.size
+    more_products_line = "• +#{remaining_count} more available—send “show all products” to see them" if remaining_count.positive?
+
+    [
+      "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}.",
+      "",
+      "Here are a few products you can order:",
+      *product_catalog_lines(visible_products),
+      more_products_line,
+      "",
+      "Know what you want? Send the product name. Not sure? Tell me whether you want a single perfume or combo, the scent style or occasion, and your budget (for example, “fresh for office under ৳1500”)."
+    ].compact.join("\n")
+  end
+
+  def product_catalog_lines(products)
+    products.map do |product|
       prefix = product.product_variants.any? ? "from " : ""
-      "#{product.name} (#{prefix}#{formatted_price(product.starting_price)})"
-    end.to_sentence
-    "What would you like to order? We currently have #{options}."
+      "• #{product.name} — #{prefix}#{formatted_price(product.starting_price)}"
+    end
+  end
+
+  def available_products
+    catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }
+  end
+
+  def business_name
+    pending_order.conversation.business.name
   end
 
   def quantity_prompt
@@ -183,6 +224,7 @@ class BotReplyGenerator
     [
       "Here’s your order summary:",
       "• #{pending_order.quantity} × #{[ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(' ')}",
+      *combo_component_lines,
       "• Total: #{formatted_price(pending_order.total_price)}",
       "• Name: #{pending_order.customer_name}",
       "• Phone: #{pending_order.phone}",
@@ -227,22 +269,38 @@ class BotReplyGenerator
     details = [ "#{product.name} starts from #{formatted_price(product.starting_price)}." ]
     details << product.description if product.description.present?
     details << product.benefits if product.benefits.present?
+    if product.combo?
+      component_names = product.combo_items.includes(:component_product).map { |item| "#{item.quantity} × #{item.component_product.name}" }
+      details << "The combo includes #{component_names.to_sentence}." if component_names.any?
+    end
     details << "#{product.total_available_stock} currently in stock."
     details.join(" ")
   end
 
   def product_recommendation_reply
+    preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"]
     result = ProductRecommendationService.new(
       business: pending_order.conversation.business,
-      message: customer_message&.content
+      message: customer_message&.content,
+      preferences: preferences
     ).call
+    return result.clarification_question if result.clarification_question.present?
+
     if result.offers.empty?
       return "I couldn’t find an available option in that range. Our available prices start from #{formatted_price(result.minimum_price)}." if result.minimum_price
 
       return "Sorry, no products are currently available."
     end
 
-    options = result.offers.map { |offer| "#{offer.label} for #{formatted_price(offer.price)}" }.to_sentence
+    options = result.offers.map do |offer|
+      description = offer.product.short_description.presence || offer.product.description.to_s
+      summary = description.squish.truncate(180)
+      product_kind = offer.product.combo? ? "Combo" : "Single fragrance"
+      sizes = offer.product.available_variants.map(&:display_name).uniq
+      detail_lines = [ "  #{product_kind}. #{summary}" ]
+      detail_lines << "  Sizes: #{sizes.to_sentence}." if sizes.any?
+      "• #{offer.label} — #{formatted_price(offer.price)}\n#{detail_lines.join("\n")}"
+    end
     introduction = if result.floor_request
       "Our available prices start from #{formatted_price(result.minimum_price)}. You can consider"
     elsif result.budget_detected
@@ -250,7 +308,19 @@ class BotReplyGenerator
     else
       "Based on what you’re looking for, I recommend"
     end
-    "#{introduction} #{options}. Which one would you like to know more about?"
+    ([ "#{introduction}:", *options, "", "Which one sounds closest to what you want?" ]).join("\n")
+  end
+
+  def product_ambiguity_reply
+    result = ProductResolutionService.new(
+      business: pending_order.conversation.business,
+      query: customer_message&.content,
+      recent_product_name: pending_order.conversation.conversation_state.to_h["last_referenced_product"]
+    ).resolve
+    names = result.candidates.map { |candidate| candidate.product.name }.uniq
+    return product_selection_prompt if names.empty?
+
+    "Which product did you mean: #{names.to_sentence(last_word_connector: ', or ')}?"
   end
 
   def product_comparison_reply
@@ -329,6 +399,14 @@ class BotReplyGenerator
 
   def selected_stock
     pending_order.product_variant&.stock_quantity || pending_order.product&.stock_quantity || 0
+  end
+
+  def combo_component_lines
+    return [] unless pending_order.product&.combo?
+
+    pending_order.product.combo_items.includes(:component_product).map do |item|
+      "  ↳ Includes #{item.quantity} × #{item.component_product.name}"
+    end
   end
 
   def address_suffix

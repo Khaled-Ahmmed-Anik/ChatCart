@@ -13,6 +13,12 @@ module Types
     argument :tags, String, required: false
     argument :active, Boolean, required: false, default_value: true
     argument :woo_commerce_product_id, String, required: false
+    argument :product_type, String, required: false, default_value: "standard"
+    argument :stock_strategy, String, required: false, default_value: "independent"
+    argument :aliases, [ String ], required: false
+    argument :image_urls, [ String ], required: false
+    argument :source_url, String, required: false
     argument :variants, [ ProductVariantInput ], required: false
+    argument :combo_items, [ ComboItemInput ], required: false
   end
 end

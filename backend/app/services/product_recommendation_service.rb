@@ -4,11 +4,15 @@ class ProductRecommendationService
       variant ? "#{product.name} #{variant.display_name}" : product.name
     end
   end
-  Result = Data.define(:offers, :minimum_price, :requested_minimum, :requested_maximum, :budget_detected, :floor_request)
+  Result = Data.define(
+    :offers, :minimum_price, :requested_minimum, :requested_maximum, :budget_detected, :floor_request,
+    :clarification_question
+  )
 
-  def initialize(business:, message:, limit: 3)
+  def initialize(business:, message:, preferences: {}, limit: 3)
     @business = business
     @message = message.to_s
+    @preferences = preferences.to_h.stringify_keys
     @limit = limit
   end
 
@@ -26,16 +30,17 @@ class ProductRecommendationService
       requested_minimum: minimum,
       requested_maximum: maximum,
       budget_detected: detected,
-      floor_request: floor_request?
+      floor_request: floor_request?,
+      clarification_question: clarification_question(detected)
     )
   end
 
   private
 
-  attr_reader :business, :message, :limit
+  attr_reader :business, :message, :preferences, :limit
 
   def offers
-    @offers ||= business.products.active.order(:name).flat_map do |product|
+    @offers ||= business.products.active.order(:name).select { |product| matches_format?(product) }.flat_map do |product|
       if product.product_variants.any?
         product.available_variants.map do |variant|
           Offer.new(product: product, variant: variant, price: variant.price, stock_quantity: variant.stock_quantity)
@@ -68,7 +73,9 @@ class ProductRecommendationService
       offer.product.description, offer.product.benefits, offer.product.suitable_for,
       offer.product.product_attributes.to_h.flatten.join(" "), offer.variant&.size, offer.variant&.name
     ].compact.join(" ").downcase
-    preference_terms.count { |term| searchable.include?(term) } * 10 + [ offer.stock_quantity, 20 ].min
+    preference_terms.count { |term| searchable.include?(term) } * 10 +
+      structured_preference_terms.count { |term| searchable.include?(term) } * 18 +
+      [ offer.stock_quantity, 20 ].min
   end
 
   def preference_terms
@@ -76,6 +83,31 @@ class ProductRecommendationService
       anything something product products price budget under below above within want need suggest please
       chai den koto taka dame moddhe ache koren
     ]
+  end
+
+  def structured_preference_terms
+    @structured_preference_terms ||= preferences.values_at(
+      "audience", "performance", "scent_families", "occasions"
+    ).flatten.compact.map(&:to_s).flat_map { |value| value.downcase.scan(/[[:alpha:]-]{3,}/) }.uniq
+  end
+
+  def matches_format?(product)
+    return product.combo? if preferences["format"] == "combo"
+    return !product.combo? if preferences["format"] == "single"
+
+    true
+  end
+
+  def clarification_question(budget_detected)
+    return if budget_detected
+    return "Would you prefer one perfume or a combo with multiple fragrances?" if preferences["format"].blank?
+    return if structured_preference_terms.any?
+
+    if preferences["format"] == "combo"
+      "Who is the combo for, and do they prefer fresh, sweet, woody/oud, or long-lasting fragrances?"
+    else
+      "What style do you prefer: fresh/clean, sweet/fruity, floral, warm/spicy, or woody/oud? You can also tell me the occasion."
+    end
   end
 
   def normalize_digits(value)

@@ -49,6 +49,38 @@ class ProcessMessengerEventJobTest < ActiveJob::TestCase
     assert_predicate order, :confirmed?
   end
 
+  test "combines rapid customer messages into one conversational turn and one reply" do
+    Product.create!(
+      name: "The Office", price: 350, stock_quantity: 10,
+      short_description: "A fresh, clean fragrance for office use.",
+      tags: "fresh clean office"
+    )
+    first = create_webhook_event(text: "single", message_id: "mid-batch-1")
+    second = create_webhook_event(text: "fresh for office under 500", message_id: "mid-batch-2")
+
+    assert_difference -> { Message.customer.count }, 1 do
+      assert_difference -> { Message.bot.count }, 1 do
+        assert_difference -> { MessengerDelivery.count }, 1 do
+          ProcessMessengerEventJob.perform_now(first)
+        end
+      end
+    end
+
+    conversation = Conversation.find_by!(external_customer_id: first.sender_id)
+    customer_message = conversation.messages.customer.last
+    assert_equal "single\nfresh for office under 500", customer_message.content
+    assert_equal 2, customer_message.metadata["batched_message_count"]
+    assert_equal %w[mid-batch-1 mid-batch-2], customer_message.metadata["batched_message_ids"]
+    assert_equal "processed", first.reload.status
+    assert_equal "processed", second.reload.status
+    assert_nil first.messenger_delivery
+    assert second.messenger_delivery.present?
+
+    assert_no_difference [ -> { Message.count }, -> { MessengerDelivery.count } ] do
+      ProcessMessengerEventJob.perform_now(second)
+    end
+  end
+
   private
 
   def create_webhook_event(text:, message_id: "mid-123")

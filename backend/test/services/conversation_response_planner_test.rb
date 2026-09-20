@@ -91,6 +91,25 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     assert_includes plan.content, "To continue your order"
   end
 
+  test "keeps product discovery focused instead of combining unrelated secondary prompts" do
+    order = create_pending_order(status: :collecting_product)
+    order.conversation.update!(conversation_state: { "shopping_preferences" => { "format" => "single" } })
+    message = order.conversation.messages.create!(sender_type: :customer, content: "ekta")
+
+    plan = ConversationResponsePlanner.new(
+      conversation: order.conversation,
+      pending_order: order,
+      customer_message: message,
+      outcome: :product_recommendation_requested,
+      secondary_outcomes: [ :help, :product_variants_requested ],
+      interpretation: interpretation(intent: "product_recommendation")
+    ).plan
+
+    assert_includes plan.content, "What style do you prefer"
+    assert_not_includes plan.content, "new order"
+    assert_not_includes plan.content, "size"
+  end
+
   test "remembers and naturally mirrors the customer's form of address" do
     order = create_pending_order
     message = order.conversation.messages.create!(sender_type: :customer, content: "Bhai, hello")

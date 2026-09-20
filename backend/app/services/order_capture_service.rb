@@ -28,6 +28,7 @@ class OrderCaptureService
         product_variant: pending_order.product_variant,
         product_name: pending_order.product.name,
         variant_name: pending_order.product_variant&.display_name,
+        combo_components: pending_order.product.component_snapshot,
         quantity: pending_order.quantity,
         unit_price: pending_order.unit_price,
         total: pending_order.total_price
