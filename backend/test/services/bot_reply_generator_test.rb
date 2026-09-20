@@ -25,6 +25,22 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     )
   end
 
+  test "explains size tradeoffs instead of only listing variants" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10, position: 1)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10, position: 3)
+    product.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 10, position: 2)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    reply = BotReplyGenerator.new(pending_order: pending_order).content
+
+    assert_operator reply.index("10 ML"), :<, reply.index("15 ML")
+    assert_operator reply.index("15 ML"), :<, reply.index("30 ML")
+    assert_includes reply, "good for trying it first"
+    assert_includes reply, "best value for regular use"
+    assert_includes reply, "reply with the size, price"
+  end
+
   test "asks for product when collecting quantity has no product yet" do
     Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     pending_order = create_pending_order(status: :collecting_quantity)
@@ -148,6 +164,36 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "Fresh Musk is ৳750 per bottle."
     assert_nil pending_order.reload.product
     assert product.persisted?
+  end
+
+  test "compares the products named by the customer using useful buying differences" do
+    office = create_product(
+      name: "The Office", price: 350,
+      product_attributes: { scent_families: %w[fresh aquatic], occasions: %w[office daily], longevity_hours: "6-8", projection: "moderate" }
+    )
+    bleu = create_product(
+      name: "Bleu Inspired", price: 400,
+      product_attributes: { scent_families: %w[fresh woody], occasions: %w[office evening], longevity_hours: "8-10", projection: "strong" }
+    )
+    create_product(name: "Unrelated Product", price: 300)
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(
+      sender_type: :customer,
+      content: "What is the difference between The Office and Bleu Inspired?"
+    )
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: :product_comparison_requested
+    ).content
+
+    assert_includes reply, "The Office — from ৳350"
+    assert_includes reply, "fresh and aquatic"
+    assert_includes reply, "Bleu Inspired — from ৳400"
+    assert_includes reply, "8-10 hours"
+    assert_not_includes reply, "Unrelated Product"
+    assert office.persisted? && bleu.persisted?
   end
 
   private

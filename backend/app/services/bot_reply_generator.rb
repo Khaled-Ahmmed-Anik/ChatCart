@@ -51,6 +51,10 @@ class BotReplyGenerator
       product_details_reply
     when :product_recommendation_requested, :alternative_product_requested
       product_recommendation_reply
+    when :recommendations_rejected
+      "No problem—I won’t repeat those options. What felt wrong: the scent style, strength, price, product type, or something else?"
+    when :shortlist_updated, :shortlist_requested
+      shortlist_reply
     when :product_comparison_requested
       product_comparison_reply
     when :product_variants_requested, :product_images_requested
@@ -213,11 +217,22 @@ class BotReplyGenerator
   end
 
   def variant_selection_prompt
-    variants = pending_order.product&.available_variants.to_a
+    variants = pending_order.product&.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
     return "Which size would you like?" if variants.empty?
 
-    options = variants.map { |variant| "#{variant.display_name} (#{formatted_price(variant.price)})" }.to_sentence
-    "Which size would you like? Available options are #{options}."
+    options = variants.each_with_index.map do |variant, index|
+      guidance = if index.zero? && variants.many?
+        " — good for trying it first"
+      elsif index == variants.length - 1 && variants.many?
+        " — best value for regular use"
+      end
+      "• #{variant.display_name}: #{formatted_price(variant.price)}#{guidance}"
+    end
+    ([ "Which size would suit you?", *options, "", "You can reply with the size, price, or say “small”, “medium”, or “best value”." ]).join("\n")
+  end
+
+  def variant_size_number(variant)
+    variant.size.to_s[/\d+(?:\.\d+)?/]&.to_d || variant.position
   end
 
   def confirmation_prompt
@@ -278,7 +293,11 @@ class BotReplyGenerator
   end
 
   def product_recommendation_reply
-    preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"]
+    conversation_state = pending_order.conversation.conversation_state.to_h
+    guided_context = conversation_state.dig("guided_sales", "context").to_h
+    preferences = conversation_state["shopping_preferences"].to_h.merge(
+      "rejected_product_ids" => guided_context["rejected_product_ids"]
+    )
     result = ProductRecommendationService.new(
       business: pending_order.conversation.business,
       message: customer_message&.content,
@@ -292,14 +311,24 @@ class BotReplyGenerator
       return "Sorry, no products are currently available."
     end
 
+    GuidedSalesConversation.new(pending_order.conversation).remember_recommendations!(result.offers.map { |offer| offer.product.id })
+
     options = result.offers.map do |offer|
       description = offer.product.short_description.presence || offer.product.description.to_s
       summary = description.squish.truncate(180)
       product_kind = offer.product.combo? ? "Combo" : "Single fragrance"
-      sizes = offer.product.available_variants.map(&:display_name).uniq
+      sizes = offer.product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }.map(&:display_name).uniq
       detail_lines = [ "  #{product_kind}. #{summary}" ]
+      if result.budget_detected && offer.variant.present?
+        detail_lines << "  Best size within your budget: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
+      end
       detail_lines << "  Sizes: #{sizes.to_sentence}." if sizes.any?
-      "• #{offer.label} — #{formatted_price(offer.price)}\n#{detail_lines.join("\n")}"
+      heading = if result.budget_detected
+        "• #{offer.product.name} — #{formatted_price(offer.price)}"
+      else
+        "• #{offer.product.name} — starts from #{formatted_price(offer.product.starting_price)}"
+      end
+      "#{heading}\n#{detail_lines.join("\n")}"
     end
     introduction = if result.floor_request
       "Our available prices start from #{formatted_price(result.minimum_price)}. You can consider"
@@ -309,6 +338,15 @@ class BotReplyGenerator
       "Based on what you’re looking for, I recommend"
     end
     ([ "#{introduction}:", *options, "", "Which one sounds closest to what you want?" ]).join("\n")
+  end
+
+  def shortlist_reply
+    ids = GuidedSalesConversation.new(pending_order.conversation).context["shortlist_product_ids"]
+    products = catalog.where(id: ids).order(:name)
+    return "Your shortlist is empty. Ask me for recommendations, then say “keep the first one” or name a product." if products.empty?
+
+    lines = products.map { |product| "• #{product.name} — from #{formatted_price(product.starting_price)}" }
+    ([ "Your shortlist:", *lines, "", "You can compare these, remove one, or choose one to order." ]).join("\n")
   end
 
   def product_ambiguity_reply
@@ -324,12 +362,40 @@ class BotReplyGenerator
   end
 
   def product_comparison_reply
-    products = catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }.first(4)
-    return "I need at least two available products to compare." if products.size < 2
+    products = products_mentioned_in_message
+    return "Tell me the two product names you want to compare, for example: “The Office vs Bleu Inspired”." if products.size < 2
 
-    products.map do |product|
-      "• #{product.name}: from #{formatted_price(product.starting_price)}, #{product.total_available_stock} in stock"
-    end.join("\n")
+    lines = products.first(3).map do |product|
+      attributes = product.product_attributes.to_h
+      scent = Array(attributes["scent_families"]).first(4).to_sentence.presence || product.category.presence || "fragrance"
+      occasions = Array(attributes["occasions"]).first(3).to_sentence
+      performance = [ attributes["longevity_hours"].presence&.then { |hours| "#{hours} hours" }, attributes["projection"] ].compact.to_sentence
+      details = [ scent, occasions.present? ? "best for #{occasions}" : nil, performance.presence ].compact.join("; ")
+      "• #{product.name} — from #{formatted_price(product.starting_price)}\n  #{details}."
+    end
+
+    ([ "Here’s the practical difference:", *lines, "", comparison_guidance(products.first(3)) ]).join("\n")
+  end
+
+  def products_mentioned_in_message
+    normalized = customer_message&.content.to_s.downcase
+    catalog.available_for_sale.includes(:product_variants).select do |product|
+      product.total_available_stock.positive? && product.searchable_names.any? do |name|
+        normalized.include?(name.downcase)
+      end
+    end
+  end
+
+  def comparison_guidance(products)
+    summaries = products.filter_map do |product|
+      families = Array(product.product_attributes.to_h["scent_families"])
+      next if families.empty?
+
+      "choose #{product.name} for #{families.first(2).to_sentence}"
+    end
+    return "Which one matches your taste better?" if summaries.empty?
+
+    "In short: #{summaries.to_sentence}. Which direction sounds better to you?"
   end
 
   def clarification_reply

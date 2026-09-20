@@ -15,6 +15,8 @@ class ConversationMemory
       last_intent: state["last_intent"],
       last_outcome: state["last_outcome"],
       last_referenced_product: state["last_referenced_product"],
+      guided_sales: state["guided_sales"],
+      shopping_preferences: state["shopping_preferences"],
       intent_history: Array(state["intent_history"]).last(6),
       customer_profile: remembered_customer_profile,
       previous_order: previous_order_summary

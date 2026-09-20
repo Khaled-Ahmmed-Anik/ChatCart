@@ -103,6 +103,17 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :collecting_product?
   end
 
+  test "recognizes a direct product comparison without AI" do
+    create_product(name: "The Office")
+    create_product(name: "Bleu Inspired")
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "The Office vs Bleu Inspired, which is better?")
+
+    assert_equal :product_comparison_requested, processor.outcome
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
   test "recognizes requests to show the full product list without AI" do
     pending_order = create_pending_order(status: :collecting_product)
 
@@ -159,6 +170,136 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :collecting_product?
     assert_nil pending_order.product
     assert_equal "single", pending_order.conversation.reload.conversation_state.dig("shopping_preferences", "format")
+  end
+
+  test "rejects previous recommendations and does not lose discovery context" do
+    pending_order = create_pending_order(status: :collecting_product)
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.transition!("discover")
+    flow.remember_recommendations!([ 11, 12 ])
+
+    processor = process_message(pending_order, "Egula pochondo hoy nai")
+
+    assert_equal :recommendations_rejected, processor.outcome
+    assert_equal [ 11, 12 ], flow.context["rejected_product_ids"]
+    assert_equal [ 11, 12 ], pending_order.conversation.reload.conversation_state.dig("shopping_preferences", "rejected_product_ids")
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
+  test "rejects earlier options and applies a corrected scent preference in the same message" do
+    first = create_product(name: "Bleu Inspired")
+    second = create_product(name: "The Blush")
+    pending_order = create_pending_order(status: :collecting_product)
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.transition!("discover")
+    flow.remember_recommendations!([ first.id, second.id ])
+
+    processor = process_message(pending_order, "no one, something oudy")
+
+    assert_equal :product_recommendation_requested, processor.outcome
+    state = pending_order.conversation.reload.conversation_state
+    assert_equal [ first.id, second.id ], state.dig("guided_sales", "context", "rejected_product_ids")
+    assert_includes state.dig("shopping_preferences", "scent_families"), "oud"
+    assert_equal [ first.id, second.id ], state.dig("shopping_preferences", "rejected_product_ids")
+  end
+
+  test "recognizes a misspelled oud preference without AI" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "I need something oddy")
+
+    assert_equal :product_recommendation_requested, processor.outcome
+    assert_includes pending_order.conversation.reload.conversation_state.dig("shopping_preferences", "scent_families"), "oud"
+  end
+
+  test "adds a referenced recommendation to the shortlist" do
+    first = create_product(name: "The Office")
+    second = create_product(name: "Bleu Inspired")
+    pending_order = create_pending_order(status: :collecting_product)
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.transition!("discover")
+    flow.remember_recommendations!([ first.id, second.id ])
+
+    processor = process_message(pending_order, "keep the second one")
+
+    assert_equal :shortlist_updated, processor.outcome
+    assert_equal [ second.id ], flow.context["shortlist_product_ids"]
+  end
+
+  test "resumes an order after temporarily browsing recommendations" do
+    product = create_product(name: "The Office")
+    pending_order = create_pending_order(product: product, status: :collecting_quantity)
+
+    process_message(pending_order, "give me some options")
+    assert_predicate pending_order.reload, :collecting_product?
+
+    processor = process_message(pending_order, "continue my order")
+
+    assert_equal :resume_order_requested, processor.outcome
+    assert_equal product, pending_order.reload.product
+    assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "suspends checkout cleanly while browsing and restores the exact checkout step" do
+    product = create_product(name: "The Office")
+    pending_order = create_pending_order(
+      product: product, quantity: 2, customer_name: "Anik", status: :collecting_phone
+    )
+
+    process_message(pending_order, "show me some options")
+
+    assert_predicate pending_order.reload, :collecting_product?
+    assert_nil pending_order.product
+
+    process_message(pending_order, "back to my order")
+
+    assert_equal product, pending_order.reload.product
+    assert_equal 2, pending_order.quantity
+    assert_equal "Anik", pending_order.customer_name
+    assert_predicate pending_order, :collecting_phone?
+  end
+
+  test "selects a product using its position in the latest recommendations" do
+    first = create_product(name: "The Office")
+    second = create_product(name: "Bleu Inspired")
+    pending_order = create_pending_order(status: :collecting_product)
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.transition!("discover")
+    flow.remember_recommendations!([ first.id, second.id ])
+
+    processor = process_message(pending_order, "second one nibo")
+
+    assert_equal :product_selected, processor.outcome
+    assert_equal second, pending_order.reload.product
+    assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "understands relative size and price replies" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    small = product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10, position: 3)
+    medium = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 10, position: 2)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10, position: 1)
+
+    best_value_order = create_pending_order(product: product, status: :collecting_variant)
+    process_message(best_value_order, "boro ta, best value")
+    assert_equal large, best_value_order.reload.product_variant
+
+    price_order = create_pending_order(product: product, status: :collecting_variant)
+    process_message(price_order, "480 er ta")
+    assert_equal medium, price_order.reload.product_variant
+
+    small_order = create_pending_order(product: product, status: :collecting_variant)
+    process_message(small_order, "choto ta")
+    assert_equal small, small_order.reload.product_variant
+  end
+
+  test "understands Banglish quantity words during quantity collection" do
+    pending_order = create_pending_order(product: create_product, status: :collecting_quantity)
+
+    processor = process_message(pending_order, "duita nibo")
+
+    assert_equal :quantity_collected, processor.outcome
+    assert_equal 2, pending_order.reload.quantity
   end
 
   test "collects name, phone, and address then awaits confirmation" do

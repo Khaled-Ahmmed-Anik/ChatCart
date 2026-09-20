@@ -33,7 +33,7 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Hi, I want a perfume", response_body.dig("message", "content")
     assert_equal bot_reply.id, response_body.dig("bot_reply", "id")
     assert_equal "bot", response_body.dig("bot_reply", "sender_type")
-    assert_includes response_body.dig("bot_reply", "content"), "What product would you like to order?"
+    assert_includes response_body.dig("bot_reply", "content"), "one perfume or a combo"
     assert_equal pending_order.id, response_body.dig("pending_order", "id")
     assert_equal "collecting_product", response_body.dig("pending_order", "status")
     assert_equal false, response_body.dig("pending_order", "ready_for_confirmation")

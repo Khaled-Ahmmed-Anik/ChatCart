@@ -15,11 +15,11 @@ class ProductRecommendationServiceTest < ActiveSupport::TestCase
     assert fresh.persisted?
   end
 
-  test "recommends every available option under a maximum budget up to the result limit" do
+  test "recommends the largest affordable variant for each product under a maximum budget" do
     result = recommend("500 takar moddhe ki ache?")
 
     assert result.budget_detected
-    assert_equal [ "The Oud 3 ml", "The Oud 6 ml" ], result.offers.map(&:label)
+    assert_equal [ "The Oud 6 ml" ], result.offers.map(&:label)
     assert result.offers.all? { |offer| offer.price <= 500 }
   end
 
@@ -61,6 +61,32 @@ class ProductRecommendationServiceTest < ActiveSupport::TestCase
 
     assert_equal [ combo ], result.offers.map(&:product).uniq
     assert_nil result.clarification_question
+  end
+
+  test "recommends immediately when scent and occasion preferences are already useful" do
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "fresh for daily use",
+      preferences: { scent_families: [ "fresh" ], occasions: [ "daily" ] }
+    ).call
+
+    assert_nil result.clarification_question
+    assert_equal "Fresh Musk", result.offers.first.product.name
+  end
+
+  test "excludes rejected products and unwanted scent families" do
+    sweet = @business.products.create!(name: "Sweet One", price: 400, stock_quantity: 10, tags: "sweet fruity")
+    fresh = @business.products.find_by!(name: "Fresh Musk")
+
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "show something else",
+      preferences: { avoid_scent_families: [ "sweet" ], rejected_product_ids: [ fresh.id ] },
+      limit: 10
+    ).call
+
+    assert_not_includes result.offers.map(&:product), sweet
+    assert_not_includes result.offers.map(&:product), fresh
   end
 
   private

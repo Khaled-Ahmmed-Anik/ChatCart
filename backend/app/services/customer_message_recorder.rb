@@ -44,6 +44,7 @@ class CustomerMessageRecorder
       )
       processor.process
       outcome = processor.outcome
+      GuidedSalesConversation.new(conversation).sync!(outcome: outcome, pending_order: pending_order)
       escalation = ConversationEscalationPolicy.new(
         conversation: conversation,
         interpretation: interpretation,

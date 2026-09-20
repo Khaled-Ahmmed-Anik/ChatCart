@@ -5,11 +5,12 @@ class ConversationIntentRegistry
     ],
     products: %w[
       list_products product_search product_details product_price product_availability product_recommendation
-      compare_products product_variants product_images out_of_stock alternative_product
+      compare_products product_variants product_images out_of_stock alternative_product gift_recommendation
+      refine_recommendation reject_recommendations shortlist_add shortlist_remove shortlist_show
     ],
     ordering: %w[
       new_order repeat_order select_product select_quantity provide_name provide_phone provide_address
-      review_order confirm_order cancel_order resume_order defer_confirmation
+      review_order confirm_order cancel_order resume_order defer_confirmation browse_products go_back
     ],
     updates: %w[
       change_product change_quantity change_name change_phone change_address order_details order_history

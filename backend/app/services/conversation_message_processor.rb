@@ -1,7 +1,8 @@
 class ConversationMessageProcessor
   NUMBER_WORDS = {
     "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
-    "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10
+    "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
+    "ekta" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
   }.freeze
 
   attr_reader :outcome, :secondary_outcomes
@@ -72,6 +73,12 @@ class ConversationMessageProcessor
     "product_images" => :product_images_requested,
     "out_of_stock" => :alternative_product_requested,
     "alternative_product" => :alternative_product_requested,
+    "gift_recommendation" => :product_recommendation_requested,
+    "refine_recommendation" => :product_recommendation_requested,
+    "reject_recommendations" => :recommendations_rejected,
+    "shortlist_add" => :shortlist_updated,
+    "shortlist_remove" => :shortlist_updated,
+    "shortlist_show" => :shortlist_requested,
     "resume_order" => :resume_order_requested,
     "order_history" => :order_history_requested,
     "payment_methods" => :payment_methods_requested,
@@ -227,6 +234,16 @@ class ConversationMessageProcessor
       :restarted
     elsif defer_confirmation_request?
       :confirmation_deferred
+    elsif resume_browsed_order_request?
+      resume_browsed_order
+    elsif recommendation_rejection?
+      reject_recommendations
+    elsif shortlist_show_request?
+      :shortlist_requested
+    elsif shortlist_add_request?
+      update_shortlist(:add)
+    elsif shortlist_remove_request?
+      update_shortlist(:remove)
     elsif order_details_request?
       :order_details_requested
     elsif product_list_request?
@@ -241,6 +258,8 @@ class ConversationMessageProcessor
       :price_inquiry
     elsif stock_question?
       :stock_inquiry
+    elsif comparison_request?
+      :product_comparison_requested
     elsif recommendation_request?
       enter_product_discovery!
       remember_recommendation_preferences!
@@ -266,8 +285,7 @@ class ConversationMessageProcessor
       address: nil,
       status: :collecting_product
     )
-    state = pending_order.conversation.conversation_state.to_h.except("shopping_preferences")
-    pending_order.conversation.update!(conversation_state: state)
+    GuidedSalesConversation.new(pending_order.conversation).reset!
   end
 
   def repeat_previous_order
@@ -433,7 +451,31 @@ class ConversationMessageProcessor
   end
 
   def matching_product
-    product_resolution.product if product_resolution.matched?
+    contextual_product_selection || (product_resolution.product if product_resolution.matched?)
+  end
+
+  def contextual_product_selection
+    normalized = content.downcase.squish
+    flow_context = GuidedSalesConversation.new(pending_order.conversation).context
+    recommended_ids = Array(flow_context["last_recommended_product_ids"])
+    shortlisted_ids = Array(flow_context["shortlist_product_ids"])
+    ids = recommended_ids.presence || shortlisted_ids
+    return if ids.blank?
+
+    position = if normalized.match?(/\b(first|1st|prothom)\b/)
+      0
+    elsif normalized.match?(/\b(second|2nd|ditiyo)\b/)
+      1
+    elsif normalized.match?(/\b(third|3rd|tritiyo)\b/)
+      2
+    elsif normalized.match?(/\b(last|shesh)\b/)
+      ids.length - 1
+    elsif normalized.match?(/\A(eta|eita|this one|this|এটা)( nibo| chai| please)?[?!. ]*\z/) && ids.one?
+      0
+    end
+    return if position.blank? || ids[position].blank?
+
+    catalog.available_for_sale.find_by(id: ids[position])
   end
 
   def product_resolution
@@ -448,10 +490,26 @@ class ConversationMessageProcessor
     return if product.blank? || product.product_variants.none?
 
     requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
-    product.available_variants.find do |variant|
+    exact = product.available_variants.find do |variant|
       candidates = [ variant.name, variant.size ].compact.map(&:downcase)
-      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate| content.downcase.include?(candidate) }
+      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate| content.downcase.include?(candidate) } ||
+        content.match?(/\b#{Regexp.escape(variant.price.to_i.to_s)}\b/)
     end
+    exact || contextual_variant_selection(product)
+  end
+
+  def contextual_variant_selection(product)
+    variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
+    return if variants.empty?
+
+    normalized = content.downcase.squish
+    return variants.first if normalized.match?(/\b(small|smallest|choto|trial|try)\b/)
+    return variants.last if normalized.match?(/\b(large|largest|boro|big|best value|regular use)\b/)
+    return variants[variants.length / 2] if normalized.match?(/\b(medium|middle|majhari)\b/)
+  end
+
+  def variant_size_number(variant)
+    variant.size.to_s[/\d+(?:\.\d+)?/]&.to_d || variant.position
   end
 
   def selected_inventory
@@ -541,11 +599,19 @@ class ConversationMessageProcessor
   def recommendation_request?
     return true if budget_recommendation_request?
     return true if discovery_follow_up?
+    return true if active_discovery_preference?
     return false if product_resolution.matched?
 
     content.downcase.match?(
-      /\b(suggest|recommend|help me choose|(?:give|show)(?:\s+me)?(?:\s+some)?\s+options?|which (perfume|fragrance)|(?:want|need|looking for)(?:\s+\w+){0,3}\s+(?:perfume|fragrance)|combo|bundle|single(?: perfume)?|one perfume|fresh|sweet|fruity|floral|woody|oud|spicy|tobacco)\b/
+      /\b(suggest|recommend|help me choose|(?:give|show)(?:\s+me)?(?:\s+some)?\s+options?|which (perfume|fragrance)|(?:want|need|looking for)(?:\s+\w+){0,3}\s+(?:perfume|fragrance)|combo|bundle|single(?: perfume)?|one perfume)\b|\b(fresh|sweet|fruity|floral|woody|oud|spicy|tobacco)\b.*\b(perfume|fragrance|scent|kichu)\b|\b(oudy|oudi|oody|oddy|ody)\b/
     )
+  end
+
+  def active_discovery_preference?
+    return false unless GuidedSalesConversation.new(pending_order.conversation).stage == "discover"
+
+    extracted = FragrancePreferenceExtractor.new(content).call
+    extracted.values_at("format", "audience", "performance", "scent_families", "occasions").any?(&:present?)
   end
 
   def discovery_follow_up?
@@ -559,7 +625,12 @@ class ConversationMessageProcessor
   end
 
   def enter_product_discovery!
-    return unless pending_order.status.in?(%w[collecting_variant collecting_quantity])
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.suspend_order!(pending_order)
+    flow.transition!("discover") unless flow.stage == "discover"
+    return unless pending_order.status.in?(%w[
+      collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
+    ])
 
     pending_order.update!(product: nil, product_variant: nil, quantity: nil, status: :collecting_product)
   end
@@ -573,8 +644,73 @@ class ConversationMessageProcessor
     conversation.update!(conversation_state: state)
   end
 
+  def resume_browsed_order_request?
+    content.downcase.match?(/\b(continue|resume|back to)\b.*\b(order|checkout)\b|\border\s+(continue|resume)\b/) ||
+      confident_ai_intent?(%w[resume_order go_back])
+  end
+
+  def resume_browsed_order
+    restored = GuidedSalesConversation.new(pending_order.conversation).resume_order!(pending_order)
+    restored ? :resume_order_requested : :order_details_requested
+  end
+
+  def recommendation_rejection?
+    return false unless GuidedSalesConversation.new(pending_order.conversation).stage.in?(%w[discover compare])
+
+    confident_ai_intent?(%w[reject_recommendations]) ||
+      content.downcase.match?(/don'?t like (these|them|any)|not these|none( of these)?|no one|not any|show (me )?different|kono ta na|egula pochondo (hoy )?nai|এগুলো.*পছন্দ.*না/)
+  end
+
+  def reject_recommendations
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    rejected_ids = flow.reject_last_recommendations!
+    state = pending_order.conversation.conversation_state.to_h
+    extractor = FragrancePreferenceExtractor.new(content)
+    preferences = extractor.call(existing: state.fetch("shopping_preferences", {}))
+      .merge("rejected_product_ids" => rejected_ids)
+    pending_order.conversation.update!(conversation_state: state.merge("shopping_preferences" => preferences))
+    extractor.meaningful? ? :product_recommendation_requested : :recommendations_rejected
+  end
+
+  def shortlist_show_request?
+    confident_ai_intent?(%w[shortlist_show]) ||
+      content.downcase.match?(/\b(show|view|my)\b.*\b(shortlist|saved|choices)\b|\bshortlist\b/)
+  end
+
+  def shortlist_add_request?
+    confident_ai_intent?(%w[shortlist_add]) ||
+      content.downcase.match?(/\b(keep|save|shortlist|remember)\b.*\b(first|second|third|one|ones|option|product|these|this)\b/)
+  end
+
+  def shortlist_remove_request?
+    confident_ai_intent?(%w[shortlist_remove]) || content.downcase.match?(/\b(remove|drop|bad dao|বাদ দাও)\b/)
+  end
+
+  def update_shortlist(action)
+    ids = referenced_recommendation_ids
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    action == :add ? flow.add_to_shortlist!(ids) : flow.remove_from_shortlist!(ids)
+    :shortlist_updated
+  end
+
+  def referenced_recommendation_ids
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    recommended = Array(flow.context["last_recommended_product_ids"])
+    normalized = content.downcase
+    return [ recommended[0] ].compact if normalized.match?(/\b(first|1st|prothom)\b/)
+    return [ recommended[1] ].compact if normalized.match?(/\b(second|2nd|ditiyo)\b/)
+    return [ recommended[2] ].compact if normalized.match?(/\b(third|3rd|tritiyo)\b/)
+
+    named = catalog.select { |product| product.searchable_names.any? { |name| normalized.include?(name.downcase) } }.map(&:id)
+    named.presence || recommended
+  end
+
   def stock_question?
     content.downcase.match?(/\b(stock|available|availability)\b/)
+  end
+
+  def comparison_request?
+    content.downcase.match?(/\b(compare|comparison|difference|different|versus|vs\.?|better)\b/)
   end
 
   def order_change_request?
