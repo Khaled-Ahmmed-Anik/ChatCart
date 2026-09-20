@@ -1,0 +1,14 @@
+# macOS metadata
+.DS_Store
+
+# Local Codex/generated artifacts
+/output/
+/tmp/
+
+# Editor settings
+/.idea/
+/.vscode/
+
+# Frontend dependencies and production build
+/frontend/node_modules/
+/frontend/dist/

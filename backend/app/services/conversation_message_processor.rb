@@ -1,0 +1,771 @@
+class ConversationMessageProcessor
+  NUMBER_WORDS = {
+    "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
+    "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
+    "ekta" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
+  }.freeze
+
+  attr_reader :outcome, :secondary_outcomes
+
+  def initialize(message:, pending_order:, interpretation: nil)
+    @message = message
+    @pending_order = pending_order
+    @content = message.content.to_s.strip
+    @interpretation = interpretation
+  end
+
+  def process
+    unless message.customer?
+      @outcome = :ignored
+      return pending_order
+    end
+
+    return pending_order if handle_order_update_request
+    return pending_order if handle_conversational_intent
+    return pending_order if handle_ai_intent
+
+    case pending_order.status
+    when "collecting_product"
+      collect_product
+    when "collecting_quantity"
+      collect_quantity
+    when "collecting_variant"
+      collect_variant
+    when "collecting_name"
+      collect_name
+    when "collecting_phone"
+      collect_phone
+    when "collecting_address"
+      collect_address
+    when "awaiting_confirmation"
+      collect_confirmation
+    end
+
+    apply_remaining_interpreted_details
+    @outcome ||= :no_change
+    pending_order
+  ensure
+    @secondary_outcomes = mapped_secondary_outcomes
+  end
+
+  private
+
+  attr_reader :message, :pending_order, :content, :interpretation
+
+  AI_OUTCOMES = {
+    "greeting" => :greeting,
+    "thanks" => :thanks,
+    "help" => :help,
+    "wellbeing" => :wellbeing,
+    "goodbye" => :goodbye,
+    "bot_identity" => :bot_identity,
+    "language_preference" => :language_preference,
+    "complaint" => :complaint,
+    "human_agent" => :human_agent,
+    "list_products" => :product_list_requested,
+    "product_search" => :product_list_requested,
+    "product_details" => :product_details_requested,
+    "product_price" => :price_inquiry,
+    "product_availability" => :stock_inquiry,
+    "product_recommendation" => :product_recommendation_requested,
+    "compare_products" => :product_comparison_requested,
+    "product_variants" => :product_variants_requested,
+    "product_images" => :product_images_requested,
+    "out_of_stock" => :alternative_product_requested,
+    "alternative_product" => :alternative_product_requested,
+    "gift_recommendation" => :product_recommendation_requested,
+    "refine_recommendation" => :product_recommendation_requested,
+    "reject_recommendations" => :recommendations_rejected,
+    "shortlist_add" => :shortlist_updated,
+    "shortlist_remove" => :shortlist_updated,
+    "shortlist_show" => :shortlist_requested,
+    "resume_order" => :resume_order_requested,
+    "order_history" => :order_history_requested,
+    "payment_methods" => :payment_methods_requested,
+    "cash_on_delivery" => :cash_on_delivery_requested,
+    "delivery_charge" => :delivery_charge_requested,
+    "delivery_area" => :delivery_area_requested,
+    "delivery_time" => :delivery_time_requested,
+    "return_request" => :return_requested,
+    "replacement_request" => :replacement_requested,
+    "refund_request" => :refund_requested
+  }.freeze
+
+  def handle_ai_intent
+    return false if interpretation.blank?
+
+    if interpretation.needs_clarification || interpretation.intent == "unclear"
+      @outcome = :clarification_needed
+      return true
+    end
+
+    @outcome = AI_OUTCOMES[interpretation.intent]
+    outcome.present?
+  end
+
+  def mapped_secondary_outcomes
+    return [] if interpretation.blank? || interpretation.needs_clarification
+
+    interpretation.secondary_intents.filter_map do |intent|
+      next unless intent.in?(ConversationIntentRegistry::INFORMATIONAL_INTENTS)
+
+      AI_OUTCOMES[intent]
+    end.uniq - [ outcome ]
+  end
+
+  def collect_product
+    product = matching_product
+    if product.blank?
+      @outcome = product_resolution.ambiguous? ? :product_ambiguous :
+        (named_unavailable_product? ? :product_unavailable : :product_not_found)
+      return
+    end
+
+    pending_order.product = product
+    pending_order.product_variant = matching_variant(product)
+    pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
+      :collecting_variant : :collecting_quantity
+    pending_order.save!
+    @outcome = :product_selected
+  end
+
+  def collect_variant
+    variant = matching_variant(pending_order.product)
+    if variant.blank?
+      @outcome = :variant_not_found
+      return
+    end
+
+    pending_order.update!(product_variant: variant, status: :collecting_quantity)
+    @outcome = :variant_selected
+  end
+
+  def collect_quantity
+    quantity = parsed_quantity
+    if quantity.blank?
+      @outcome = :invalid_quantity
+      return
+    end
+    if selected_inventory.present? && !selected_inventory.available_for_quantity?(quantity)
+      @outcome = :quantity_unavailable
+      return
+    end
+
+    pending_order.quantity = quantity
+    advance_after_collection(:collecting_name)
+    @outcome = :quantity_collected
+  end
+
+  def collect_name
+    name = interpreted_entity(:customer_name, for_intent: "provide_name") || remembered_value(:customer_name) || content
+    return if name.blank?
+
+    pending_order.customer_name = name
+    advance_after_collection(:collecting_phone)
+    @outcome = :name_collected
+  end
+
+  def collect_phone
+    phone = interpreted_entity(:phone, for_intent: "provide_phone") || remembered_value(:phone) || content
+    unless phone_number?(phone)
+      @outcome = :invalid_phone
+      return
+    end
+
+    pending_order.phone = phone
+    advance_after_collection(:collecting_address)
+    @outcome = :phone_collected
+  end
+
+  def collect_address
+    address = interpreted_entity(:address, for_intent: "provide_address") || remembered_value(:address) || content
+    return if address.blank?
+
+    pending_order.address = address
+    advance_after_collection(:awaiting_confirmation)
+    @outcome = :address_collected
+  end
+
+  def collect_confirmation
+    if confirmation?
+      pending_order.confirmed!
+      @outcome = :confirmed
+    elsif cancellation?
+      pending_order.cancelled!
+      @outcome = :cancelled
+    else
+      @outcome = :confirmation_unclear
+    end
+  end
+
+  def handle_order_update_request
+    return false unless order_change_request? || correction_command? || ai_change_intent?
+    return false unless pending_order.status.in?(%w[awaiting_confirmation confirmed submitted_to_woocommerce cancelled])
+
+    was_confirmed = pending_order.confirmed?
+    @outcome = if pending_order.submitted_to_woocommerce?
+      :submitted_order_change_requested
+    elsif pending_order.cancelled?
+      :cancelled_order_change_requested
+    elsif order_change_request? || confident_ai_intent?(%w[change_confirmed_order])
+      :order_change_requested
+    elsif apply_correction
+      reopen_confirmed_order(was_confirmed)
+    else
+      :invalid_order_update
+    end
+
+    true
+  end
+
+  def reopen_confirmed_order(was_confirmed)
+    return :order_updated unless was_confirmed
+
+    pending_order.update!(status: :awaiting_confirmation) if pending_order.ready_for_confirmation?
+    pending_order.order&.update!(status: "revision_pending")
+    :confirmed_order_updated
+  end
+
+  def handle_conversational_intent
+    @outcome = if repeat_order_request?
+      repeat_previous_order ? :repeat_order_prepared : :restarted
+    elsif restart_request?
+      restart_order
+      :restarted
+    elsif defer_confirmation_request?
+      :confirmation_deferred
+    elsif resume_browsed_order_request?
+      resume_browsed_order
+    elsif recommendation_rejection?
+      reject_recommendations
+    elsif shortlist_show_request?
+      :shortlist_requested
+    elsif shortlist_add_request?
+      update_shortlist(:add)
+    elsif shortlist_remove_request?
+      update_shortlist(:remove)
+    elsif order_details_request?
+      :order_details_requested
+    elsif product_list_request?
+      :product_list_requested
+    elsif greeting?
+      :greeting
+    elsif budget_recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
+    elsif price_question?
+      :price_inquiry
+    elsif stock_question?
+      :stock_inquiry
+    elsif comparison_request?
+      :product_comparison_requested
+    elsif recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
+    elsif help_request?
+      :help
+    elsif thanks?
+      :thanks
+    elsif human_agent_request?
+      :human_agent
+    end
+
+    outcome.present?
+  end
+
+  def restart_order
+    pending_order.update!(
+      product: nil,
+      product_variant: nil,
+      quantity: nil,
+      customer_name: nil,
+      phone: nil,
+      address: nil,
+      status: :collecting_product
+    )
+    GuidedSalesConversation.new(pending_order.conversation).reset!
+  end
+
+  def repeat_previous_order
+    previous = previous_completed_order
+    inventory = previous&.product_variant || previous&.product
+    unless inventory&.available_for_quantity?(previous.quantity)
+      restart_order
+      return false
+    end
+
+    pending_order.update!(
+      product: previous.product,
+      product_variant: previous.product_variant,
+      quantity: previous.quantity,
+      customer_name: previous.customer_name,
+      phone: previous.phone,
+      address: previous.address,
+      status: :awaiting_confirmation
+    )
+    true
+  end
+
+  def apply_correction
+    return apply_ai_correction if ai_change_intent?
+
+    case content
+    when /\A(?:change|update)\s+(?:the\s+)?quantity\s+(?:to\s+)?(.+)\z/i
+      update_quantity(Regexp.last_match(1))
+    when /\A(?:change|update)\s+(?:my\s+)?phone\s+(?:to\s+)?(.+)\z/i
+      update_phone(Regexp.last_match(1))
+    when /\A(?:change|update)\s+(?:my\s+)?name\s+(?:to\s+)?(.+)\z/i
+      record_change(:customer_name, Regexp.last_match(1).strip)
+    when /\A(?:change|update)\s+(?:the\s+)?address\s+(?:to\s+)?(.+)\z/i
+      record_change(:address, Regexp.last_match(1).strip)
+    else
+      false
+    end
+  end
+
+  def apply_ai_correction
+    case interpretation.intent
+    when "change_quantity"
+      update_quantity(interpretation.entities[:quantity].to_s)
+    when "change_phone"
+      update_phone(interpretation.entities[:phone].to_s)
+    when "change_name"
+      record_change(:customer_name, interpretation.entities[:customer_name].to_s.strip)
+    when "change_address"
+      record_change(:address, interpretation.entities[:address].to_s.strip)
+    when "change_product"
+      update_product(interpretation.entities[:product_name].to_s)
+    else
+      false
+    end
+  end
+
+  def update_product(name)
+    resolution = ProductResolutionService.new(business: pending_order.conversation.business, query: name).resolve
+    product = resolution.product
+    return false unless resolution.matched?
+
+    previous_product = pending_order.product
+    history = pending_order.change_history.dup
+    history << {
+      "field" => "product",
+      "from" => previous_product&.name,
+      "to" => product.name,
+      "changed_at" => Time.current.iso8601,
+      "message_id" => message.id
+    }
+    pending_order.update!(
+      product: product, product_variant: nil, quantity: nil,
+      status: product.product_variants.any? ? :collecting_variant : :collecting_quantity,
+      change_history: history
+    )
+    true
+  end
+
+  def update_quantity(value)
+    quantity = parse_quantity(value)
+    return false if quantity.blank? || selected_inventory.blank? || !selected_inventory.available_for_quantity?(quantity)
+
+    record_change(:quantity, quantity)
+  end
+
+  def update_phone(value)
+    phone = value.strip
+    return false unless phone.match?(/\A[+\d][\d\s().-]{6,}\z/)
+
+    record_change(:phone, phone)
+  end
+
+  def record_change(field, new_value)
+    return false if new_value.blank?
+
+    previous_value = pending_order.public_send(field)
+    return true if previous_value.to_s == new_value.to_s
+
+    history = pending_order.change_history.dup
+    history << {
+      "field" => field.to_s,
+      "from" => previous_value&.to_s,
+      "to" => new_value.to_s,
+      "changed_at" => Time.current.iso8601,
+      "message_id" => message.id
+    }
+    pending_order.update!(field => new_value, change_history: history)
+    true
+  end
+
+  def apply_remaining_interpreted_details
+    return if interpretation.blank? || interpretation.needs_clarification
+
+    collected = 0
+    loop do
+      advanced = case pending_order.status
+      when "collecting_quantity"
+        collect_interpreted_quantity
+      when "collecting_name"
+        collect_interpreted_value(:customer_name, :collecting_phone)
+      when "collecting_phone"
+        collect_interpreted_phone
+      when "collecting_address"
+        collect_interpreted_value(:address, :awaiting_confirmation)
+      else
+        false
+      end
+      break unless advanced
+
+      collected += 1
+    end
+
+    @outcome = :multiple_details_collected if collected.positive?
+  end
+
+  def collect_interpreted_quantity
+    quantity = interpretation.entities[:quantity].to_i
+    return false unless quantity.positive? && selected_inventory&.available_for_quantity?(quantity)
+
+    pending_order.update!(quantity: quantity, status: :collecting_name)
+    true
+  end
+
+  def collect_interpreted_value(field, next_status)
+    value = interpretation.entities[field].to_s.strip
+    return false if value.blank?
+
+    pending_order.update!(field => value, status: next_status)
+    true
+  end
+
+  def collect_interpreted_phone
+    phone = interpretation.entities[:phone].to_s.strip
+    return false unless phone_number?(phone)
+
+    pending_order.update!(phone: phone, status: :collecting_address)
+    true
+  end
+
+  def advance_after_collection(next_status)
+    pending_order.status = pending_order.ready_for_confirmation? ? :awaiting_confirmation : next_status
+    pending_order.save!
+  end
+
+  def matching_product
+    contextual_product_selection || (product_resolution.product if product_resolution.matched?)
+  end
+
+  def contextual_product_selection
+    normalized = content.downcase.squish
+    flow_context = GuidedSalesConversation.new(pending_order.conversation).context
+    recommended_ids = Array(flow_context["last_recommended_product_ids"])
+    shortlisted_ids = Array(flow_context["shortlist_product_ids"])
+    ids = recommended_ids.presence || shortlisted_ids
+    return if ids.blank?
+
+    position = if normalized.match?(/\b(first|1st|prothom)\b/)
+      0
+    elsif normalized.match?(/\b(second|2nd|ditiyo)\b/)
+      1
+    elsif normalized.match?(/\b(third|3rd|tritiyo)\b/)
+      2
+    elsif normalized.match?(/\b(last|shesh)\b/)
+      ids.length - 1
+    elsif normalized.match?(/\A(eta|eita|this one|this|এটা)( nibo| chai| please)?[?!. ]*\z/) && ids.one?
+      0
+    end
+    return if position.blank? || ids[position].blank?
+
+    catalog.available_for_sale.find_by(id: ids[position])
+  end
+
+  def product_resolution
+    @product_resolution ||= ProductResolutionService.new(
+      business: pending_order.conversation.business,
+      query: interpreted_entity(:product_name, for_intent: "select_product") || content,
+      recent_product_name: pending_order.conversation.conversation_state.to_h["last_referenced_product"]
+    ).resolve
+  end
+
+  def matching_variant(product)
+    return if product.blank? || product.product_variants.none?
+
+    requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
+    exact = product.available_variants.find do |variant|
+      candidates = [ variant.name, variant.size ].compact.map(&:downcase)
+      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate| content.downcase.include?(candidate) } ||
+        content.match?(/\b#{Regexp.escape(variant.price.to_i.to_s)}\b/)
+    end
+    exact || contextual_variant_selection(product)
+  end
+
+  def contextual_variant_selection(product)
+    variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
+    return if variants.empty?
+
+    normalized = content.downcase.squish
+    return variants.first if normalized.match?(/\b(small|smallest|choto|trial|try)\b/)
+    return variants.last if normalized.match?(/\b(large|largest|boro|big|best value|regular use)\b/)
+    variants[variants.length / 2] if normalized.match?(/\b(medium|middle|majhari)\b/)
+  end
+
+  def variant_size_number(variant)
+    variant.size.to_s[/\d+(?:\.\d+)?/]&.to_d || variant.position
+  end
+
+  def selected_inventory
+    pending_order.product_variant || pending_order.product
+  end
+
+  def named_unavailable_product?
+    catalog.find_each.any? { |product| content.downcase.include?(product.name.downcase) }
+  end
+
+  def catalog
+    pending_order.conversation.business.products
+  end
+
+  def parsed_quantity
+    ai_quantity = interpretation&.entities&.[](:quantity).to_i
+    return ai_quantity if interpretation&.intent == "select_quantity" && ai_quantity.positive?
+
+    parse_quantity(content)
+  end
+
+  def parse_quantity(value)
+    numeric_quantity = value[/\d+/]&.to_i
+    return numeric_quantity if numeric_quantity&.positive?
+
+    NUMBER_WORDS.find { |word, _number| value.downcase.match?(/\b#{word}\b/) }&.last
+  end
+
+  def phone_number?(value = content)
+    value.match?(/\A[+\d][\d\s().-]{6,}\z/)
+  end
+
+  def confirmation?
+    normalized_content.in?(%w[confirm confirmed yes y]) || confident_ai_intent?(%w[confirm_order])
+  end
+
+  def cancellation?
+    normalized_content.in?(%w[cancel cancelled stop no n]) || confident_ai_intent?(%w[cancel_order])
+  end
+
+  def normalized_content
+    content.downcase.gsub(/[^a-z]/, "")
+  end
+
+  def greeting?
+    content.downcase.strip.match?(/\A(hi|hello|hey|assalamu alaikum|assalamualaikum)[!. ]*\z/)
+  end
+
+  def help_request?
+    content.downcase.match?(/\b(help|options|menu)\b/)
+  end
+
+  def product_list_request?
+    normalized = content.downcase.squish
+    normalized.match?(/\b(show|see|list)\s+(all\s+)?products?\b/) ||
+      normalized.match?(/\b(available|all)\s+products?\b/) ||
+      normalized.match?(/\b(product|products)\s+(dekhao|dekhaw|list)\b/) ||
+      normalized.match?(/ki ki product|product ki ki/)
+  end
+
+  def thanks?
+    content.downcase.strip.match?(/\A(thanks|thank you|thx)[!. ]*\z/)
+  end
+
+  def restart_request?
+    intent_detector.new_order? || confident_ai_intent?(%w[new_order repeat_order])
+  end
+
+  def repeat_order_request?
+    confident_ai_intent?(%w[repeat_order]) ||
+      content.downcase.match?(/\b(re-?order|order again|same order|ager order|আগের অর্ডার)\b/)
+  end
+
+  def order_details_request?
+    intent_detector.order_details? || confident_ai_intent?(%w[order_details review_order order_status])
+  end
+
+  def price_question?
+    content.downcase.match?(/\b(price|cost)\b|how much/)
+  end
+
+  def budget_recommendation_request?
+    normalized = content.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
+    normalized.match?(/\b(under|below|within|budget|cheapest|lowest|starting price|price starts|kom dam|moddhe)\b|মধ্যে|নিচে|বাজেট|কম দাম/)
+  end
+
+  def recommendation_request?
+    return true if budget_recommendation_request?
+    return true if discovery_follow_up?
+    return true if active_discovery_preference?
+    return false if product_resolution.matched?
+
+    content.downcase.match?(
+      /\b(suggest|recommend|help me choose|(?:give|show)(?:\s+me)?(?:\s+some)?\s+options?|which (perfume|fragrance)|(?:want|need|looking for)(?:\s+\w+){0,3}\s+(?:perfume|fragrance)|combo|bundle|single(?: perfume)?|one perfume)\b|\b(fresh|sweet|fruity|floral|woody|oud|spicy|tobacco)\b.*\b(perfume|fragrance|scent|kichu)\b|\b(oudy|oudi|oody|oddy|ody)\b/
+    )
+  end
+
+  def active_discovery_preference?
+    return false unless GuidedSalesConversation.new(pending_order.conversation).stage == "discover"
+
+    extracted = FragrancePreferenceExtractor.new(content).call
+    extracted.values_at("format", "audience", "performance", "scent_families", "occasions").any?(&:present?)
+  end
+
+  def discovery_follow_up?
+    preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"]
+    return false unless content.downcase.squish.match?(/\A(ekta|ekta nibo|one|single|combo|একটা)[?!. ]*\z/)
+    return true if preferences.present?
+
+    pending_order.conversation.messages.bot.order(created_at: :desc, id: :desc).limit(5).any? do |recent_message|
+      recent_message.content.downcase.match?(/single.*combo|one perfume.*combo|ekta perfume.*combo/)
+    end
+  end
+
+  def enter_product_discovery!
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.suspend_order!(pending_order)
+    flow.transition!("discover") unless flow.stage == "discover"
+    return unless pending_order.status.in?(%w[
+      collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
+    ])
+
+    pending_order.update!(product: nil, product_variant: nil, quantity: nil, status: :collecting_product)
+  end
+
+  def remember_recommendation_preferences!
+    conversation = pending_order.conversation
+    state = conversation.conversation_state.to_h
+    state["shopping_preferences"] = FragrancePreferenceExtractor.new(content).call(
+      existing: state["shopping_preferences"]
+    )
+    conversation.update!(conversation_state: state)
+  end
+
+  def resume_browsed_order_request?
+    content.downcase.match?(/\b(continue|resume|back to)\b.*\b(order|checkout)\b|\border\s+(continue|resume)\b/) ||
+      confident_ai_intent?(%w[resume_order go_back])
+  end
+
+  def resume_browsed_order
+    restored = GuidedSalesConversation.new(pending_order.conversation).resume_order!(pending_order)
+    restored ? :resume_order_requested : :order_details_requested
+  end
+
+  def recommendation_rejection?
+    return false unless GuidedSalesConversation.new(pending_order.conversation).stage.in?(%w[discover compare])
+
+    confident_ai_intent?(%w[reject_recommendations]) ||
+      content.downcase.match?(/don'?t like (these|them|any)|not these|none( of these)?|no one|not any|show (me )?different|kono ta na|egula pochondo (hoy )?nai|এগুলো.*পছন্দ.*না/)
+  end
+
+  def reject_recommendations
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    rejected_ids = flow.reject_last_recommendations!
+    state = pending_order.conversation.conversation_state.to_h
+    extractor = FragrancePreferenceExtractor.new(content)
+    preferences = extractor.call(existing: state.fetch("shopping_preferences", {}))
+      .merge("rejected_product_ids" => rejected_ids)
+    pending_order.conversation.update!(conversation_state: state.merge("shopping_preferences" => preferences))
+    extractor.meaningful? ? :product_recommendation_requested : :recommendations_rejected
+  end
+
+  def shortlist_show_request?
+    confident_ai_intent?(%w[shortlist_show]) ||
+      content.downcase.match?(/\b(show|view|my)\b.*\b(shortlist|saved|choices)\b|\bshortlist\b/)
+  end
+
+  def shortlist_add_request?
+    confident_ai_intent?(%w[shortlist_add]) ||
+      content.downcase.match?(/\b(keep|save|shortlist|remember)\b.*\b(first|second|third|one|ones|option|product|these|this)\b/)
+  end
+
+  def shortlist_remove_request?
+    confident_ai_intent?(%w[shortlist_remove]) || content.downcase.match?(/\b(remove|drop|bad dao|বাদ দাও)\b/)
+  end
+
+  def update_shortlist(action)
+    ids = referenced_recommendation_ids
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    action == :add ? flow.add_to_shortlist!(ids) : flow.remove_from_shortlist!(ids)
+    :shortlist_updated
+  end
+
+  def referenced_recommendation_ids
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    recommended = Array(flow.context["last_recommended_product_ids"])
+    normalized = content.downcase
+    return [ recommended[0] ].compact if normalized.match?(/\b(first|1st|prothom)\b/)
+    return [ recommended[1] ].compact if normalized.match?(/\b(second|2nd|ditiyo)\b/)
+    return [ recommended[2] ].compact if normalized.match?(/\b(third|3rd|tritiyo)\b/)
+
+    named = catalog.select { |product| product.searchable_names.any? { |name| normalized.include?(name.downcase) } }.map(&:id)
+    named.presence || recommended
+  end
+
+  def stock_question?
+    content.downcase.match?(/\b(stock|available|availability)\b/)
+  end
+
+  def comparison_request?
+    content.downcase.match?(/\b(compare|comparison|difference|different|versus|vs\.?|better)\b/)
+  end
+
+  def order_change_request?
+    content.downcase.strip.match?(/\A(change|update|edit)\s+((my|the)\s+)?(previous\s+|last\s+)?order[?!. ]*\z/)
+  end
+
+  def correction_command?
+    content.match?(/\A(?:change|update)\s+(?:the\s+quantity|quantity|my\s+phone|phone|my\s+name|name|the\s+address|address)\b/i)
+  end
+
+  def ai_change_intent?
+    confident_ai_intent?(%w[change_product change_quantity change_name change_phone change_address])
+  end
+
+  def intent_detector
+    @intent_detector ||= ConversationIntentDetector.new(content)
+  end
+
+  def defer_confirmation_request?
+    return false unless pending_order.awaiting_confirmation?
+    return true if confident_ai_intent?(%w[defer_confirmation])
+
+    normalized = content.downcase.squish
+    normalized.match?(/\bconfirm\s+(later|letter)\b/) ||
+      normalized.match?(/\b(will|i'll|i will)\s+confirm\b.*\b(later|letter)\b/) ||
+      normalized.match?(/\b(pore|later)\s+confirm\s+(korbo|kore dibo)\b/) ||
+      normalized.match?(/\bekhon\s+na\b|\bpore\s+korbo\b/)
+  end
+
+  def human_agent_request?
+    confident_ai_intent?(%w[human_agent]) || content.downcase.match?(
+      /\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b.*\b(talk|speak|connect|chai|kotha|কথা)\b|\b(talk|speak|connect|kotha|কথা)\b.*\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b/
+    )
+  end
+
+  def remembered_value(field)
+    return unless content.downcase.match?(/\b(same|previous|ager|আগের)\b/)
+
+    previous_completed_order&.public_send(field)
+  end
+
+  def previous_completed_order
+    @previous_completed_order ||= pending_order.conversation.pending_orders
+      .where.not(id: pending_order.id)
+      .where(status: %i[confirmed submitted_to_woocommerce])
+      .order(id: :desc).first
+  end
+
+  def confident_ai_intent?(intents)
+    interpretation.present? && !interpretation.needs_clarification && interpretation.intent.in?(intents)
+  end
+
+  def interpreted_entity(key, for_intent:)
+    return unless confident_ai_intent?([ for_intent ])
+
+    interpretation.entities[key].presence
+  end
+end

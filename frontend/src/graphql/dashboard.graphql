@@ -1,0 +1,146 @@
+query DashboardContext {
+  viewer {
+    id
+    name
+    email
+    role
+  }
+  currentBusiness {
+    id
+    name
+    slug
+    category
+    defaultLanguage
+    timezone
+    currency
+    status
+  }
+}
+
+query DashboardAnalytics {
+  analytics {
+    conversations
+    uniqueCustomers
+    confirmedOrders
+    conversationToOrderRate
+    orderingCustomers
+    repeatCustomers
+    repeatCustomerRate
+    revenue
+    averageOrderValue
+    ordersByChannel
+    ordersByStatus
+    topProducts
+  }
+}
+
+query DashboardProducts($first: Int = 50) {
+  products(first: $first) {
+    id
+    name
+    description
+    shortDescription
+    category
+    benefits
+    usageInstructions
+    suitableFor
+    productAttributes
+    price
+    stockQuantity
+    tags
+    active
+    wooCommerceProductId
+    productType
+    stockStrategy
+    aliases
+    imageUrls
+    sourceUrl
+    archivedAt
+    variants {
+      id
+      name
+      size
+      sku
+      price
+      stockQuantity
+      active
+      position
+    }
+    comboItems {
+      id
+      quantity
+      selectionGroup
+      required
+      position
+      componentProduct { id name }
+    }
+  }
+}
+
+mutation SaveDashboardProduct($id: ID, $input: ProductInput!) {
+  saveProduct(id: $id, input: $input) {
+    product {
+      id
+      name
+      description
+      shortDescription
+      category
+      benefits
+      usageInstructions
+      suitableFor
+      productAttributes
+      price
+      stockQuantity
+      tags
+      active
+      wooCommerceProductId
+      productType
+      stockStrategy
+      aliases
+      imageUrls
+      sourceUrl
+      archivedAt
+      variants {
+        id
+        name
+        size
+        sku
+        price
+        stockQuantity
+        active
+        position
+      }
+      comboItems {
+        id
+        quantity
+        selectionGroup
+        required
+        position
+        componentProduct { id name }
+      }
+    }
+    errors
+  }
+}
+
+mutation ArchiveDashboardProduct($id: ID!, $permanent: Boolean = false) {
+  archiveProduct(id: $id, permanent: $permanent) {
+    deleted
+    product { id active archivedAt }
+    errors
+  }
+}
+
+mutation PreviewDashboardProductImport($url: String!) {
+  previewProductImport(url: $url) {
+    draft { id sourceUrl status extractedData error }
+    errors
+  }
+}
+
+mutation ApproveDashboardProductImport($draftId: ID!) {
+  approveProductImport(draftId: $draftId) {
+    product { id name active sourceUrl }
+    errors
+  }
+}
