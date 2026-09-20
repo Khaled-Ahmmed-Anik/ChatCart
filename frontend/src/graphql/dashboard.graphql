@@ -1,0 +1,64 @@
+query DashboardContext {
+  viewer {
+    id
+    name
+    email
+    role
+  }
+  currentBusiness {
+    id
+    name
+    slug
+    category
+    defaultLanguage
+    timezone
+    currency
+    status
+  }
+}
+
+query DashboardAnalytics {
+  analytics {
+    conversations
+    uniqueCustomers
+    confirmedOrders
+    conversationToOrderRate
+    orderingCustomers
+    repeatCustomers
+    repeatCustomerRate
+    revenue
+    averageOrderValue
+    ordersByChannel
+    ordersByStatus
+    topProducts
+  }
+}
+
+query DashboardProducts($first: Int = 50) {
+  products(first: $first) {
+    id
+    name
+    description
+    price
+    stockQuantity
+    tags
+    active
+    wooCommerceProductId
+  }
+}
+
+mutation SaveDashboardProduct($id: ID, $input: ProductInput!) {
+  saveProduct(id: $id, input: $input) {
+    product {
+      id
+      name
+      description
+      price
+      stockQuantity
+      tags
+      active
+      wooCommerceProductId
+    }
+    errors
+  }
+}

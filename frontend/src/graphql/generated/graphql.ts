@@ -1,0 +1,46 @@
+/* eslint-disable */
+/** Internal type. DO NOT USE DIRECTLY. */
+type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
+/** Internal type. DO NOT USE DIRECTLY. */
+export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
+export type ProductInput = {
+  active?: boolean | null | undefined;
+  description?: string | null | undefined;
+  name: string;
+  price: string;
+  stockQuantity: number;
+  tags?: string | null | undefined;
+  wooCommerceProductId?: string | null | undefined;
+};
+
+export type DashboardContextQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DashboardContextQuery = { viewer: { id: string, name: string, email: string, role: string }, currentBusiness: { id: string, name: string, slug: string, category: string | null, defaultLanguage: string, timezone: string, currency: string, status: string } };
+
+export type DashboardAnalyticsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DashboardAnalyticsQuery = { analytics: { conversations: number, uniqueCustomers: number, confirmedOrders: number, conversationToOrderRate: number, orderingCustomers: number, repeatCustomers: number, repeatCustomerRate: number, revenue: string, averageOrderValue: string, ordersByChannel: unknown, ordersByStatus: unknown, topProducts: unknown } };
+
+export type DashboardProductsQueryVariables = Exact<{
+  first?: number | null | undefined;
+}>;
+
+
+export type DashboardProductsQuery = { products: Array<{ id: string, name: string, description: string | null, price: string, stockQuantity: number, tags: string | null, active: boolean, wooCommerceProductId: string | null }> };
+
+export type SaveDashboardProductMutationVariables = Exact<{
+  id?: string | number | null | undefined;
+  input: ProductInput;
+}>;
+
+
+export type SaveDashboardProductMutation = { saveProduct: { errors: Array<string>, product: { id: string, name: string, description: string | null, price: string, stockQuantity: number, tags: string | null, active: boolean, wooCommerceProductId: string | null } | null } | null };
+
+
+export const DashboardContextDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DashboardContext"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"viewer"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"currentBusiness"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"category"}},{"kind":"Field","name":{"kind":"Name","value":"defaultLanguage"}},{"kind":"Field","name":{"kind":"Name","value":"timezone"}},{"kind":"Field","name":{"kind":"Name","value":"currency"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<DashboardContextQuery, DashboardContextQueryVariables>;
+export const DashboardAnalyticsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DashboardAnalytics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"analytics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"conversations"}},{"kind":"Field","name":{"kind":"Name","value":"uniqueCustomers"}},{"kind":"Field","name":{"kind":"Name","value":"confirmedOrders"}},{"kind":"Field","name":{"kind":"Name","value":"conversationToOrderRate"}},{"kind":"Field","name":{"kind":"Name","value":"orderingCustomers"}},{"kind":"Field","name":{"kind":"Name","value":"repeatCustomers"}},{"kind":"Field","name":{"kind":"Name","value":"repeatCustomerRate"}},{"kind":"Field","name":{"kind":"Name","value":"revenue"}},{"kind":"Field","name":{"kind":"Name","value":"averageOrderValue"}},{"kind":"Field","name":{"kind":"Name","value":"ordersByChannel"}},{"kind":"Field","name":{"kind":"Name","value":"ordersByStatus"}},{"kind":"Field","name":{"kind":"Name","value":"topProducts"}}]}}]}}]} as unknown as DocumentNode<DashboardAnalyticsQuery, DashboardAnalyticsQueryVariables>;
+export const DashboardProductsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DashboardProducts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"first"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}},"defaultValue":{"kind":"IntValue","value":"50"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"products"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"Variable","name":{"kind":"Name","value":"first"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"price"}},{"kind":"Field","name":{"kind":"Name","value":"stockQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"wooCommerceProductId"}}]}}]}}]} as unknown as DocumentNode<DashboardProductsQuery, DashboardProductsQueryVariables>;
+export const SaveDashboardProductDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveDashboardProduct"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ProductInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveProduct"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"product"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"price"}},{"kind":"Field","name":{"kind":"Name","value":"stockQuantity"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"wooCommerceProductId"}}]}},{"kind":"Field","name":{"kind":"Name","value":"errors"}}]}}]}}]} as unknown as DocumentNode<SaveDashboardProductMutation, SaveDashboardProductMutationVariables>;

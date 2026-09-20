@@ -14,7 +14,8 @@ ChatCart is a multi-business conversational-commerce platform. It receives Messe
 - Durable confirmed orders with immutable item and price snapshots
 - Dashboard analytics, order CSV export, conversation transcript, and human takeover
 - Automatic or manual delivery submission with retryable background jobs
-- A dependency-free responsive owner dashboard in `frontend/`
+- A responsive React/TypeScript owner dashboard in `frontend/`
+- A tenant-scoped GraphQL dashboard API with generated frontend operation types
 - Seed catalog for the current ChatCart products
 
 Messenger is the currently implemented customer channel. Instagram and WhatsApp are represented in the channel model but require their channel-specific webhook and send adapters.
@@ -116,6 +117,7 @@ Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `
 | `POST` | `/conversation_messages` | Exercise the conversation flow without Messenger |
 | `GET` | `/webhooks/messenger` | Meta webhook verification |
 | `POST` | `/webhooks/messenger` | Receive Messenger events |
+| `POST` | `/graphql` | Typed business dashboard queries and mutations |
 | `GET` | `/api/analytics` | Business conversion and customer analytics |
 | `GET` | `/api/orders` | Authenticated business order dashboard |
 | `GET` | `/api/orders/export` | Export the business's orders as CSV |
@@ -127,6 +129,16 @@ Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `
 
 Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. The original API-token path remains temporarily available for backward compatibility.
 
+The React dashboard uses GraphQL for its business context, analytics, and product catalog. Authentication, Meta webhooks, health checks, and CSV downloads remain REST endpoints. After changing the GraphQL schema or dashboard operations, regenerate the checked-in client types:
+
+```bash
+cd backend
+mise exec -- bin/rails graphql:schema:dump
+cd ../frontend
+npm run codegen
+npm run typecheck
+```
+
 ## Tests and code quality
 
 ```bash
@@ -134,6 +146,12 @@ cd backend
 mise exec -- bundle exec rails test
 mise exec -- bundle exec rubocop --cache false
 mise exec -- bin/brakeman --no-pager
+
+cd ../frontend
+npm run codegen
+npm run typecheck
+npm run lint
+npm run build
 ```
 
 ## Project layout

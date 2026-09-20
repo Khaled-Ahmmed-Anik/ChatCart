@@ -11,6 +11,8 @@ Rails.application.routes.draw do
     post "messenger", to: "messenger#create"
   end
 
+  post "graphql", to: "graphql#execute"
+
   get "conversations/lookup", to: "conversations#lookup"
   resources :conversation_messages, only: :create
   resources :products, only: [ :index, :create ]
