@@ -1,6 +1,4 @@
 class BotReplyGenerator
-  INITIAL_CATALOG_LIMIT = 6
-
   def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil)
     @pending_order = pending_order
     @customer_message = customer_message
@@ -38,7 +36,7 @@ class BotReplyGenerator
     when :human_agent
       "I’ll mark this for seller assistance. Please leave a short description of what you need help with."
     when :human_handover_started
-      "I’ve passed this conversation to the seller so they can help properly. They’ll continue with you here as soon as possible."
+      I18n.t("bot_replies.human_handover_started", locale: :bn)
     when :clarification_needed
       clarification_reply
     when :price_inquiry
@@ -57,8 +55,10 @@ class BotReplyGenerator
       shortlist_reply
     when :product_comparison_requested
       product_comparison_reply
-    when :product_variants_requested, :product_images_requested
-      "I don’t have those product details configured yet. Please ask the seller, or choose from the available products: #{available_product_names}."
+    when :product_variants_requested
+      product_variants_reply
+    when :product_images_requested
+      "I don’t have product images configured here yet. Please tell me the product name and I can still help with its details."
     when :restarted
       "No problem—we’ll start a fresh order. #{product_selection_prompt}"
     when :repeat_order_prepared
@@ -180,7 +180,7 @@ class BotReplyGenerator
     products = available_products
     return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. How can I help you today?" if products.empty?
 
-    visible_products = products.first(INITIAL_CATALOG_LIMIT)
+    visible_products = products.first(Constants::Conversation::INITIAL_CATALOG_LIMIT)
     remaining_count = products.size - visible_products.size
     more_products_line = "• +#{remaining_count} more available—send “show all products” to see them" if remaining_count.positive?
 
@@ -296,7 +296,8 @@ class BotReplyGenerator
     conversation_state = pending_order.conversation.conversation_state.to_h
     guided_context = conversation_state.dig("guided_sales", "context").to_h
     preferences = conversation_state["shopping_preferences"].to_h.merge(
-      "rejected_product_ids" => guided_context["rejected_product_ids"]
+      "rejected_product_ids" => guided_context["rejected_product_ids"],
+      "previous_recommendations" => guided_context["last_recommendations"]
     )
     result = ProductRecommendationService.new(
       business: pending_order.conversation.business,
@@ -311,7 +312,11 @@ class BotReplyGenerator
       return "Sorry, no products are currently available."
     end
 
-    GuidedSalesConversation.new(pending_order.conversation).remember_recommendations!(result.offers.map { |offer| offer.product.id })
+    previous_recommendations = Array(guided_context["last_recommendations"])
+    recommendation_snapshots = result.offers.map { |offer| recommendation_snapshot(offer) }
+    GuidedSalesConversation.new(pending_order.conversation).remember_recommendations!(
+      result.offers.map { |offer| offer.product.id }, offers: recommendation_snapshots
+    )
 
     options = result.offers.map do |offer|
       description = offer.product.short_description.presence || offer.product.description.to_s
@@ -319,6 +324,8 @@ class BotReplyGenerator
       product_kind = offer.product.combo? ? "Combo" : "Single fragrance"
       sizes = offer.product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }.map(&:display_name).uniq
       detail_lines = [ "  #{product_kind}. #{summary}" ]
+      tradeoff = recommendation_tradeoff(offer, previous_recommendations, result)
+      detail_lines << "  #{tradeoff}" if tradeoff.present?
       if result.budget_detected && offer.variant.present?
         detail_lines << "  Best size within your budget: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
       end
@@ -330,7 +337,19 @@ class BotReplyGenerator
       end
       "#{heading}\n#{detail_lines.join("\n")}"
     end
-    introduction = if result.floor_request
+    introduction = if !result.exact_match && result.requested_maximum.present?
+      "I couldn’t find an exact match within #{formatted_price(result.requested_maximum)}. The closest available option is"
+    elsif !result.exact_match && preferences["price_direction"].present?
+      "I couldn’t find an exact #{preferences['price_direction']} alternative. The closest available options are"
+    elsif preferences["price_direction"] == "lower"
+      "Here are lower-priced alternatives"
+    elsif preferences["price_direction"] == "higher"
+      "Here are more premium alternatives"
+    elsif preferences["projection_preference"] == "stronger"
+      "Here are stronger-projecting alternatives"
+    elsif preferences["projection_preference"] == "softer"
+      "Here are softer alternatives"
+    elsif result.floor_request
       "Our available prices start from #{formatted_price(result.minimum_price)}. You can consider"
     elsif result.budget_detected
       "Within your requested price, you can consider"
@@ -338,6 +357,35 @@ class BotReplyGenerator
       "Based on what you’re looking for, I recommend"
     end
     ([ "#{introduction}:", *options, "", "Which one sounds closest to what you want?" ]).join("\n")
+  end
+
+  def recommendation_snapshot(offer)
+    attributes = offer.product.product_attributes.to_h
+    {
+      product_id: offer.product.id,
+      variant_id: offer.variant&.id,
+      price: offer.price.to_s,
+      projection: attributes["projection"],
+      scent_families: Array(attributes["scent_families"])
+    }
+  end
+
+  def recommendation_tradeoff(offer, previous_recommendations, result)
+    if !result.exact_match && result.requested_maximum.present? && offer.price > result.requested_maximum
+      difference = offer.price - result.requested_maximum
+      return "This is #{formatted_price(difference)} above your budget, but it is the nearest in-stock choice."
+    end
+
+    previous_prices = previous_recommendations.filter_map do |item|
+      item.to_h.with_indifferent_access[:price].presence&.to_d
+    end
+    return if previous_prices.empty?
+
+    if offer.price < previous_prices.min
+      "It costs #{formatted_price(previous_prices.min - offer.price)} less than the previous options."
+    elsif offer.price > previous_prices.max
+      "It costs #{formatted_price(offer.price - previous_prices.max)} more than the previous options."
+    end
   end
 
   def shortlist_reply
@@ -438,6 +486,55 @@ class BotReplyGenerator
     end
 
     "#{information} #{status_prompt}"
+  end
+
+  def product_variants_reply
+    return general_product_variants_reply if general_variant_request?
+
+    product = contextual_product
+    return "Sure—which product would you like the size options for? Just send me its name." if product.blank?
+
+    variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
+    if variants.empty?
+      return "#{product.name} currently has one standard option at #{formatted_price(product.price)}. How many would you like?"
+    end
+
+    options = variants.map do |variant|
+      "• #{variant.display_name} — #{formatted_price(variant.price)} (#{variant.stock_quantity} in stock)"
+    end
+    ([ "#{product.name} is available in:", *options, "", "Which size would you prefer?" ]).join("\n")
+  end
+
+  def general_product_variants_reply
+    grouped_variants = catalog.active.includes(:product_variants).flat_map(&:available_variants).group_by do |variant|
+      variant.display_name.upcase
+    end
+    return "Sizes vary by product. Send me a product name and I’ll show its exact available options." if grouped_variants.empty?
+
+    options = grouped_variants.sort_by { |label, _variants| label[/\d+(?:\.\d+)?/]&.to_d || Float::INFINITY }
+      .first(8).map do |label, variants|
+        prices = variants.map(&:price)
+        price_label = prices.min == prices.max ? formatted_price(prices.min) :
+          "#{formatted_price(prices.min)}–#{formatted_price(prices.max)}"
+        examples = variants.map { |variant| variant.product.name }.uniq.first(2).to_sentence
+        "• #{label} — #{price_label} (for example, #{examples})"
+      end
+
+    ([ "Our common available size options are:", *options, "", "Exact sizes depend on the product. Tell me a product name if you want its full size and price list." ]).join("\n")
+  end
+
+  def general_variant_request?
+    customer_message&.content.to_s.downcase.squish.match?(
+      /\b(general|overall|common|all products?|any product|jekono|যেকোনো)\b/
+    )
+  end
+
+  def contextual_product
+    return mentioned_product if mentioned_product.present?
+    return pending_order.product if pending_order.product.present?
+
+    remembered_name = pending_order.conversation.conversation_state.to_h["last_referenced_product"]
+    catalog.find_by(name: remembered_name) if remembered_name.present?
   end
 
   def mentioned_product

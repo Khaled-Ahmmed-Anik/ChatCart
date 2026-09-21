@@ -1,10 +1,4 @@
 class ConversationMessageProcessor
-  NUMBER_WORDS = {
-    "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
-    "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
-    "ekta" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
-  }.freeze
-
   attr_reader :outcome, :secondary_outcomes
 
   def initialize(message:, pending_order:, interpretation: nil)
@@ -52,45 +46,6 @@ class ConversationMessageProcessor
 
   attr_reader :message, :pending_order, :content, :interpretation
 
-  AI_OUTCOMES = {
-    "greeting" => :greeting,
-    "thanks" => :thanks,
-    "help" => :help,
-    "wellbeing" => :wellbeing,
-    "goodbye" => :goodbye,
-    "bot_identity" => :bot_identity,
-    "language_preference" => :language_preference,
-    "complaint" => :complaint,
-    "human_agent" => :human_agent,
-    "list_products" => :product_list_requested,
-    "product_search" => :product_list_requested,
-    "product_details" => :product_details_requested,
-    "product_price" => :price_inquiry,
-    "product_availability" => :stock_inquiry,
-    "product_recommendation" => :product_recommendation_requested,
-    "compare_products" => :product_comparison_requested,
-    "product_variants" => :product_variants_requested,
-    "product_images" => :product_images_requested,
-    "out_of_stock" => :alternative_product_requested,
-    "alternative_product" => :alternative_product_requested,
-    "gift_recommendation" => :product_recommendation_requested,
-    "refine_recommendation" => :product_recommendation_requested,
-    "reject_recommendations" => :recommendations_rejected,
-    "shortlist_add" => :shortlist_updated,
-    "shortlist_remove" => :shortlist_updated,
-    "shortlist_show" => :shortlist_requested,
-    "resume_order" => :resume_order_requested,
-    "order_history" => :order_history_requested,
-    "payment_methods" => :payment_methods_requested,
-    "cash_on_delivery" => :cash_on_delivery_requested,
-    "delivery_charge" => :delivery_charge_requested,
-    "delivery_area" => :delivery_area_requested,
-    "delivery_time" => :delivery_time_requested,
-    "return_request" => :return_requested,
-    "replacement_request" => :replacement_requested,
-    "refund_request" => :refund_requested
-  }.freeze
-
   def handle_ai_intent
     return false if interpretation.blank?
 
@@ -99,7 +54,7 @@ class ConversationMessageProcessor
       return true
     end
 
-    @outcome = AI_OUTCOMES[interpretation.intent]
+    @outcome = Constants::Conversation::AI_OUTCOMES[interpretation.intent]
     outcome.present?
   end
 
@@ -107,9 +62,9 @@ class ConversationMessageProcessor
     return [] if interpretation.blank? || interpretation.needs_clarification
 
     interpretation.secondary_intents.filter_map do |intent|
-      next unless intent.in?(ConversationIntentRegistry::INFORMATIONAL_INTENTS)
+      next unless intent.in?(ConversationIntentRegistry.informational_intents)
 
-      AI_OUTCOMES[intent]
+      Constants::Conversation::AI_OUTCOMES[intent]
     end.uniq - [ outcome ]
   end
 
@@ -126,7 +81,7 @@ class ConversationMessageProcessor
     pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
       :collecting_variant : :collecting_quantity
     pending_order.save!
-    @outcome = :product_selected
+    @outcome = collect_quantity_from_product_selection ? :multiple_details_collected : :product_selected
   end
 
   def collect_variant
@@ -248,6 +203,8 @@ class ConversationMessageProcessor
       :order_details_requested
     elsif product_list_request?
       :product_list_requested
+    elsif product_variants_request? || product_variants_follow_up?
+      :product_variants_requested
     elsif greeting?
       :greeting
     elsif budget_recommendation_request?
@@ -260,6 +217,10 @@ class ConversationMessageProcessor
       :stock_inquiry
     elsif comparison_request?
       :product_comparison_requested
+    elsif recommendation_refinement_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
     elsif recommendation_request?
       enter_product_discovery!
       remember_recommendation_preferences!
@@ -532,10 +493,28 @@ class ConversationMessageProcessor
   end
 
   def parse_quantity(value)
-    numeric_quantity = value[/\d+/]&.to_i
-    return numeric_quantity if numeric_quantity&.positive?
+    normalized = value.to_s.downcase
+      .gsub(/\b(first|second|third|last|prothom|ditiyo|tritiyo)\s+one\b/, "")
+      .gsub(/\b\d+(?:\.\d+)?\s*ml\b/, "")
 
-    NUMBER_WORDS.find { |word, _number| value.downcase.match?(/\b#{word}\b/) }&.last
+    word_quantity = Constants::Conversation::NUMBER_WORDS.find do |word, _number|
+      normalized.match?(/\b#{word}\b/)
+    end&.last
+    return word_quantity if word_quantity.present?
+
+    numeric_quantity = normalized[/\d+/]&.to_i
+    numeric_quantity if numeric_quantity&.positive?
+  end
+
+  def collect_quantity_from_product_selection
+    return false unless pending_order.collecting_quantity?
+
+    quantity = parsed_quantity
+    return false if quantity.blank? || !selected_inventory&.available_for_quantity?(quantity)
+
+    pending_order.quantity = quantity
+    advance_after_collection(:collecting_name)
+    true
   end
 
   def phone_number?(value = content)
@@ -559,7 +538,22 @@ class ConversationMessageProcessor
   end
 
   def help_request?
-    content.downcase.match?(/\b(help|options|menu)\b/)
+    content.downcase.match?(/\b(help|menu)\b/)
+  end
+
+  def product_variants_request?
+    normalized = content.downcase.squish
+    normalized.match?(/\b(size|sizes|variant|variants)\b.*\b(option|options|available|have|ache|ki|what|which)\b/) ||
+      normalized.match?(/\b(what|which|available|ki ki)\b.*\b(size|sizes|variant|variants)\b/) ||
+      normalized.match?(/\A(size|sizes|size options|variant|variants)[?!. ]*\z/)
+  end
+
+  def product_variants_follow_up?
+    return false unless pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
+
+    normalized = content.downcase.squish
+    generic_reply = normalized.match?(/\A(any( product)?|general|overall|common|all|doesn'?t matter|jekono|যেকোনো)[?!. ]*\z/)
+    generic_reply || product_resolution.matched?
   end
 
   def product_list_request?
@@ -711,6 +705,11 @@ class ConversationMessageProcessor
 
   def comparison_request?
     content.downcase.match?(/\b(compare|comparison|difference|different|versus|vs\.?|better)\b/)
+  end
+
+  def recommendation_refinement_request?
+    extractor = FragrancePreferenceExtractor.new(content)
+    confident_ai_intent?(%w[refine_recommendation closest_alternative]) || extractor.refinement?
   end
 
   def order_change_request?

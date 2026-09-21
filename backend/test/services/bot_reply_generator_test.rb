@@ -41,6 +41,60 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "reply with the size, price"
   end
 
+  test "asks for a product name when a size question has no product context" do
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "size options?")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: :product_variants_requested
+    ).content
+
+    assert_includes reply, "which product"
+    assert_not_includes reply, "available products"
+  end
+
+  test "answers a size follow-up using the current product context" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 5)
+    product.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 4)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "what sizes are available?")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: :product_variants_requested
+    ).content
+
+    assert_includes reply, "The Office is available in:"
+    assert_includes reply, "10 ML — ৳350"
+    assert_includes reply, "15 ML — ৳480"
+    assert_not_includes reply, "available products"
+  end
+
+  test "summarizes common sizes when the customer asks for general options" do
+    first = create_product(name: "The Office", stock_quantity: 0)
+    first.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 5)
+    second = create_product(name: "The Oud", stock_quantity: 0)
+    second.product_variants.create!(name: "10 ML", size: "10 ML", price: 420, stock_quantity: 5)
+    second.product_variants.create!(name: "15 ML", size: "15 ML", price: 600, stock_quantity: 4)
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "general size options")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: :product_variants_requested
+    ).content
+
+    assert_includes reply, "common available size options"
+    assert_includes reply, "10 ML — ৳350–৳420"
+    assert_includes reply, "15 ML — ৳600"
+    assert_not_includes reply, "which product"
+  end
+
   test "asks for product when collecting quantity has no product yet" do
     Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     pending_order = create_pending_order(status: :collecting_quantity)

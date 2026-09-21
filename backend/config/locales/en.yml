@@ -28,4 +28,5 @@
 #       enabled: "ON"
 
 en:
-  hello: "Hello world"
+  bot_replies:
+    human_handover_started: "Please wait, we will get back to you soon."

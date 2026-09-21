@@ -30,11 +30,45 @@ class ProductRecommendationServiceTest < ActiveSupport::TestCase
     assert result.offers.all? { |offer| offer.price.between?(400, 700) }
   end
 
-  test "returns the catalog floor when no product matches" do
+  test "returns the closest catalog option when no product matches" do
     result = recommend("200 takar under kichu ache?")
 
-    assert_empty result.offers
+    assert_equal "The Oud 3 ml", result.offers.first.label
+    assert_not result.exact_match
     assert_equal 250.to_d, result.minimum_price
+  end
+
+  test "uses previous recommendations to find a cheaper alternative" do
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "ektu cheaper kichu",
+      preferences: {
+        price_direction: "lower",
+        previous_recommendations: [ { price: "600" } ],
+        scent_families: [ "oud" ]
+      },
+      limit: 10
+    ).call
+
+    assert result.exact_match
+    assert result.offers.all? { |offer| offer.price < 600 }
+    assert_equal "The Oud", result.offers.first.product.name
+  end
+
+  test "ranks stronger projection first when requested" do
+    strong = @business.products.create!(
+      name: "Bold Oud", price: 500, stock_quantity: 4, tags: "oud",
+      product_attributes: { projection: "strong", scent_families: [ "oud" ] }
+    )
+    @business.products.find_by!(name: "The Oud").update!(product_attributes: { projection: "soft" })
+
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "stronger oud chai",
+      preferences: { projection_preference: "stronger", scent_families: [ "oud" ] }
+    ).call
+
+    assert_equal strong, result.offers.first.product
   end
 
   test "asks whether the customer wants a single fragrance or combo for a broad request" do

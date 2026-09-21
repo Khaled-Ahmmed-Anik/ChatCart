@@ -184,7 +184,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "customer_requested_human", result.conversation.conversation_state.dig("handover_summary", "reason")
     assert_equal "I want to talk to a human agent",
       result.conversation.conversation_state.dig("handover_summary", "last_customer_message")
-    assert_includes result.bot_reply.content, "passed this conversation to the seller"
+    assert_includes result.bot_reply.content, "আমরা শিগগিরই আপনার সাথে যোগাযোগ করব"
 
     follow_up = record_message("hello?")
     assert_equal :awaiting_human, follow_up.outcome

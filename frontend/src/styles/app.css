@@ -10,3 +10,95 @@
 .variant-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-top:8px;border-top:1px solid var(--line)}.variant-heading small{display:block;color:var(--muted);margin-top:3px}.variant-list{display:grid;gap:8px}.variant-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .7fr auto;gap:8px;align-items:center}.variant-row input{min-width:0}
 @media(max-width:720px){.variant-row{grid-template-columns:1fr 1fr}.variant-row button{grid-column:1/-1}}
 .combo-row{display:grid;grid-template-columns:1.4fr .5fr 1fr auto;gap:8px}.import-preview pre{max-height:420px;overflow:auto;padding:12px;border-radius:10px;background:#f2f5f3;white-space:pre-wrap;font-size:12px}
+.legal-page {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 4vw, 4rem) 1rem;
+  background: #f4f6fb;
+  color: #172033;
+}
+
+.legal-document {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  border: 1px solid #dce2ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 55px rgb(32 47 78 / 9%);
+}
+
+.legal-brand {
+  display: inline-block;
+  margin-bottom: 2.5rem;
+  color: #5637e8;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.legal-eyebrow,
+.legal-updated {
+  color: #68738a;
+}
+
+.legal-eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.legal-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  letter-spacing: -0.045em;
+}
+
+.legal-updated {
+  margin: 0.75rem 0 0;
+  font-size: 0.92rem;
+}
+
+.legal-content {
+  margin-top: 3rem;
+  line-height: 1.75;
+}
+
+.legal-content section {
+  margin-top: 2.25rem;
+}
+
+.legal-content h2 {
+  margin-bottom: 0.65rem;
+  font-size: 1.2rem;
+}
+
+.legal-content p,
+.legal-content li {
+  color: #3f4a60;
+}
+
+.legal-content li + li {
+  margin-top: 0.45rem;
+}
+
+.legal-content a,
+.legal-footer a {
+  color: #5637e8;
+}
+
+.legal-content address {
+  color: #3f4a60;
+  font-style: normal;
+}
+
+.legal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-top: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e6eaf2;
+  font-size: 0.9rem;
+}

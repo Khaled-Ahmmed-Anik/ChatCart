@@ -9,6 +9,8 @@ Rails.application.routes.draw do
   namespace :webhooks do
     get "messenger", to: "messenger#show"
     post "messenger", to: "messenger#create"
+    get "whatsapp", to: "whatsapp#show"
+    post "whatsapp", to: "whatsapp#create"
   end
 
   post "graphql", to: "graphql#execute"

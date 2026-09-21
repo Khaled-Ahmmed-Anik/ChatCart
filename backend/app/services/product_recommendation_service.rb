@@ -6,7 +6,7 @@ class ProductRecommendationService
   end
   Result = Data.define(
     :offers, :minimum_price, :requested_minimum, :requested_maximum, :budget_detected, :floor_request,
-    :clarification_question
+    :clarification_question, :exact_match
   )
 
   def initialize(business:, message:, preferences: {}, limit: 3)
@@ -19,13 +19,22 @@ class ProductRecommendationService
   def call
     minimum, maximum, detected = price_bounds
     eligible = offers.select do |offer|
-      (minimum.blank? || offer.price >= minimum) && (maximum.blank? || offer.price <= maximum)
+      (minimum.blank? || offer.price >= minimum) && (maximum.blank? || offer.price <= maximum) &&
+        matches_price_direction?(offer)
     end
-    product_offers = eligible.group_by { |offer| offer.product.id }.values.map do |product_options|
-      preferred_offer(product_options, minimum: minimum, maximum: maximum)
+    exact_match = eligible.any?
+    candidates = exact_match ? eligible : closest_candidates(minimum: minimum, maximum: maximum)
+    product_offers = candidates.group_by { |offer| offer.product.id }.values.map do |product_options|
+      preferred_offer(product_options, minimum: minimum, maximum: maximum, exact_match: exact_match)
     end
     ranked = product_offers.sort_by do |offer|
-      floor_request? ? [ offer.price, -preference_score(offer), offer.label ] : [ -preference_score(offer), offer.price, offer.label ]
+      if !exact_match && (minimum.present? || maximum.present?)
+        [ constraint_distance(offer, minimum:, maximum:), -preference_score(offer), offer.label ]
+      elsif floor_request?
+        [ offer.price, -preference_score(offer), offer.label ]
+      else
+        [ -preference_score(offer), offer.price, offer.label ]
+      end
     end.first(limit)
     Result.new(
       offers: ranked,
@@ -34,7 +43,8 @@ class ProductRecommendationService
       requested_maximum: maximum,
       budget_detected: detected,
       floor_request: floor_request?,
-      clarification_question: clarification_question(detected)
+      clarification_question: clarification_question(detected),
+      exact_match: exact_match
     )
   end
 
@@ -78,14 +88,53 @@ class ProductRecommendationService
     searchable = searchable_text(offer.product, offer.variant)
     preference_terms.count { |term| searchable.include?(term) } * 10 +
       structured_preference_terms.count { |term| searchable.include?(term) } * 18 +
+      projection_preference_score(offer.product) +
       [ offer.stock_quantity, 20 ].min
   end
 
-  def preferred_offer(product_options, minimum:, maximum:)
+  def preferred_offer(product_options, minimum:, maximum:, exact_match:)
+    unless exact_match
+      return product_options.min_by { |offer| constraint_distance(offer, minimum:, maximum:) }
+    end
+
     return product_options.max_by(&:price) if maximum.present?
     return product_options.min_by(&:price) if minimum.present?
 
     product_options.min_by(&:price)
+  end
+
+  def matches_price_direction?(offer)
+    baseline_prices = Array(preferences["previous_recommendations"]).filter_map do |item|
+      item.to_h.with_indifferent_access[:price].presence&.to_d
+    end
+    return true if baseline_prices.empty?
+    return offer.price < baseline_prices.min if preferences["price_direction"] == "lower"
+    return offer.price > baseline_prices.max if preferences["price_direction"] == "higher"
+
+    true
+  end
+
+  def closest_candidates(minimum:, maximum:)
+    return offers.sort_by { |offer| (offer.price - maximum).abs } if maximum.present?
+    return offers.sort_by { |offer| (offer.price - minimum).abs } if minimum.present?
+
+    offers
+  end
+
+  def constraint_distance(offer, minimum:, maximum:)
+    return (offer.price - maximum).abs if maximum.present?
+    return (offer.price - minimum).abs if minimum.present?
+
+    0
+  end
+
+  def projection_preference_score(product)
+    preference = preferences["projection_preference"]
+    return 0 if preference.blank?
+
+    rank = { "soft" => 1, "moderate" => 2, "strong" => 3, "very strong" => 4 }
+      .fetch(product.product_attributes.to_h["projection"].to_s.downcase, 2)
+    preference == "stronger" ? rank * 12 : (5 - rank) * 12
   end
 
   def preference_terms
@@ -140,6 +189,7 @@ class ProductRecommendationService
   def clarification_question(budget_detected)
     return if budget_detected
     return if structured_preference_terms.any?
+    return if preferences["price_direction"].present? || preferences["projection_preference"].present?
     return "Would you prefer one perfume or a combo with multiple fragrances?" if preferences["format"].blank?
 
     if preferences["format"] == "combo"

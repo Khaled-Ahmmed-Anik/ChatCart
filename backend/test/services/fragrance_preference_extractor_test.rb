@@ -31,4 +31,12 @@ class FragrancePreferenceExtractorTest < ActiveSupport::TestCase
       assert_includes preferences["scent_families"], "oud", spelling
     end
   end
+
+  test "recognizes comparative recommendation refinements" do
+    preferences = FragrancePreferenceExtractor.new("Ektu cheaper but stronger kichu chai").call
+
+    assert_equal "lower", preferences["price_direction"]
+    assert_equal "stronger", preferences["projection_preference"]
+    assert FragrancePreferenceExtractor.new("Ektu cheaper but stronger kichu chai").refinement?
+  end
 end

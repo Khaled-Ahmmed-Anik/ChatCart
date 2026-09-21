@@ -13,7 +13,7 @@ export async function graphqlRequest<TResult, TVariables extends Variables>(
   });
 
   try {
-    return await client.request(document, variables);
+    return await client.request<TResult, Variables>(document, variables);
   } catch (error) {
     const status = typeof error === "object" && error && "response" in error
       ? (error.response as { status?: number }).status

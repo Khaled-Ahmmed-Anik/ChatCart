@@ -124,6 +124,37 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :collecting_product?
   end
 
+  test "treats a size-options follow-up as a variant question rather than generic help" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "size options?")
+
+    assert_equal :product_variants_requested, processor.outcome
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
+  test "understands a short answer to its previous product-for-sizes question" do
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.update!(conversation_state: { "last_outcome" => "product_variants_requested" })
+
+    processor = process_message(pending_order, "any product")
+
+    assert_equal :product_variants_requested, processor.outcome
+    assert_predicate pending_order.reload, :collecting_product?
+  end
+
+  test "uses a named product as the answer to its previous size question without selecting it" do
+    create_product(name: "The Office")
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.update!(conversation_state: { "last_outcome" => "product_variants_requested" })
+
+    processor = process_message(pending_order, "The Office")
+
+    assert_equal :product_variants_requested, processor.outcome
+    assert_nil pending_order.reload.product
+    assert_predicate pending_order, :collecting_product?
+  end
+
   test "remembers guided fragrance preferences across messages" do
     pending_order = create_pending_order(status: :collecting_product)
 
@@ -272,6 +303,36 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal :product_selected, processor.outcome
     assert_equal second, pending_order.reload.product
     assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "collects a recommended product variant and quantity from one reply" do
+    first = create_product(name: "The Office")
+    second = create_product(name: "Bleu Inspired", stock_quantity: 0)
+    variant = second.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 10)
+    pending_order = create_pending_order(status: :collecting_product)
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.transition!("discover")
+    flow.remember_recommendations!([ first.id, second.id ])
+
+    processor = process_message(pending_order, "second one, 15 ML, duita")
+
+    pending_order.reload
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal second, pending_order.product
+    assert_equal variant, pending_order.product_variant
+    assert_equal 2, pending_order.quantity
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "remembers comparative refinement preferences" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "ektu cheaper but stronger kichu chai")
+
+    preferences = pending_order.conversation.reload.conversation_state.fetch("shopping_preferences")
+    assert_equal :product_recommendation_requested, processor.outcome
+    assert_equal "lower", preferences["price_direction"]
+    assert_equal "stronger", preferences["projection_preference"]
   end
 
   test "understands relative size and price replies" do

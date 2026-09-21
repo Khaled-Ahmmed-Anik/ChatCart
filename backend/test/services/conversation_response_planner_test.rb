@@ -110,6 +110,24 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     assert_not_includes plan.content, "size"
   end
 
+  test "keeps a size question focused instead of appending generic help" do
+    order = create_pending_order(status: :collecting_product)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "size options?")
+
+    plan = ConversationResponsePlanner.new(
+      conversation: order.conversation,
+      pending_order: order,
+      customer_message: message,
+      outcome: :product_variants_requested,
+      secondary_outcomes: [ :help ],
+      interpretation: interpretation(intent: "product_variants")
+    ).plan
+
+    assert_includes plan.content, "which product"
+    assert_not_includes plan.content, "place an order"
+    assert_not_includes plan.content, "available products"
+  end
+
   test "remembers and naturally mirrors the customer's form of address" do
     order = create_pending_order
     message = order.conversation.messages.create!(sender_type: :customer, content: "Bhai, hello")

@@ -1,15 +1,4 @@
 class ConversationResponsePlanner
-  FOCUSED_OUTCOMES = %i[
-    product_recommendation_requested product_ambiguous variant_not_found clarification_needed
-  ].freeze
-
-  INTERRUPTING_OUTCOMES = %i[
-    price_inquiry stock_inquiry product_details_requested product_recommendation_requested
-    product_comparison_requested product_variants_requested product_images_requested
-    payment_methods_requested cash_on_delivery_requested delivery_charge_requested
-    delivery_area_requested delivery_time_requested
-  ].freeze
-
   Plan = Data.define(:content, :language, :tone, :address_preference, :pending_question, :interrupted)
 
   def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil, secondary_outcomes: [])
@@ -61,7 +50,7 @@ class ConversationResponsePlanner
   end
 
   def combined_reply
-    return base_reply if outcome.in?(FOCUSED_OUTCOMES)
+    return base_reply if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
 
     replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
@@ -85,7 +74,7 @@ class ConversationResponsePlanner
   end
 
   def interruption?
-    ([ outcome ] + secondary_outcomes).intersect?(INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
+    ([ outcome ] + secondary_outcomes).intersect?(Constants::Conversation::INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
       collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
     ])
   end
