@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_21_000200) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -33,14 +33,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_000200) do
 
   create_table "business_policies", force: :cascade do |t|
     t.text "additional_information"
+    t.text "authenticity_statement"
+    t.text "bulk_order_policy"
     t.bigint "business_id", null: false
     t.text "cash_on_delivery"
     t.datetime "created_at", null: false
     t.text "delivery_areas"
     t.text "delivery_charges"
     t.text "delivery_time"
+    t.text "discount_policy"
     t.text "payment_methods"
     t.text "return_policy"
+    t.text "trial_policy"
+    t.text "trust_information"
     t.datetime "updated_at", null: false
     t.index ["business_id"], name: "index_business_policies_on_business_id", unique: true
   end

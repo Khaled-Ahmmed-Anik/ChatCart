@@ -96,6 +96,8 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(status: :collecting_product)
 
     assert_equal :greeting, process_message(pending_order, "Hello!").outcome
+    assert_equal :greeting, process_message(pending_order, "assalamulaikum").outcome
+    assert_equal :greeting, process_message(pending_order, "Its a greetings").outcome
     assert_equal :help, process_message(pending_order, "Can you help me?").outcome
     assert_equal :thanks, process_message(pending_order, "Thank you").outcome
     assert_equal :price_inquiry, process_message(pending_order, "What is the price of Fresh Musk?").outcome
@@ -117,7 +119,7 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
   test "recognizes requests to show the full product list without AI" do
     pending_order = create_pending_order(status: :collecting_product)
 
-    [ "show all products", "available products", "products dekhao", "ki ki product ache?" ].each do |content|
+    [ "show all products", "show me all productsa", "available products", "products dekhao", "ki ki product ache?" ].each do |content|
       assert_equal :product_list_requested, process_message(pending_order, content).outcome, content
     end
 
@@ -305,6 +307,20 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order, :collecting_quantity?
   end
 
+  test "selects from the exact stored product list even when catalog order changes" do
+    first = create_product(name: "The Office")
+    second = create_product(name: "Bleu Inspired")
+    pending_order = create_pending_order(status: :collecting_product)
+    ConversationMemory.new(pending_order.conversation).remember_options!(
+      kind: :products, records: [ first, second ]
+    )
+
+    processor = process_message(pending_order, "2")
+
+    assert_equal :product_selected, processor.outcome
+    assert_equal second, pending_order.reload.product
+  end
+
   test "collects a recommended product variant and quantity from one reply" do
     first = create_product(name: "The Office")
     second = create_product(name: "Bleu Inspired", stock_quantity: 0)
@@ -354,6 +370,25 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal small, small_order.reload.product_variant
   end
 
+  test "understands ordinal and positional replies for the offered variants" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    small = product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    product.product_variants.create!(name: "15 ML", size: "15 ML", price: 500, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+
+    last_order = create_pending_order(product: product, status: :collecting_variant)
+    assert_equal :variant_selected, process_message(last_order, "last one").outcome
+    assert_equal large, last_order.reload.product_variant
+
+    third_order = create_pending_order(product: product, status: :collecting_variant)
+    assert_equal :variant_selected, process_message(third_order, "3").outcome
+    assert_equal large, third_order.reload.product_variant
+
+    first_order = create_pending_order(product: product, status: :collecting_variant)
+    assert_equal :variant_selected, process_message(first_order, "first").outcome
+    assert_equal small, first_order.reload.product_variant
+  end
+
   test "understands Banglish quantity words during quantity collection" do
     pending_order = create_pending_order(product: create_product, status: :collecting_quantity)
 
@@ -382,6 +417,52 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal "House 10, Road 2, Dhaka", pending_order.reload.address
     assert_predicate pending_order, :awaiting_confirmation?
     assert pending_order.ready_for_confirmation?
+  end
+
+  test "collects comma-separated name phone and address in one message" do
+    pending_order = create_pending_order(product: create_product, quantity: 2, status: :collecting_name)
+
+    processor = process_message(pending_order, "Anik, 01712345678, Middle Badda, Dhaka")
+
+    pending_order.reload
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal "Anik", pending_order.customer_name
+    assert_equal "01712345678", pending_order.phone
+    assert_equal "Middle Badda, Dhaka", pending_order.address
+    assert_predicate pending_order, :awaiting_confirmation?
+  end
+
+  test "keeps valid bundled details but asks again for an invalid Bangladeshi phone" do
+    pending_order = create_pending_order(product: create_product, quantity: 2, status: :collecting_name)
+
+    processor = process_message(pending_order, "Anik, 0199999999, Middle Badda")
+
+    pending_order.reload
+    assert_equal :invalid_phone, processor.outcome
+    assert_equal "Anik", pending_order.customer_name
+    assert_nil pending_order.phone
+    assert_equal "Middle Badda", pending_order.address
+    assert_predicate pending_order, :collecting_phone?
+  end
+
+  test "remembers a product discussed for details without selecting it" do
+    product = create_product(name: "The Club")
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(
+      sender_type: :customer, content: "what are the notes of The Club?"
+    )
+    processor = ConversationMessageProcessor.new(
+      message: message,
+      pending_order: pending_order,
+      interpretation: ai_interpretation(intent: "product_details", entities: { product_name: "The Club" })
+    )
+
+    processor.process
+
+    assert_equal :product_details_requested, processor.outcome
+    assert_equal "The Club", pending_order.conversation.reload.conversation_state["last_referenced_product"]
+    assert_nil pending_order.reload.product
+    assert product.persisted?
   end
 
   test "ignores non-customer messages" do
@@ -450,6 +531,76 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal "3", pending_order.change_history.sole.fetch("to")
     assert pending_order.change_history.sole.fetch("changed_at").present?
     assert pending_order.change_history.sole.fetch("message_id").present?
+  end
+
+  test "changes quantity naturally during active checkout without restarting" do
+    pending_order = create_pending_order(
+      product: create_product(stock_quantity: 10), quantity: 1, status: :collecting_name
+    )
+
+    processor = process_message(pending_order, "actually, make it 3")
+
+    assert_equal :order_updated, processor.outcome
+    assert_equal 3, pending_order.reload.quantity
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "changes the selected variant while preserving valid checkout progress" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    small = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 500, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(
+      product: product, product_variant: large, quantity: 2, customer_name: "Anik", status: :collecting_phone
+    )
+    ConversationMemory.new(pending_order.conversation).remember_options!(
+      kind: :variants, records: [ small, large ], product: product
+    )
+
+    processor = process_message(pending_order, "actually 15 ML")
+
+    pending_order.reload
+    assert_equal :order_updated, processor.outcome
+    assert_equal small, pending_order.product_variant
+    assert_equal 2, pending_order.quantity
+    assert_equal "Anik", pending_order.customer_name
+    assert_predicate pending_order, :collecting_phone?
+    assert_equal "product_variant", pending_order.change_history.last["field"]
+  end
+
+  test "moves to the previous offered variant during active checkout" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    small = product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    medium = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 500, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(
+      product: product, product_variant: large, quantity: 1, status: :collecting_name
+    )
+    ConversationMemory.new(pending_order.conversation).remember_options!(
+      kind: :variants, records: [ small, medium, large ], product: product
+    )
+
+    process_message(pending_order, "ager ta nibo")
+
+    assert_equal medium, pending_order.reload.product_variant
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "changes product during active checkout and returns to product configuration" do
+    club = create_product(name: "The Club")
+    oud = create_product(name: "The Oud", stock_quantity: 0)
+    oud.product_variants.create!(name: "10 ML", size: "10 ML", price: 420, stock_quantity: 10)
+    pending_order = create_pending_order(
+      product: club, quantity: 2, customer_name: "Anik", status: :collecting_phone
+    )
+
+    processor = process_message(pending_order, "The Club na, The Oud ta den")
+
+    pending_order.reload
+    assert_equal :order_updated, processor.outcome
+    assert_equal oud, pending_order.product
+    assert_nil pending_order.quantity
+    assert_equal "Anik", pending_order.customer_name
+    assert_predicate pending_order, :collecting_variant?
   end
 
   test "explains how to update a confirmed order" do
@@ -616,6 +767,64 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal "01712345678", current.phone
     assert_equal "Badda, Dhaka", current.address
     assert_predicate current, :awaiting_confirmation?
+  end
+
+  test "accepts a valid phone from raw content when AI redacts the entity" do
+    pending_order = create_pending_order(product: create_product, quantity: 1, customer_name: "Anik",
+      status: :collecting_phone)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "01725126467")
+    interpretation = ai_interpretation(intent: "provide_phone", entities: { phone: "[PHONE]" })
+
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order,
+      interpretation: interpretation)
+    processor.process
+
+    assert_equal :phone_collected, processor.outcome
+    assert_equal "01725126467", pending_order.reload.phone
+    assert_predicate pending_order, :collecting_address?
+  end
+
+  test "changes a phone during checkout using the number in raw content" do
+    pending_order = create_pending_order(product: create_product, quantity: 1, customer_name: "Anik",
+      status: :collecting_phone)
+    message = pending_order.conversation.messages.create!(sender_type: :customer,
+      content: "change phone to 01712345678")
+    interpretation = ai_interpretation(intent: "change_phone", entities: { phone: "[PHONE]" })
+
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order,
+      interpretation: interpretation)
+    processor.process
+
+    assert_equal :order_updated, processor.outcome
+    assert_equal "01712345678", pending_order.reload.phone
+  end
+
+  test "treats never trying a scent as guidance rather than a sample request" do
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "woody try kori nai kokhon o")
+
+    assert_equal :first_time_scent_guidance, processor.outcome
+  end
+
+  test "recognizes a contextual weather question" do
+    product = create_product(name: "The Club")
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.update!(conversation_state: { "last_referenced_product" => product.name })
+
+    processor = process_message(pending_order, "kon weather er jonno perfect eita?")
+
+    assert_equal :product_weather_requested, processor.outcome
+  end
+
+  test "does not repeat the same long recommendation for identical follow-up input" do
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.update!(conversation_state: { "last_outcome" => "product_recommendation_requested" })
+    pending_order.conversation.messages.create!(sender_type: :customer, content: "oud")
+
+    processor = process_message(pending_order, "oud")
+
+    assert_equal :recommendation_choice_reminder, processor.outcome
   end
 
   private

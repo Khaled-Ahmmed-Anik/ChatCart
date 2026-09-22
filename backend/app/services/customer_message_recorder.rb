@@ -79,14 +79,7 @@ class CustomerMessageRecorder
       log_decision(conversation, message, interpretation, outcome, processor.secondary_outcomes)
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
-        content: AiConversationAssistant.new(
-          customer_message: message,
-          pending_order: pending_order,
-          outcome: outcome,
-          language: response_plan.language,
-          tone: response_plan.tone,
-          address_preference: response_plan.address_preference
-        ).rewrite(fallback: response_plan.content)
+        content: final_reply_content(message, pending_order, outcome, interpretation, response_plan)
       )
     end
 
@@ -104,6 +97,20 @@ class CustomerMessageRecorder
   private
 
   attr_reader :channel, :external_customer_id, :content, :metadata, :business
+
+  def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
+    return response_plan.content if interpretation.blank?
+    return response_plan.content if message.metadata["intent_classifier"] == "local"
+
+    AiConversationAssistant.new(
+      customer_message: message,
+      pending_order: pending_order,
+      outcome: outcome,
+      language: response_plan.language,
+      tone: response_plan.tone,
+      address_preference: response_plan.address_preference
+    ).rewrite(fallback: response_plan.content)
+  end
 
   def find_or_create_conversation
     business.conversations.find_or_create_by!(
@@ -132,6 +139,12 @@ class CustomerMessageRecorder
   end
 
   def classify_intent(message, pending_order, conversation)
+    local = CompactIntentClassifier.new(message: message, pending_order: pending_order).classify
+    if local.interpretation.present?
+      message.update!(metadata: message.metadata.merge("intent_classifier" => "local"))
+      return local.interpretation
+    end
+
     AiIntentClassifier.new(
       message: message,
       pending_order: pending_order,

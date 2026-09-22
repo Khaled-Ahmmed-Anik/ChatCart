@@ -15,6 +15,7 @@ class ConversationMemory
       last_intent: state["last_intent"],
       last_outcome: state["last_outcome"],
       last_referenced_product: state["last_referenced_product"],
+      last_offered_options: state["last_offered_options"],
       guided_sales: state["guided_sales"],
       shopping_preferences: state["shopping_preferences"],
       intent_history: Array(state["intent_history"]).last(6),
@@ -39,6 +40,23 @@ class ConversationMemory
       "name" => pending_order.customer_name,
       "has_phone" => pending_order.phone.present?,
       "has_address" => pending_order.address.present?
+    }.compact
+    conversation.update!(conversation_state: state)
+  end
+
+  def remember_options!(kind:, records:, product: nil)
+    options = Array(records).map do |record|
+      {
+        "id" => record.id,
+        "label" => record.respond_to?(:display_name) ? record.display_name : record.name
+      }
+    end
+    state = conversation.conversation_state.to_h
+    state["last_offered_options"] = {
+      "kind" => kind.to_s,
+      "product_id" => product&.id,
+      "options" => options,
+      "shown_at" => Time.current.iso8601
     }.compact
     conversation.update!(conversation_state: state)
   end

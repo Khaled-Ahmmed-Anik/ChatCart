@@ -188,15 +188,30 @@ class ProductRecommendationService
 
   def clarification_question(budget_detected)
     return if budget_detected
-    return if structured_preference_terms.any?
     return if preferences["price_direction"].present? || preferences["projection_preference"].present?
-    return "Would you prefer one perfume or a combo with multiple fragrances?" if preferences["format"].blank?
+    dimensions = preference_dimensions
+    return if dimensions.size >= 2
+    return "Would you prefer one perfume or a combo with multiple fragrances?" if dimensions.empty?
+
+    if preferences["format"].blank?
+      return "To narrow it down, is this for daily use, office, an occasion, or a gift? You can also share your budget."
+    end
 
     if preferences["format"] == "combo"
       "Who is the combo for, and do they prefer fresh, sweet, woody/oud, or long-lasting fragrances?"
     else
       "What style do you prefer: fresh/clean, sweet/fruity, floral, warm/spicy, or woody/oud? You can also tell me the occasion."
     end
+  end
+
+  def preference_dimensions
+    {
+      format: preferences["format"],
+      audience: preferences["audience"],
+      performance: preferences["performance"],
+      scent_families: Array(preferences["scent_families"]).presence,
+      occasions: Array(preferences["occasions"]).presence
+    }.compact_blank.keys
   end
 
   def normalize_digits(value)

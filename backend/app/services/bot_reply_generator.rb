@@ -47,6 +47,12 @@ class BotReplyGenerator
       product_selection_prompt
     when :product_details_requested
       product_details_reply
+    when :product_weather_requested
+      product_weather_reply
+    when :first_time_scent_guidance
+      first_time_scent_reply
+    when :recommendation_choice_reminder
+      recommendation_choice_reminder
     when :product_recommendation_requested, :alternative_product_requested
       product_recommendation_reply
     when :recommendations_rejected
@@ -79,6 +85,18 @@ class BotReplyGenerator
       configured_policy("delivery areas", policy.delivery_areas || ENV["SHOP_DELIVERY_AREAS"])
     when :delivery_time_requested
       configured_policy("delivery times", policy.delivery_time || ENV["SHOP_DELIVERY_TIME"])
+    when :discount_requested
+      objection_policy_reply(policy.discount_policy, "I don’t have an approved discount to promise. Tell me your budget and I can show suitable lower-priced options.")
+    when :authenticity_requested
+      objection_policy_reply(policy.authenticity_statement, "I don’t have a verified authenticity statement configured, so I don’t want to make an unsupported claim. I can ask the seller to confirm it for you.")
+    when :trust_information_requested
+      objection_policy_reply(policy.trust_information, "I don’t have verified trust or review information configured yet. I can ask the seller to share the relevant details with you.")
+    when :trial_requested
+      objection_policy_reply(policy.trial_policy, "A trial or sample policy hasn’t been configured. If the product has a smaller in-stock size, I can show that option, or ask the seller to confirm.")
+    when :delivery_price_objection
+      delivery_price_objection_reply
+    when :price_objection
+      "I understand—you’d like a more affordable option.\n\n#{product_recommendation_reply}"
     when :return_requested
       after_sales_reply("return")
     when :replacement_requested
@@ -91,23 +109,23 @@ class BotReplyGenerator
     when :variant_selected
       "Great—#{pending_order.product_variant.display_name}. #{quantity_prompt}"
     when :variant_not_found
-      "I couldn’t match that size. #{variant_selection_prompt}"
+      "I couldn’t match that answer to a size. You can reply with the size, option number, or position—for example, “30 ML”, “3”, or “last one”.\n\n#{variant_selection_prompt}"
     when :product_unavailable
       "Sorry, that product isn’t available right now. #{product_selection_prompt}"
     when :product_not_found
-      "I couldn’t match that to one of our available products. #{product_selection_prompt}"
+      "I may have misunderstood what you’re asking. Could you say it another way? I can help with a product, recommendation, price, delivery, payment, or an existing order. If you meant a product, send its name or tell me what you want and your budget."
     when :product_ambiguous
       product_ambiguity_reply
     when :invalid_quantity
       "I didn’t catch the quantity. Please send a number, such as “2”, or write “two”."
     when :quantity_unavailable
-      "Sorry, we only have #{selected_stock} available for that option. How many would you like?"
+      "We currently have #{selected_stock} available for that option. Would you like all #{selected_stock}, a smaller quantity, or should I ask the seller about a bulk order?"
     when :quantity_collected
       "Perfect—#{pending_order.quantity} #{bottle_word(pending_order.quantity)}. What name should I put on the order?"
     when :name_collected
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
     when :invalid_phone
-      "That doesn’t look like a complete phone number. Please send one like 01712345678."
+      invalid_phone_reply
     when :phone_collected
       "Got it. What’s the full delivery address?"
     when :address_collected
@@ -119,7 +137,7 @@ class BotReplyGenerator
     when :confirmation_deferred
       "No problem—your order is saved, but it isn’t confirmed yet. Send “confirm” whenever you’re ready, or say “change the order” to update it."
     when :order_updated
-      "Done—I’ve updated it.\n\n#{confirmation_prompt}"
+      "Done—I’ve updated it. #{status_prompt}"
     when :confirmed_order_updated
       "I’ve updated your confirmed order and reopened it for review. #{status_prompt}"
     when :order_change_requested
@@ -166,6 +184,8 @@ class BotReplyGenerator
     products = available_products
     return "What product would you like to order?" if products.empty?
 
+    remember_options!(:products, products)
+
     [
       "Here are our available products:",
       *product_catalog_lines(products),
@@ -181,6 +201,7 @@ class BotReplyGenerator
     return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. How can I help you today?" if products.empty?
 
     visible_products = products.first(Constants::Conversation::INITIAL_CATALOG_LIMIT)
+    remember_options!(:products, visible_products)
     remaining_count = products.size - visible_products.size
     more_products_line = "• +#{remaining_count} more available—send “show all products” to see them" if remaining_count.positive?
 
@@ -219,6 +240,8 @@ class BotReplyGenerator
   def variant_selection_prompt
     variants = pending_order.product&.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
     return "Which size would you like?" if variants.empty?
+
+    remember_options!(:variants, variants, product: pending_order.product)
 
     options = variants.each_with_index.map do |variant, index|
       guidance = if index.zero? && variants.many?
@@ -278,18 +301,68 @@ class BotReplyGenerator
   end
 
   def product_details_reply
-    product = mentioned_product
+    product = contextual_product
     return product_selection_prompt if product.blank?
 
-    details = [ "#{product.name} starts from #{formatted_price(product.starting_price)}." ]
-    details << product.description if product.description.present?
-    details << product.benefits if product.benefits.present?
+    return product_performance_reply(product) if performance_question?
+
+    attributes = product.product_attributes.to_h
+    families = Array(attributes["scent_families"]).first(4)
+    notes = Array(attributes["notes"]).first(8)
+    occasions = Array(attributes["occasions"]).first(4)
+    variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
+
+    lines = [ "#{product.name} starts from #{formatted_price(product.starting_price)}." ]
+    summary = product.short_description.presence || product.description.to_s.squish.truncate(220)
+    lines << summary if summary.present?
+    lines << "Profile: #{families.to_sentence}." if families.any?
+    lines << "Notes: #{notes.to_sentence}." if notes.any?
+    lines << "Best for: #{occasions.to_sentence}." if occasions.any?
+    performance = [
+      attributes["longevity_hours"].presence&.then { |hours| "#{hours} hours longevity" },
+      attributes["projection"].presence&.then { |projection| "#{projection} projection" }
+    ].compact.to_sentence
+    lines << "Performance: #{performance}." if performance.present?
+    if variants.any?
+      sizes = variants.map { |variant| "#{variant.display_name} #{formatted_price(variant.price)}" }
+      lines << "Sizes: #{sizes.join(', ')}."
+    end
+
     if product.combo?
       component_names = product.combo_items.includes(:component_product).map { |item| "#{item.quantity} × #{item.component_product.name}" }
-      details << "The combo includes #{component_names.to_sentence}." if component_names.any?
+      lines << "Includes: #{component_names.to_sentence}." if component_names.any?
     end
-    details << "#{product.total_available_stock} currently in stock."
-    details.join(" ")
+    lines << "Would you like a size recommendation or would you like to order it?"
+    lines.join("\n")
+  end
+
+  def performance_question?
+    customer_message&.content.to_s.downcase.match?(
+      /\b(longevity|lasts?|long lasting|performance|projection|beshi khon|koto khon|kemon)\b|দীর্ঘস্থায়ী|কতক্ষণ/
+    )
+  end
+
+  def product_performance_reply(product)
+    attributes = product.product_attributes.to_h
+    hours = attributes["longevity_hours"].presence
+    projection = attributes["projection"].presence
+    if interpretation&.language == "banglish"
+      details = [ hours&.then { |value| "#{value} hours-er moto longevity" },
+        projection&.then { |value| "#{value} projection" } ].compact.to_sentence
+      return "#{product.name}-er #{details.presence || 'performance product ar use-er upor depend kore'}. Skin ar weather-er upor ektu vary korte pare."
+    end
+
+    details = [ hours&.then { |value| "around #{value} hours" },
+      projection&.then { |value| "#{value} projection" } ].compact.to_sentence
+    "#{product.name} offers #{details.presence || 'performance that varies by use'}. Performance can vary slightly with skin and weather."
+  end
+
+  def invalid_phone_reply
+    saved = []
+    saved << "name" if pending_order.customer_name.present?
+    saved << "address" if pending_order.address.present?
+    prefix = saved.any? ? "I saved your #{saved.to_sentence}, but " : ""
+    "#{prefix}that doesn’t look like a complete phone number for Bangladesh. Please send one like 01712345678."
   end
 
   def product_recommendation_reply
@@ -297,7 +370,8 @@ class BotReplyGenerator
     guided_context = conversation_state.dig("guided_sales", "context").to_h
     preferences = conversation_state["shopping_preferences"].to_h.merge(
       "rejected_product_ids" => guided_context["rejected_product_ids"],
-      "previous_recommendations" => guided_context["last_recommendations"]
+      "previous_recommendations" => guided_context["last_recommendations"].presence ||
+        conversation_state.dig("shopping_preferences", "previous_recommendations")
     )
     result = ProductRecommendationService.new(
       business: pending_order.conversation.business,
@@ -317,6 +391,7 @@ class BotReplyGenerator
     GuidedSalesConversation.new(pending_order.conversation).remember_recommendations!(
       result.offers.map { |offer| offer.product.id }, offers: recommendation_snapshots
     )
+    remember_options!(:products, result.offers.map(&:product).uniq)
 
     options = result.offers.map do |offer|
       description = offer.product.short_description.presence || offer.product.description.to_s
@@ -324,6 +399,8 @@ class BotReplyGenerator
       product_kind = offer.product.combo? ? "Combo" : "Single fragrance"
       sizes = offer.product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }.map(&:display_name).uniq
       detail_lines = [ "  #{product_kind}. #{summary}" ]
+      reason = recommendation_reason(offer, preferences)
+      detail_lines << "  Why it fits: #{reason}." if reason.present?
       tradeoff = recommendation_tradeoff(offer, previous_recommendations, result)
       detail_lines << "  #{tradeoff}" if tradeoff.present?
       if result.budget_detected && offer.variant.present?
@@ -388,6 +465,22 @@ class BotReplyGenerator
     end
   end
 
+  def recommendation_reason(offer, preferences)
+    searchable = [ offer.product.name, offer.product.category, offer.product.tags, offer.product.short_description,
+      offer.product.description, offer.product.suitable_for, offer.product.product_attributes.to_h.flatten.join(" ") ]
+      .compact.join(" ").downcase
+    reasons = []
+    Array(preferences["scent_families"]).each do |family|
+      reasons << "matches your #{family} preference" if searchable.include?(family.to_s.downcase)
+    end
+    Array(preferences["occasions"]).each do |occasion|
+      reasons << "suited to #{occasion}" if searchable.include?(occasion.to_s.downcase)
+    end
+    audience = preferences["audience"].to_s
+    reasons << "fits your #{audience} request" if audience.present? && searchable.include?(audience.downcase)
+    reasons.first(2).to_sentence.presence
+  end
+
   def shortlist_reply
     ids = GuidedSalesConversation.new(pending_order.conversation).context["shortlist_product_ids"]
     products = catalog.where(id: ids).order(:name)
@@ -447,7 +540,76 @@ class BotReplyGenerator
   end
 
   def clarification_reply
-    "I’m not fully sure what you’d like to do. You can ask about products, price, delivery, your order, or say “new order”."
+    count = pending_order.conversation.messages.customer.order(id: :desc).limit(8).count do |message|
+      intelligence = message.metadata.to_h["conversation_intelligence"].to_h
+      intelligence["needs_clarification"] || intelligence["outcome"] == "clarification_needed"
+    end
+    if count >= 2
+      return "Sorry, I’m still not understanding correctly. Reply with a number:\n1. Choose or find a product\n2. Continue or change an order\n3. Ask about delivery or payment\n4. Talk to the seller"
+    end
+
+    options = pending_order.conversation.conversation_state.to_h.dig("last_offered_options", "options")
+    if Array(options).size.between?(2, 4)
+      labels = options.each_with_index.map { |option, index| "#{index + 1}. #{option['label'] || option['name']}" }
+      return ([ "Did you mean one of these?", *labels, "Or tell me what you want in a few words." ]).join("\n")
+    end
+
+    "I’m not fully sure what you’d like to do. Are you choosing a product, changing an order, or asking about delivery/payment?"
+  end
+
+  def recommendation_choice_reminder
+    ids = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommended_product_ids"])
+    products = catalog.available_for_sale.where(id: ids).index_by(&:id)
+    ordered = ids.filter_map { |id| products[id.to_i] }
+    return product_recommendation_reply if ordered.empty?
+
+    remember_options!(:products, ordered)
+    choices = ordered.first(3).each_with_index.map do |product, index|
+      "#{index + 1}. #{product.name} — from #{formatted_price(product.starting_price)}"
+    end
+    ([ "These are the Oud options I meant:", *choices, "Reply 1, 2, or 3—or tell me if you want a single perfume instead of a combo." ]).join("\n")
+  end
+
+  def product_weather_reply
+    product = contextual_product
+    return "Which product would you like weather guidance for?" if product.blank?
+
+    attributes = product.product_attributes.to_h
+    families = Array(attributes["scent_families"]).map(&:downcase)
+    occasions = Array(attributes["occasions"]).map(&:downcase)
+    warm = families.intersect?(%w[oud woody oriental warm spicy tobacco sweet])
+    guidance = if warm
+      "cool weather, evenings, or air-conditioned environments"
+    elsif families.intersect?(%w[fresh citrus aquatic marine airy clean])
+      "warm weather and daytime use"
+    else
+      "moderate weather and the occasions listed for it"
+    end
+    extra = occasions.any? ? " It is especially suited to #{occasions.first(3).to_sentence}." : ""
+    if interpretation&.language == "banglish"
+      banglish = warm ? "cool weather, evening, ba AC environment-e best" : "warm weather ar daytime use-er jonno bhalo"
+      return "#{product.name} #{banglish}. Weather onujayi spray kom-beshi korte paren.#{extra}"
+    end
+
+    "#{product.name} works best in #{guidance}. Adjust the number of sprays for the temperature.#{extra}"
+  end
+
+  def first_time_scent_reply
+    family = Constants::Fragrance::SCENT_FAMILIES.find do |_name, terms|
+      terms.any? { |term| customer_message&.content.to_s.downcase.match?(/\b#{Regexp.escape(term)}\b/) }
+    end&.first || "that scent style"
+    "No problem—first time #{family} try korle softer option ba smallest available size diye start kora safer. Apni soft/subtle naki bold/strong direction prefer korben?"
+  end
+
+  def objection_policy_reply(configured_value, fallback)
+    configured_value.presence || fallback
+  end
+
+  def delivery_price_objection_reply
+    charges = policy.delivery_charges || ENV["SHOP_DELIVERY_CHARGES"]
+    return "I understand the delivery charge is a concern. #{charges}" if charges.present?
+
+    "I understand the delivery charge is a concern, but the charge details haven’t been configured. I can ask the seller to confirm them."
   end
 
   def configured_policy(topic, value)
@@ -470,12 +632,19 @@ class BotReplyGenerator
   end
 
   def product_information(kind)
-    product = mentioned_product
+    product = contextual_product
     return product_selection_prompt if product.blank?
 
     information = if kind == :price
       if product.product_variants.any?
-        product.available_variants.map { |variant| "#{variant.display_name}: #{formatted_price(variant.price)}" }.to_sentence
+        variants = product.available_variants.to_a
+        requested = variants.find do |variant|
+          [ variant.display_name, variant.size, variant.name ].compact.any? do |label|
+            customer_message&.content.to_s.downcase.gsub(/\s+/, "").include?(label.downcase.gsub(/\s+/, ""))
+          end
+        end
+        selected = requested.present? ? [ requested ] : variants
+        selected.map { |variant| "#{variant.display_name}: #{formatted_price(variant.price)}" }.to_sentence
       else
         "#{product.name} is #{formatted_price(product.price)} per bottle."
       end
@@ -485,7 +654,8 @@ class BotReplyGenerator
       "Sorry, #{product.name} is currently out of stock."
     end
 
-    "#{information} #{status_prompt}"
+    follow_up = product.product_variants.any? ? "Would you like one of these sizes?" : "Would you like to order it?"
+    "#{information} #{follow_up}"
   end
 
   def product_variants_reply
@@ -498,6 +668,8 @@ class BotReplyGenerator
     if variants.empty?
       return "#{product.name} currently has one standard option at #{formatted_price(product.price)}. How many would you like?"
     end
+
+    remember_options!(:variants, variants, product: product)
 
     options = variants.map do |variant|
       "• #{variant.display_name} — #{formatted_price(variant.price)} (#{variant.stock_quantity} in stock)"
@@ -575,5 +747,11 @@ class BotReplyGenerator
   def address_suffix
     display = ConversationAddressPreference.display(address_preference)
     display.present? ? ", #{display}" : ""
+  end
+
+  def remember_options!(kind, records, product: nil)
+    ConversationMemory.new(pending_order.conversation).remember_options!(
+      kind: kind, records: records, product: product
+    )
   end
 end

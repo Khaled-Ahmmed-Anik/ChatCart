@@ -13,9 +13,45 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     ).plan
 
     assert plan.interrupted
-    assert_includes plan.content, "To continue your order: What phone number"
+    assert_includes plan.content, "To continue your order: Delivery-r jonno phone number-ta diben?"
     assert_equal "banglish", plan.language
     assert_equal "phone", order.conversation.reload.conversation_state["pending_question"]
+  end
+
+  test "answers a side question while choosing a variant and resumes with a concise Banglish prompt" do
+    product = Product.create!(name: "The Club", price: 390, stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    order = create_pending_order(product: product, status: :collecting_variant)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "delivery charge koto?")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :delivery_charge_requested,
+      interpretation: interpretation(intent: "delivery_charge", language: "banglish")
+    ).plan
+
+    assert plan.interrupted
+    assert_includes plan.content, "To continue your order: The Club-er kon size ta niben?"
+    assert_not_includes plan.content, "good for trying it first"
+  end
+
+  test "offers a clear resume change or pause choice after repeated context switches" do
+    product = Product.create!(name: "The Club", price: 390, stock_quantity: 0)
+    variant = product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    order = create_pending_order(product: product, product_variant: variant, status: :collecting_quantity)
+    order.conversation.update!(conversation_state: { "context_switch_count" => 1 })
+    message = order.conversation.messages.create!(sender_type: :customer, content: "delivery time koto?")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :delivery_time_requested,
+      interpretation: interpretation(intent: "delivery_time", language: "banglish")
+    ).plan
+
+    assert_includes plan.content, "Apnar The Club 10 ML selection-ta save ache"
+    assert_equal 2, order.conversation.reload.conversation_state["context_switch_count"]
   end
 
   test "asks a focused question when new and changed orders are both possible" do
@@ -151,6 +187,17 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
       interpretation: interpretation(intent: "thanks", language: "banglish")
     ).plan
     assert_includes next_plan.content, "welcome, bhai"
+  end
+
+  test "does not switch away from remembered Banglish for a one-word product reply" do
+    order = create_pending_order
+    order.conversation.update!(conversation_state: { "preferred_language" => "banglish" })
+    message = order.conversation.messages.create!(sender_type: :customer, content: "oud")
+
+    plan = build_planner(order: order, message: message, outcome: :product_recommendation_requested,
+      interpretation: interpretation(intent: "product_recommendation", language: "english")).plan
+
+    assert_equal "banglish", plan.language
   end
 
   private

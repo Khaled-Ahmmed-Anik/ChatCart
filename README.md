@@ -24,6 +24,11 @@ ChatCart is a multi-business conversational-commerce platform. It receives Messe
 
 Messenger and WhatsApp Cloud API are implemented customer channels. Instagram is represented in the channel model but still requires its channel-specific webhook and send adapter.
 
+Detailed implementation documentation:
+
+- [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
+- [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
+
 ## Requirements
 
 - Ruby 3.4.7

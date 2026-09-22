@@ -1,5 +1,5 @@
 class ConversationEscalationPolicy
-  REPEATED_PROBLEM_THRESHOLD = 2
+  REPEATED_PROBLEM_THRESHOLD = 3
 
   def initialize(conversation:, interpretation:, outcome:)
     @conversation = conversation

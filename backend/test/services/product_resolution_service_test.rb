@@ -43,6 +43,17 @@ class ProductResolutionServiceTest < ActiveSupport::TestCase
     assert_equal club, result.product
   end
 
+  test "does not call unrelated low-confidence products ambiguous" do
+    product("Arab Oud")
+    product("The Blush")
+    product("Sauvage Inspired")
+
+    result = resolve("assalamulaikum")
+
+    assert_equal :not_found, result.status
+    assert_nil result.product
+  end
+
   private
 
   def product(name, aliases: [])

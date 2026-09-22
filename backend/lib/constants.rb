@@ -22,16 +22,20 @@ module Constants
       "payment_methods" => :payment_methods_requested, "cash_on_delivery" => :cash_on_delivery_requested,
       "delivery_charge" => :delivery_charge_requested, "delivery_area" => :delivery_area_requested,
       "delivery_time" => :delivery_time_requested, "return_request" => :return_requested,
-      "replacement_request" => :replacement_requested, "refund_request" => :refund_requested
+      "replacement_request" => :replacement_requested, "refund_request" => :refund_requested,
+      "order_status" => :order_details_requested, "defer_confirmation" => :confirmation_deferred
     }.freeze
     FOCUSED_OUTCOMES = %i[
-      product_recommendation_requested product_variants_requested product_ambiguous variant_not_found clarification_needed
+      product_recommendation_requested recommendation_choice_reminder product_variants_requested product_ambiguous
+      variant_not_found clarification_needed product_weather_requested first_time_scent_guidance
     ].freeze
     INTERRUPTING_OUTCOMES = %i[
       price_inquiry stock_inquiry product_details_requested product_recommendation_requested
       product_comparison_requested product_variants_requested product_images_requested
       payment_methods_requested cash_on_delivery_requested delivery_charge_requested
-      delivery_area_requested delivery_time_requested
+      delivery_area_requested delivery_time_requested product_weather_requested
+      alternative_product_requested discount_requested authenticity_requested trust_information_requested
+      trial_requested delivery_price_objection price_objection return_requested replacement_requested refund_requested
     ].freeze
     GUIDED_SALES_STAGES = %w[discover compare select configure checkout confirm complete].freeze
     GUIDED_SALES_OUTCOME_STAGES = {
