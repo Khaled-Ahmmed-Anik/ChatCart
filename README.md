@@ -28,6 +28,7 @@ Detailed implementation documentation:
 
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
+- [Free MVP deployment](docs/free-production-deployment.md) — Koyeb, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
 ## Requirements
 

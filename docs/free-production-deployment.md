@@ -5,12 +5,14 @@ This is the recommended zero-cost launch layout for ChatCart:
 | Component | Provider | Free-tier behavior |
 | --- | --- | --- |
 | React dashboard and legal pages | Cloudflare Pages | Static hosting with HTTPS and SPA routing |
-| Rails API, webhooks, and Solid Queue | Koyeb Free Web Service | One 512 MB instance; sleeps after one hour without inbound traffic |
-| PostgreSQL | Neon Free | Persistent serverless PostgreSQL with scale-to-zero |
+| Rails API, webhooks, and Solid Queue | Koyeb Free Web Service | One 512 MB/0.1 vCPU instance; sleeps after one hour without inbound traffic |
+| PostgreSQL | Neon Free | Serverless PostgreSQL with scale-to-zero; current free allowance is sufficient for an MVP |
 | Conversation AI | Google AI Studio / Gemini | Existing API key and free quota |
 | Messaging | Meta Messenger and WhatsApp Cloud API | Meta app and business assets |
 
 This is suitable for an MVP and Meta review. Free compute can sleep, restart, reach quotas, or change terms. Move the Rails service to paid always-on compute before promising production uptime to businesses.
+
+The repository no longer includes a Render Blueprint because it conflicted with this plan and could accidentally provision the wrong resources. Koyeb is configured from its dashboard using the exact values below.
 
 ## 1. Security gate
 
@@ -36,8 +38,9 @@ The first command supplies the three Active Record encryption values. The second
 
 1. Create a free Neon account and a project named `chatcart-production`.
 2. Select the region nearest the backend when possible. Koyeb Free currently offers Frankfurt or Washington, D.C.; use the matching/nearest Neon region.
-3. Copy the pooled PostgreSQL connection string.
-4. Keep it private. It becomes Koyeb's `DATABASE_URL`.
+3. Set the compute to the smallest practical size with scale-to-zero enabled.
+4. Copy the pooled PostgreSQL connection string. Confirm it includes `sslmode=require`.
+5. Keep it private. It becomes Koyeb's `DATABASE_URL`.
 
 No Render database is needed. Render's free PostgreSQL expires after 30 days, so it is not used in this plan.
 
@@ -62,9 +65,10 @@ RAILS_ENV=production
 RAILS_MAX_THREADS=2
 WEB_CONCURRENCY=1
 SOLID_QUEUE_IN_PUMA=true
-JOB_THREADS=2
-JOB_POLLING_INTERVAL=1
-JOB_DISPATCH_INTERVAL=1
+SOLID_QUEUE_SUPERVISOR_MODE=async
+JOB_THREADS=1
+JOB_POLLING_INTERVAL=2
+JOB_DISPATCH_INTERVAL=2
 FORCE_SSL=true
 DATABASE_URL=<Neon pooled connection string>
 SECRET_KEY_BASE=<generated Rails secret>
@@ -95,15 +99,25 @@ After the first successful deploy, run the seed command once using Koyeb's conso
 ./bin/rails db:seed
 ```
 
+Before deploying, copy `backend/.env.production.example` to a temporary private location, fill it with production values, and run:
+
+```bash
+cd backend
+RAILS_ENV=production mise exec -- bin/rails deployment:preflight
+```
+
+Do not commit the filled file. The preflight checks presence and structure without printing secret values.
+
 The container entrypoint automatically runs `db:prepare` whenever the Rails server starts. Solid Queue runs inside Puma so a separate paid worker is not required.
 
 Verify:
 
 ```text
 https://<koyeb-host>/up
+https://<koyeb-host>/ready
 ```
 
-It must return a successful response.
+Both must succeed. `/ready` additionally confirms that PostgreSQL and Solid Queue tables are available.
 
 ## 4. Deploy the React frontend to Cloudflare Pages
 
@@ -165,8 +179,9 @@ Test in this order:
 ## Free-tier operational limits
 
 - Koyeb Free sleeps after one hour without inbound traffic. Its documented deep-sleep wake is normally 1–5 seconds.
-- Background jobs run inside the Rails web process. They do not run while the free instance is asleep, but an inbound webhook wakes the service.
-- Neon can scale to zero. The production queue polls once per second to reduce database compute use.
+- Background jobs run inside the Rails web process in Solid Queue's async supervisor mode. This avoids several forked Ruby processes on the 512 MB instance. Jobs do not run while the free instance is asleep, but an inbound webhook wakes the service.
+- Koyeb documents a typical deep-sleep wake of 1–5 seconds. A Rails cold boot can add time, and Meta may retry a slow webhook; this is acceptable for staging but not an uptime promise.
+- Neon can scale to zero. The production queue polls every two seconds to reduce database compute use. Monitor the current free-plan compute, storage, and egress allowances in Neon because provider limits can change.
 - Cloudflare Pages is static and remains available even while the backend sleeps, so Meta can access the legal pages.
 - Monitor Koyeb memory and Neon storage/compute. Upgrade the backend first if real customers depend on timely replies.
 
