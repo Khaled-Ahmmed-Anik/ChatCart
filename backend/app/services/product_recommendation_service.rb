@@ -68,6 +68,8 @@ class ProductRecommendationService
 
   def price_bounds
     text = normalize_digits(message.downcase)
+    return [ nil, nil, false ] if unlimited_budget?
+
     numbers = text.scan(/\d+(?:\.\d+)?/).map(&:to_d)
     if text.match?(/(?:-|–|to|theke|থেকে)/) && numbers.length >= 2
       return [ numbers.first, numbers.second, true ]
@@ -93,6 +95,8 @@ class ProductRecommendationService
   end
 
   def preferred_offer(product_options, minimum:, maximum:, exact_match:)
+    return product_options.max_by(&:price) if unlimited_budget?
+
     unless exact_match
       return product_options.min_by { |offer| constraint_distance(offer, minimum:, maximum:) }
     end
@@ -220,5 +224,11 @@ class ProductRecommendationService
 
   def floor_request?
     message.downcase.match?(/\b(cheapest|lowest|starting price|price starts|kom dam)\b|সবচেয়ে কম|কম দাম/)
+  end
+
+  def unlimited_budget?
+    message.downcase.match?(
+      /\b(unlimited|unlimitted|no budget|budget is open|any price|price doesn'?t matter)\b|বাজেট সমস্যা নেই/
+    )
   end
 end

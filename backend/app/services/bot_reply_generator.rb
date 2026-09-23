@@ -41,6 +41,8 @@ class BotReplyGenerator
       clarification_reply
     when :price_inquiry
       product_information(:price)
+    when :currency_clarification
+      currency_reply
     when :stock_inquiry
       product_information(:stock)
     when :product_list_requested
@@ -109,15 +111,21 @@ class BotReplyGenerator
     when :variant_selected
       "Great—#{pending_order.product_variant.display_name}. #{quantity_prompt}"
     when :variant_not_found
-      "I couldn’t match that answer to a size. You can reply with the size, option number, or position—for example, “30 ML”, “3”, or “last one”.\n\n#{variant_selection_prompt}"
+      "Which size would you like? You can send the size, option number, or position—for example, “30 ML”, “3”, or “last one”.\n\n#{variant_selection_prompt}"
+    when :variant_size_unavailable
+      variant_bundle_offer_reply
+    when :variant_options_rejected
+      "No problem. What size are you looking for? If you need more than the largest bottle, tell me the amount—such as “50 ML” or “100 ML”—and I can check a multiple-bottle option."
+    when :variant_bundle_selected
+      "Great—#{pending_order.quantity} × #{pending_order.product_variant.display_name}. What name should I put on the order?"
     when :product_unavailable
       "Sorry, that product isn’t available right now. #{product_selection_prompt}"
     when :product_not_found
-      "I may have misunderstood what you’re asking. Could you say it another way? I can help with a product, recommendation, price, delivery, payment, or an existing order. If you meant a product, send its name or tell me what you want and your budget."
+      "Are you asking about a product, recommendation, price, delivery, payment, or an existing order? You can send the product name, or tell me what you want and your budget."
     when :product_ambiguous
       product_ambiguity_reply
     when :invalid_quantity
-      "I didn’t catch the quantity. Please send a number, such as “2”, or write “two”."
+      "How many would you like? You can send a number such as “2”, or write “two”."
     when :quantity_unavailable
       "We currently have #{selected_stock} available for that option. Would you like all #{selected_stock}, a smaller quantity, or should I ask the seller about a bulk order?"
     when :quantity_collected
@@ -131,7 +139,7 @@ class BotReplyGenerator
     when :address_collected
       confirmation_prompt
     when :multiple_details_collected
-      "Got it. #{status_prompt}"
+      banglish? ? "Thik ache—selection save korechi. #{status_prompt}" : "Got it. #{status_prompt}"
     when :confirmation_unclear
       "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
     when :confirmation_deferred
@@ -143,19 +151,21 @@ class BotReplyGenerator
     when :order_change_requested
       order_change_help
     when :invalid_order_update
-      "I couldn’t apply that change. #{order_change_help}"
+      "What would you like to change? #{order_change_help}"
     when :submitted_order_change_requested
       "That order has already been submitted for processing, so I can’t change it automatically. Please contact the seller for help."
     when :cancelled_order_change_requested
       "That order was cancelled, so it can’t be edited. Send “new order” to start again."
     when :confirmed
-      "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly."
+      "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly. Was this chat helpful? Reply “helpful” or “not helpful”."
     when :cancelled
       "Your order has been cancelled. If you change your mind, just send “new order”."
     end
   end
 
   def status_prompt
+    return banglish_status_prompt if banglish?
+
     case pending_order.status
     when "collecting_product"
       product_selection_prompt
@@ -177,6 +187,20 @@ class BotReplyGenerator
       "This order is cancelled. Send “new order” whenever you’d like to begin again."
     else
       "How can I help with your order?"
+    end
+  end
+
+  def banglish_status_prompt
+    case pending_order.status
+    when "collecting_product" then "Kon product-ta nite chan? Product-er naam ba apnar preference bolun."
+    when "collecting_variant" then "#{pending_order.product.name}-er kon size-ta niben?"
+    when "collecting_quantity" then "Koyta niben?"
+    when "collecting_name" then "Order-ta kon name-e dibo?"
+    when "collecting_phone" then "Delivery-r jonno phone number-ta diben?"
+    when "collecting_address" then "Full delivery address-ta diben?"
+    when "awaiting_confirmation" then confirmation_prompt
+    when "confirmed" then "Apnar order already confirmed ✅"
+    else "Kibhabe help korte pari?"
     end
   end
 
@@ -252,6 +276,28 @@ class BotReplyGenerator
       "• #{variant.display_name}: #{formatted_price(variant.price)}#{guidance}"
     end
     ([ "Which size would suit you?", *options, "", "You can reply with the size, price, or say “small”, “medium”, or “best value”." ]).join("\n")
+  end
+
+  def variant_bundle_offer_reply
+    offer = pending_order.conversation.conversation_state.to_h["variant_bundle_offer"].to_h
+    return variant_selection_prompt if offer.blank?
+
+    requested_sizes = Array(offer["requested_sizes"]).presence || [ offer["requested_size"] ]
+    requested = requested_sizes.map { |size| formatted_size(size) }.to_sentence
+    unit = formatted_size(offer["unit_size"])
+    total = formatted_size(offer["total_size"])
+    quantity = offer["quantity"].to_i
+    price = formatted_price(offer["total_price"])
+    comparison = total == requested ? requested : "#{total} in total"
+
+    verb = requested_sizes.one? ? "isn’t" : "aren’t"
+    "#{requested} #{verb} available as one bottle. Our largest available size is #{unit}. " \
+      "You can take #{quantity} × #{unit} (#{comparison}) for #{price}. Would that work, or would you prefer another size?"
+  end
+
+  def formatted_size(value)
+    number = value.to_d
+    "#{number.frac.zero? ? number.to_i : number.to_s("F")} ML"
   end
 
   def variant_size_number(variant)
@@ -361,8 +407,8 @@ class BotReplyGenerator
     saved = []
     saved << "name" if pending_order.customer_name.present?
     saved << "address" if pending_order.address.present?
-    prefix = saved.any? ? "I saved your #{saved.to_sentence}, but " : ""
-    "#{prefix}that doesn’t look like a complete phone number for Bangladesh. Please send one like 01712345678."
+    prefix = saved.any? ? "Saved so far: #{saved.to_sentence}. " : ""
+    "#{prefix}Please send a complete Bangladesh phone number, for example 01712345678."
   end
 
   def product_recommendation_reply
@@ -381,7 +427,7 @@ class BotReplyGenerator
     return result.clarification_question if result.clarification_question.present?
 
     if result.offers.empty?
-      return "I couldn’t find an available option in that range. Our available prices start from #{formatted_price(result.minimum_price)}." if result.minimum_price
+      return "Options in that range aren’t available right now. Our available prices start from #{formatted_price(result.minimum_price)}." if result.minimum_price
 
       return "Sorry, no products are currently available."
     end
@@ -393,20 +439,16 @@ class BotReplyGenerator
     )
     remember_options!(:products, result.offers.map(&:product).uniq)
 
-    options = result.offers.map do |offer|
+    options = result.offers.first(3).map do |offer|
       description = offer.product.short_description.presence || offer.product.description.to_s
-      summary = description.squish.truncate(180)
-      product_kind = offer.product.combo? ? "Combo" : "Single fragrance"
-      sizes = offer.product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }.map(&:display_name).uniq
-      detail_lines = [ "  #{product_kind}. #{summary}" ]
+      summary = description.squish.truncate(100)
+      detail_lines = []
       reason = recommendation_reason(offer, preferences)
       detail_lines << "  Why it fits: #{reason}." if reason.present?
+      detail_lines << "  #{summary}" if reason.blank? && summary.present?
       tradeoff = recommendation_tradeoff(offer, previous_recommendations, result)
       detail_lines << "  #{tradeoff}" if tradeoff.present?
-      if result.budget_detected && offer.variant.present?
-        detail_lines << "  Best size within your budget: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
-      end
-      detail_lines << "  Sizes: #{sizes.to_sentence}." if sizes.any?
+      detail_lines << "  Best option: #{offer.variant.display_name} for #{formatted_price(offer.price)}." if offer.variant.present?
       heading = if result.budget_detected
         "• #{offer.product.name} — #{formatted_price(offer.price)}"
       else
@@ -415,9 +457,9 @@ class BotReplyGenerator
       "#{heading}\n#{detail_lines.join("\n")}"
     end
     introduction = if !result.exact_match && result.requested_maximum.present?
-      "I couldn’t find an exact match within #{formatted_price(result.requested_maximum)}. The closest available option is"
+      "The closest available option to your #{formatted_price(result.requested_maximum)} budget is"
     elsif !result.exact_match && preferences["price_direction"].present?
-      "I couldn’t find an exact #{preferences['price_direction']} alternative. The closest available options are"
+      "The closest available #{preferences['price_direction']} options are"
     elsif preferences["price_direction"] == "lower"
       "Here are lower-priced alternatives"
     elsif preferences["price_direction"] == "higher"
@@ -433,7 +475,29 @@ class BotReplyGenerator
     else
       "Based on what you’re looking for, I recommend"
     end
-    ([ "#{introduction}:", *options, "", "Which one sounds closest to what you want?" ]).join("\n")
+    question = banglish? ? "Kontar dike apnar beshi pochondo?" : "Which one sounds closest to what you want?"
+    ([ "#{introduction}:", *options, "", question ]).join("\n")
+  end
+
+  def currency_reply
+    rate = pending_order.conversation.business.settings.to_h["usd_exchange_rate"].to_d
+    product = contextual_product
+    if rate.positive? && product.present?
+      amount = pending_order.product_variant&.price || product.starting_price
+      dollars = (amount.to_d / rate).round(2)
+      return "#{product.name} starts from approximately $#{format('%.2f', dollars)} USD (using ৳#{rate.to_i}/USD). The final charged amount remains in BDT."
+    end
+    if rate.positive?
+      return "Prices are charged in BDT. Tell me the product name and I can estimate USD using the configured ৳#{rate.to_i}/USD rate."
+    end
+
+    "Our listed prices are in Bangladeshi taka (BDT). An exchange rate hasn’t been configured, so I won’t guess a dollar amount."
+  end
+
+  def banglish?
+    return true if interpretation&.language == "banglish"
+
+    pending_order.conversation.conversation_state.to_h["preferred_language"] == "banglish"
   end
 
   def recommendation_snapshot(offer)

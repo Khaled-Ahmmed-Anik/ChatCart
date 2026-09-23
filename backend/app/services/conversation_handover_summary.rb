@@ -12,7 +12,9 @@ class ConversationHandoverSummary
       "active_order" => active_order_summary,
       "created_at" => Time.current.iso8601
     }.compact
-    state = conversation.conversation_state.to_h.merge("handover_summary" => summary)
+    state = conversation.conversation_state.to_h
+    history = Array(state["handover_history"]) << summary
+    state = state.merge("handover_summary" => summary, "handover_history" => history.last(20))
     conversation.update!(conversation_state: state)
     summary
   end

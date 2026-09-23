@@ -5,6 +5,11 @@ class FragrancePreferenceExtractor
 
   def call(existing: {})
     preferences = existing.to_h.stringify_keys
+    if unlimited_budget?
+      preferences.delete("minimum_price")
+      preferences.delete("maximum_price")
+      preferences["budget_flexible"] = true
+    end
     avoided_families = (Array(preferences["avoid_scent_families"]) + detected_avoided_families).uniq
     preferences["format"] = detected_format || preferences["format"]
     preferences["audience"] = detected_audience || preferences["audience"]
@@ -86,5 +91,9 @@ class FragrancePreferenceExtractor
     return { "minimum_price" => numbers.first } if numbers.any? && text.match?(/above|over|minimum|min|beshi|বেশি|উপরে/)
 
     {}
+  end
+
+  def unlimited_budget?
+    message.match?(/\b(unlimited|unlimitted|no budget|budget is open|any price|price doesn'?t matter)\b|বাজেট সমস্যা নেই/)
   end
 end

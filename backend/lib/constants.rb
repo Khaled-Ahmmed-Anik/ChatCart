@@ -1,5 +1,6 @@
 module Constants
   module Conversation
+    ENGINE_VERSION = "2026.09.1"
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,

@@ -34,6 +34,8 @@ Rails.application.routes.draw do
         post :handover
         post :resume
         post :reply
+        post :review
+        post :feedback
       end
     end
     resource :analytics, only: :show

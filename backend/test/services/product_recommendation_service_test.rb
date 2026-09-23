@@ -108,6 +108,20 @@ class ProductRecommendationServiceTest < ActiveSupport::TestCase
     assert_equal "Fresh Musk", result.offers.first.product.name
   end
 
+  test "treats an unlimited budget as flexible and recommends premium variants" do
+    result = ProductRecommendationService.new(
+      business: @business,
+      message: "unlimitted budget",
+      preferences: { scent_families: [ "oud" ] },
+      limit: 10
+    ).call
+
+    assert_not result.budget_detected
+    oud_offer = result.offers.find { |offer| offer.product.name == "The Oud" }
+    assert_equal "12 ml", oud_offer.variant.display_name
+    assert_equal 800.to_d, oud_offer.price
+  end
+
   test "excludes rejected products and unwanted scent families" do
     sweet = @business.products.create!(name: "Sweet One", price: 400, stock_quantity: 10, tags: "sweet fruity")
     fresh = @business.products.find_by!(name: "Fresh Musk")

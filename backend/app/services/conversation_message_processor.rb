@@ -14,6 +14,8 @@ class ConversationMessageProcessor
       return pending_order
     end
 
+    return pending_order if accept_variant_bundle_offer
+    return pending_order if apply_action_plan
     return pending_order if handle_order_update_request
     return pending_order if handle_conversational_intent
     return pending_order if handle_ai_intent
@@ -47,6 +49,46 @@ class ConversationMessageProcessor
 
   attr_reader :message, :pending_order, :content, :interpretation
 
+  def apply_action_plan
+    return false if interpretation&.entities&.values_at(:customer_name, :phone, :address)&.any?(&:present?)
+
+    plan = ConversationActionPlanner.new(
+      message: message,
+      business: pending_order.conversation.business,
+      current_product: pending_order.product
+    ).call
+    return false unless plan.actionable?
+
+    product = plan.product || pending_order.product
+    variant = plan.variant
+    return false if product.blank?
+    return false if product.available_variants.any? && variant.blank?
+
+    inventory = variant || product
+    if plan.quantity.present? && !inventory.available_for_quantity?(plan.quantity)
+      @outcome = :quantity_unavailable
+      return true
+    end
+
+    attributes = { product: product, product_variant: variant }
+    attributes[:quantity] = plan.quantity if plan.quantity.present?
+    attributes[:status] = next_planned_status(product, variant, plan.quantity)
+    pending_order.update!(attributes)
+    @planned_secondary_outcomes = plan.informational_outcomes
+    @outcome = :multiple_details_collected
+    true
+  end
+
+  def next_planned_status(product, variant, quantity)
+    return :collecting_variant if product.available_variants.any? && variant.blank?
+    return :collecting_quantity if quantity.blank?
+    return :collecting_name if pending_order.customer_name.blank?
+    return :collecting_phone if pending_order.phone.blank?
+    return :collecting_address if pending_order.address.blank?
+
+    :awaiting_confirmation
+  end
+
   def handle_ai_intent
     return false if interpretation.blank?
 
@@ -71,13 +113,15 @@ class ConversationMessageProcessor
   end
 
   def mapped_secondary_outcomes
-    return [] if interpretation.blank? || interpretation.needs_clarification
+    planned = Array(@planned_secondary_outcomes)
+    return planned if interpretation.blank? || interpretation.needs_clarification
 
-    interpretation.secondary_intents.filter_map do |intent|
+    mapped = interpretation.secondary_intents.filter_map do |intent|
       next unless intent.in?(ConversationIntentRegistry.informational_intents)
 
       Constants::Conversation::AI_OUTCOMES[intent]
-    end.uniq - [ outcome ]
+    end
+    (planned + mapped).uniq - [ outcome ]
   end
 
   def collect_product
@@ -93,18 +137,29 @@ class ConversationMessageProcessor
     pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
       :collecting_variant : :collecting_quantity
     pending_order.save!
+    if pending_order.collecting_variant? && requested_variant_sizes.any? && prepare_variant_bundle_offer
+      @outcome = :variant_size_unavailable
+      return
+    end
     @outcome = collect_quantity_from_product_selection ? :multiple_details_collected : :product_selected
   end
 
   def collect_variant
     variant = matching_variant(pending_order.product)
     if variant.blank?
-      @outcome = :variant_not_found
+      @outcome = prepare_variant_bundle_offer ? :variant_size_unavailable : :variant_not_found
       return
     end
 
+    clear_variant_bundle_offer!
     pending_order.update!(product_variant: variant, status: :collecting_quantity)
-    @outcome = :variant_selected
+    quantity = parse_quantity(content) if combined_variant_quantity?
+    if quantity.present? && variant.available_for_quantity?(quantity)
+      pending_order.update!(quantity: quantity, status: :collecting_name)
+      @outcome = :multiple_details_collected
+    else
+      @outcome = :variant_selected
+    end
   end
 
   def collect_quantity
@@ -224,6 +279,11 @@ class ConversationMessageProcessor
   def handle_order_update_request
     return false unless order_change_request? || correction_command? || ai_change_intent?
 
+    if variant_correction_request? && matching_variant(pending_order.product).blank? && prepare_variant_bundle_offer
+      @outcome = :variant_size_unavailable
+      return true
+    end
+
     if pending_order.status.in?(%w[collecting_variant collecting_quantity collecting_name collecting_phone collecting_address])
       @outcome = if order_change_request?
         :order_change_requested
@@ -271,6 +331,8 @@ class ConversationMessageProcessor
       :confirmation_deferred
     elsif resume_browsed_order_request?
       resume_browsed_order
+    elsif variant_options_rejection?
+      :variant_options_rejected
     elsif recommendation_rejection?
       reject_recommendations
     elsif shortlist_show_request?
@@ -310,6 +372,8 @@ class ConversationMessageProcessor
       enter_product_discovery!
       remember_recommendation_preferences!
       :product_recommendation_requested
+    elsif currency_question?
+      :currency_clarification
     elsif price_question?
       :price_inquiry
     elsif stock_question?
@@ -582,6 +646,14 @@ class ConversationMessageProcessor
 
   def contextual_product_selection
     normalized = content.downcase.squish
+    if normalized.match?(/\b(previous product|previous one|one before|ager product|agerta|আগের প্রোডাক্ট|আগেরটা)\b/)
+      history = Array(pending_order.conversation.conversation_state.to_h.dig("turn_manager", "reference_history"))
+      current_id = pending_order.product_id || history.last&.dig("product_id")
+      previous = history.reverse.find { |reference| reference["product_id"].to_i != current_id.to_i }
+      product = catalog.available_for_sale.find_by(id: previous&.dig("product_id"))
+      return product if product.present?
+    end
+
     offered = last_offered_options
     if offered["kind"] == "products"
       offered_ids = Array(offered["options"]).filter_map { |option| option["id"] }
@@ -607,10 +679,12 @@ class ConversationMessageProcessor
   end
 
   def product_resolution
+    turn_reference = pending_order.conversation.conversation_state.to_h.dig("turn_manager", "reference", "product_name")
     @product_resolution ||= ProductResolutionService.new(
       business: pending_order.conversation.business,
       query: interpreted_entity(:product_name, for_intent: "select_product") || content,
-      recent_product_name: pending_order.conversation.conversation_state.to_h["last_referenced_product"]
+      recent_product_name: turn_reference.presence ||
+        pending_order.conversation.conversation_state.to_h["last_referenced_product"]
     ).resolve
   end
 
@@ -620,7 +694,9 @@ class ConversationMessageProcessor
     requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
     exact = product.available_variants.find do |variant|
       candidates = [ variant.name, variant.size ].compact.map(&:downcase)
-      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate| content.downcase.include?(candidate) } ||
+      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate|
+        content.downcase.include?(candidate) || content.downcase.delete(" ").include?(candidate.delete(" "))
+      } ||
         content.match?(/\b#{Regexp.escape(variant.price.to_i.to_s)}\b/)
     end
     exact || contextual_variant_selection(product)
@@ -636,8 +712,91 @@ class ConversationMessageProcessor
     return variants[position] if position.present? && variants[position].present?
 
     return variants.first if normalized.match?(/\b(small|smallest|choto|trial|try)\b/)
+    if normalized.match?(/\b(bigger|larger|next size|aro boro|আরও বড়)\b/)
+      current_size = variant_size_number(pending_order.product_variant) if pending_order.product_variant
+      return variants.find { |variant| variant_size_number(variant) > current_size } if current_size
+      return variants.last
+    end
     return variants.last if normalized.match?(/\b(large|largest|boro|big|best val(?:ue)?|regular use)\b/)
     variants[variants.length / 2] if normalized.match?(/\b(medium|middle|majhari)\b/)
+  end
+
+  def prepare_variant_bundle_offer
+    product = pending_order.product
+    variants = product&.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
+    return false if variants.blank?
+
+    largest = variants.last
+    largest_size = variant_size_number(largest)
+    requested_sizes = requested_variant_sizes
+    requested_size = requested_sizes.first
+    if requested_size.blank? && relative_larger_variant_request? && pending_order.product_variant == largest
+      requested_size = largest_size * 2
+    end
+    return false if requested_size.blank? || requested_size <= largest_size
+
+    quantity = (requested_size / largest_size).ceil
+    return false unless largest.available_for_quantity?(quantity)
+
+    state = pending_order.conversation.conversation_state.to_h
+    state["variant_bundle_offer"] = {
+      "product_id" => product.id,
+      "variant_id" => largest.id,
+      "requested_size" => requested_size.to_s("F"),
+      "requested_sizes" => requested_sizes.map { |size| size.to_s("F") },
+      "unit_size" => largest_size.to_s("F"),
+      "quantity" => quantity,
+      "total_size" => (largest_size * quantity).to_s("F"),
+      "total_price" => (largest.price * quantity).to_s
+    }
+    pending_order.conversation.update!(conversation_state: state)
+    true
+  end
+
+  def accept_variant_bundle_offer
+    offer = pending_order.conversation.conversation_state.to_h["variant_bundle_offer"].to_h
+    return false if offer.blank? || !content.downcase.squish.match?(/\A(yes|okay|ok|sure|that works|nibo|den|হ্যাঁ|ঠিক আছে)[?!. ]*\z/)
+    return false unless offer["product_id"].to_i == pending_order.product_id
+
+    variant = pending_order.product.available_variants.find_by(id: offer["variant_id"])
+    quantity = offer["quantity"].to_i
+    return false unless variant&.available_for_quantity?(quantity)
+
+    pending_order.update!(product_variant: variant, quantity: quantity, status: :collecting_name)
+    clear_variant_bundle_offer!
+    @outcome = :variant_bundle_selected
+    true
+  end
+
+  def clear_variant_bundle_offer!
+    state = pending_order.conversation.conversation_state.to_h
+    return unless state.key?("variant_bundle_offer")
+
+    pending_order.conversation.update!(conversation_state: state.except("variant_bundle_offer"))
+  end
+
+  def requested_variant_size
+    requested_variant_sizes.first
+  end
+
+  def requested_variant_sizes
+    normalized = content.tr("০১২৩৪৫৬৭৮৯", "0123456789")
+    values = normalized.scan(/(\d+(?:\.\d+)?)\s*(?:ml|মিলি)/i).flatten
+    if normalized.match?(/\b(?:or|ba)\b|অথবা/) && normalized.match?(/(?:ml|মিলি)/i)
+      values = normalized.scan(/\d+(?:\.\d+)?/)
+    end
+    values.map(&:to_d).uniq
+  end
+
+  def combined_variant_quantity?
+    normalized = content.tr("০১২৩৪৫৬৭৮৯", "0123456789").downcase
+    without_size = normalized.sub(/\b\d+(?:\.\d+)?\s*(?:ml|মিলি)\b/, " ")
+    normalized.match?(/\b\d+(?:\.\d+)?\s*(?:ml|মিলি)\b/) &&
+      without_size.match?(/\b(?:\d+|one|two|three|four|five|ekta|duita|duta|tinta)\b/)
+  end
+
+  def relative_larger_variant_request?
+    content.downcase.match?(/\b(bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/)
   end
 
   def offered_variants_for(product)
@@ -794,6 +953,11 @@ class ConversationMessageProcessor
     content.downcase.match?(/\b(price|cost)\b|how much/)
   end
 
+  def currency_question?
+    content.downcase.match?(/\b(dollar|doller|usd|currency|taka|bdt)\b|ডলার|টাকা/) &&
+      !content.downcase.match?(/\b(price|cost|budget|under|within)\b/)
+  end
+
   def discount_request?
     content.downcase.match?(/\b(discount|offer|best price|last price|komaben|kom hobe|ছাড়|কমাবেন)\b/)
   end
@@ -919,6 +1083,12 @@ class ConversationMessageProcessor
       content.downcase.match?(/don'?t like (these|them|any)|not these|none( of these)?|no one|not any|show (me )?different|kono ta na|egula pochondo (hoy )?nai|এগুলো.*পছন্দ.*না/)
   end
 
+  def variant_options_rejection?
+    pending_order.collecting_variant? && content.downcase.squish.match?(
+      /\A(no|none|none of these|egula na|kono ta na|না|কোনোটাই না)[?!. ]*\z/
+    )
+  end
+
   def reject_recommendations
     flow = GuidedSalesConversation.new(pending_order.conversation)
     rejected_ids = flow.reject_last_recommendations!
@@ -991,9 +1161,9 @@ class ConversationMessageProcessor
     return false if pending_order.product.blank? || pending_order.product.product_variants.empty?
 
     normalized = content.downcase.squish
-    normalized.match?(/\b(actually|instead|change|size|previous|one before|ager|agerta|আগের)\b/) &&
+    normalized.match?(/\b(actually|instead|change|size|previous|one before|ager|agerta|bigger|larger|next size|আগের)\b|আরও বড়/) &&
       (normalized.match?(/\b\d+(?:\.\d+)?\s*ml\b/) || normalized.match?(
-        /\b(first|second|third|last|small|medium|large|best val(?:ue)?|ager|agerta|আগের)\b/
+        /\b(first|second|third|last|small|medium|large|bigger|larger|next size|best val(?:ue)?|ager|agerta|আগের)\b/
       ))
   end
 

@@ -35,6 +35,128 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal 5, pending_order.product_variant.stock_quantity
   end
 
+  test "offers multiple bottles when the requested size is larger than available" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    processor = process_message(pending_order, "100 ml ache?")
+
+    assert_equal :variant_size_unavailable, processor.outcome
+    offer = pending_order.conversation.reload.conversation_state.fetch("variant_bundle_offer")
+    assert_equal large.id, offer["variant_id"]
+    assert_equal 4, offer["quantity"]
+    assert_equal "120.0", offer["total_size"]
+    assert_predicate pending_order.reload, :collecting_variant?
+  end
+
+  test "answers an unavailable size while selecting a named product" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "do you have The Club in 50ml size?")
+
+    assert_equal :variant_size_unavailable, processor.outcome
+    assert_equal product, pending_order.reload.product
+    assert_predicate pending_order, :collecting_variant?
+    assert_equal 2, pending_order.conversation.reload.conversation_state.dig("variant_bundle_offer", "quantity")
+  end
+
+  test "acknowledges every unavailable size in a multi-size question" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    processor = process_message(pending_order, "50 or 100ml ase?")
+
+    assert_equal :variant_size_unavailable, processor.outcome
+    offer = pending_order.conversation.reload.conversation_state.fetch("variant_bundle_offer")
+    assert_equal %w[50.0 100.0], offer["requested_sizes"]
+  end
+
+  test "treats no during size selection as a size objection" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    processor = process_message(pending_order, "no")
+
+    assert_equal :variant_options_rejected, processor.outcome
+    assert_predicate pending_order.reload, :collecting_variant?
+  end
+
+  test "accepts the remembered multiple-bottle size offer" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+    process_message(pending_order, "100 ml ache?")
+
+    processor = process_message(pending_order, "yes")
+
+    assert_equal :variant_bundle_selected, processor.outcome
+    assert_equal large, pending_order.reload.product_variant
+    assert_equal 4, pending_order.quantity
+    assert_predicate pending_order, :collecting_name?
+    assert_nil pending_order.conversation.reload.conversation_state["variant_bundle_offer"]
+  end
+
+  test "selects an available larger variant directly" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    processor = process_message(pending_order, "bigger size")
+
+    assert_equal :order_updated, processor.outcome
+    assert_equal large, pending_order.reload.product_variant
+    assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "collects a compact size and quantity in the same message" do
+    product = create_product(name: "The Blush", stock_quantity: 0)
+    variant = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+
+    processor = process_message(pending_order, "30ml 2")
+
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal variant, pending_order.reload.product_variant
+    assert_equal 2, pending_order.quantity
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "clarifies a currency-only question instead of repeating product prices" do
+    product = create_product(name: "The Blush")
+    pending_order = create_pending_order(product: product, status: :collecting_quantity)
+
+    processor = process_message(pending_order, "doller?")
+
+    assert_equal :currency_clarification, processor.outcome
+    assert_predicate pending_order.reload, :collecting_quantity?
+  end
+
+  test "offers another bottle when customer is already on the largest size" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    large = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(
+      product: product, product_variant: large, status: :collecting_quantity
+    )
+
+    processor = process_message(pending_order, "bigger size")
+
+    assert_equal :variant_size_unavailable, processor.outcome
+    offer = pending_order.conversation.reload.conversation_state.fetch("variant_bundle_offer")
+    assert_equal 2, offer["quantity"]
+    assert_equal "60.0", offer["total_size"]
+    assert_predicate pending_order.reload, :collecting_quantity?
+  end
+
   test "does not collect inactive or out of stock product" do
     create_product(name: "Fresh Musk", active: false, stock_quantity: 10)
     create_product(name: "Royal Oud", active: true, stock_quantity: 0)
@@ -817,6 +939,26 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal :product_weather_requested, processor.outcome
   end
 
+  test "resolves the previous product from turn-manager reference history" do
+    first = create_product(name: "The Office")
+    second = create_product(name: "The Oud")
+    pending_order = create_pending_order(product: second, status: :collecting_product)
+    pending_order.conversation.update!(conversation_state: {
+      "turn_manager" => {
+        "reference" => { "product_id" => second.id, "product_name" => second.name },
+        "reference_history" => [
+          { "product_id" => first.id, "product_name" => first.name },
+          { "product_id" => second.id, "product_name" => second.name }
+        ]
+      }
+    })
+
+    processor = process_message(pending_order, "not this, the previous product")
+
+    assert_equal :product_selected, processor.outcome
+    assert_equal first, pending_order.reload.product
+  end
+
   test "does not repeat the same long recommendation for identical follow-up input" do
     pending_order = create_pending_order(status: :collecting_product)
     pending_order.conversation.update!(conversation_state: { "last_outcome" => "product_recommendation_requested" })
@@ -825,6 +967,49 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     processor = process_message(pending_order, "oud")
 
     assert_equal :recommendation_choice_reminder, processor.outcome
+  end
+
+  test "atomically collects product size quantity and preserves a delivery question" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    variant = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 8)
+    pending_order = create_pending_order(status: :collecting_product)
+
+    processor = process_message(pending_order, "The Oud 30ml two bottles, delivery charge koto?")
+
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal [ :delivery_charge_requested ], processor.secondary_outcomes
+    assert_equal product, pending_order.reload.product
+    assert_equal variant, pending_order.product_variant
+    assert_equal 2, pending_order.quantity
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "uses the positive product when customer corrects product in a multi-action message" do
+    rejected = create_product(name: "The Oud", stock_quantity: 0)
+    rejected.product_variants.create!(name: "10 ML", size: "10 ML", price: 420, stock_quantity: 5)
+    selected = create_product(name: "The Office", stock_quantity: 0)
+    variant = selected.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 5)
+    pending_order = create_pending_order(product: rejected, status: :collecting_variant)
+
+    processor = process_message(pending_order, "Not The Oud, give The Office 10ml two bottles")
+
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal selected, pending_order.reload.product
+    assert_equal variant, pending_order.product_variant
+    assert_equal 2, pending_order.quantity
+  end
+
+  test "does not partially apply a multi-action plan when requested stock is unavailable" do
+    current = create_product(name: "The Oud")
+    selected = create_product(name: "The Office", stock_quantity: 0)
+    selected.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 1)
+    pending_order = create_pending_order(product: current, status: :collecting_quantity)
+
+    process_message(pending_order, "give The Office 10ml two bottles")
+
+    assert_equal current, pending_order.reload.product
+    assert_nil pending_order.product_variant
+    assert_nil pending_order.quantity
   end
 
   private

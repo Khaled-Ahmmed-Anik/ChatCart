@@ -44,6 +44,42 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_equal [ "10 ML", "15 ML", "30 ML" ], offered["options"].pluck("label")
   end
 
+  test "offers multiple bottles for a requested size above the largest option" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "100 ML ache?")
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
+    processor.process
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      customer_message: message,
+      outcome: processor.outcome
+    ).content
+
+    assert_includes reply, "100 ML isn’t available as one bottle"
+    assert_includes reply, "4 × 30 ML"
+    assert_includes reply, "120 ML in total"
+    assert_includes reply, "৳3400"
+    assert_includes reply, "Would that work"
+  end
+
+  test "mentions both requested sizes when neither is sold as one bottle" do
+    product = create_product(name: "The Club", stock_quantity: 0)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    pending_order = create_pending_order(product: product, status: :collecting_variant)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "50 or 100ml ase?")
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
+    processor.process
+
+    reply = BotReplyGenerator.new(pending_order: pending_order, customer_message: message, outcome: processor.outcome).content
+
+    assert_includes reply, "50 ML and 100 ML aren’t available as one bottle"
+    assert_includes reply, "2 × 30 ML"
+  end
+
   test "asks for a product name when a size question has no product context" do
     pending_order = create_pending_order(status: :collecting_product)
     message = pending_order.conversation.messages.create!(sender_type: :customer, content: "size options?")
@@ -208,9 +244,9 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :invalid_phone).content
 
-    assert_includes reply, "doesn’t look like a complete phone number"
+    assert_includes reply, "Please send a complete Bangladesh phone number"
     assert_includes reply, "01712345678"
-    assert_includes reply, "saved your name and address"
+    assert_includes reply, "Saved so far: name and address"
   end
 
   test "offers a useful bulk-order recovery when requested quantity exceeds stock" do

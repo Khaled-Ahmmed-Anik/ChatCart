@@ -77,6 +77,29 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal "A seller is here to help.", conversation.messages.seller.sole.content
   end
 
+  test "seller can review a conversation and record feedback" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "review-buyer")
+
+    post review_api_conversation_path(conversation), params: { label: "confusing", notes: "Repeated question" },
+      headers: authorization(@token), as: :json
+    assert_response :success
+    assert_equal "confusing", JSON.parse(response.body).dig("quality", "review", "label")
+
+    post feedback_api_conversation_path(conversation), params: { rating: "unhelpful" },
+      headers: authorization(@token), as: :json
+    assert_response :success
+    assert_equal "unhelpful", JSON.parse(response.body).dig("quality", "customer_feedback", "rating")
+  end
+
+  test "conversation quality endpoints are tenant isolated" do
+    conversation = @other_business.conversations.create!(channel: "facebook", external_customer_id: "other-buyer")
+
+    post review_api_conversation_path(conversation), params: { label: "successful" },
+      headers: authorization(@token), as: :json
+
+    assert_response :not_found
+  end
+
   test "manual delivery integration submits an order without an external charge" do
     order = create_order(@business, number: "ORD-DELIVERY")
     integration = @business.create_delivery_integration!(provider: "manual", active: true)

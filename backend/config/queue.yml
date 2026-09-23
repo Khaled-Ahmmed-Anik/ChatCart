@@ -15,4 +15,11 @@ test:
   <<: *default
 
 production:
-  <<: *default
+  dispatchers:
+    - polling_interval: <%= ENV.fetch("JOB_DISPATCH_INTERVAL", 1) %>
+      batch_size: 100
+  workers:
+    - queues: "*"
+      threads: <%= ENV.fetch("JOB_THREADS", 2) %>
+      processes: 1
+      polling_interval: <%= ENV.fetch("JOB_POLLING_INTERVAL", 1) %>

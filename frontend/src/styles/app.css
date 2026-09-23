@@ -6,6 +6,8 @@
 .conversation-list .panel-header,.transcript .panel-header{position:sticky;top:-21px;z-index:3;background:var(--card);padding:21px 0 14px;border-bottom:1px solid var(--line)}
 .messages{min-height:calc(100% - 70px);padding-top:4px}
 .handover-summary{display:grid;gap:4px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff7df;border:1px solid #efd99c;color:var(--warning);font-size:13px}.handover-summary span{text-transform:none}.handover-summary strong{color:var(--ink)}
+.handover-summary.urgent{border-left:5px solid #d68b00;box-shadow:0 6px 18px rgba(138,100,24,.12)}
+.conversation-row.needs-attention{background:#fff8e6;border:1px solid #edd28a;box-shadow:inset 4px 0 #d68b00}.conversation-row.needs-attention:hover,.conversation-row.needs-attention.selected{background:#fff2cc}.attention-reason{margin-top:4px;color:var(--warning)!important;font-weight:750!important}.attention-summary{display:inline-flex;align-items:center;border-radius:999px;padding:8px 12px;background:#fff1cf;color:var(--warning);font-size:13px;font-weight:800}.sidebar nav a{display:flex;align-items:center;justify-content:space-between;gap:10px}.nav-alert-count{display:grid;place-items:center;min-width:23px;height:23px;padding:0 6px;border-radius:999px;background:#ffcb57;color:#392600;font-size:12px}.alert-toggle{margin:0 0 14px;padding:9px 10px;border:1px solid #3a5848;background:#193526;color:#d7e2db;text-align:left;font-size:12px}.alert-toggle:hover,.alert-toggle.enabled{background:#294b39;color:#fff}
 .reply-form{bottom:-21px;z-index:3;padding:15px 0 21px;border-top:1px solid var(--line)}
 .variant-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-top:8px;border-top:1px solid var(--line)}.variant-heading small{display:block;color:var(--muted);margin-top:3px}.variant-list{display:grid;gap:8px}.variant-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .7fr auto;gap:8px;align-items:center}.variant-row input{min-width:0}
 @media(max-width:720px){.variant-row{grid-template-columns:1fr 1fr}.variant-row button{grid-column:1/-1}}
@@ -102,3 +104,6 @@
   border-top: 1px solid #e6eaf2;
   font-size: 0.9rem;
 }
+.quality-review { border-top: 1px solid var(--border); padding: 1rem; display: grid; gap: .65rem; }
+.quality-review > div, .quality-review form, .feedback-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.quality-review form input { flex: 1; min-width: 12rem; }

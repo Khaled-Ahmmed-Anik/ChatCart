@@ -154,6 +154,38 @@ Locally classified turns use deterministic wording and do not call Gemini again 
 
 This order prevents an AI label from overriding a safe order mutation or a clearly recognized command.
 
+### Conversation turn manager
+
+After every processed customer turn, `ConversationTurnManager` stores a structured, privacy-conscious view of the live conversation:
+
+- the customer's active goal;
+- the exact pending-order step and required field;
+- a paused checkout task when a side question interrupts it;
+- a bounded list of answered side questions;
+- the currently referenced product and variant;
+- the five most recent product references;
+- the unresolved clarification type;
+- the context-switch count; and
+- the last intent, outcome, and secondary outcomes.
+
+Raw customer message text is not copied into this state. The manager lets deterministic processing and AI context share the same view of what is active, paused, referenced, and unresolved. Completing an order step clears the paused task, while informational interruptions preserve it. Reference history supports phrases such as `this one`, `the second one`, and `not this, the previous product` without losing the order flow.
+
+### Automatic seller takeover
+
+Automation stops and the conversation becomes `handed_over` when:
+
+- the customer explicitly asks for a human or seller;
+- three consecutive customer turns are classified as complaints;
+- three consecutive customer turns require clarification;
+- the customer requests a refund or replacement;
+- the customer asks to change an order already submitted for processing;
+- the customer reports a delivered-but-not-received parcel; or
+- the customer reports a damaged, leaking, broken, or incorrect product.
+
+Successful turns break the consecutive-problem count, preventing isolated misunderstandings from accumulating into a false escalation. The customer receives the configured waiting message and later messages do not receive automated replies until a seller resumes automation.
+
+The dashboard polls for conversation updates every five seconds. Handed-over conversations receive a `Needs reply` marker, reason, highlighted summary, and navigation badge. After the seller enables takeover alerts from the sidebar, each newly detected handover produces a short sound and a browser notification when notification permission is available.
+
 Examples of deterministic behaviors include:
 
 - start or repeat an order;
@@ -250,6 +282,8 @@ The system remembers the options most recently shown. Customers can select with:
 - relative language: `small`, `medium`, `large`, or `best value`.
 
 Every newly displayed recommendation or variant list replaces the active selectable options. This prevents `2nd` from accidentally selecting an older catalogue entry.
+
+When a customer requests a size larger than the product's largest in-stock variant, the system offers a practical multiple-bottle alternative. For example, a 100 ML request can become `4 × 30 ML = 120 ML` when stock permits. The offer includes the total price and is remembered; replying `yes` applies the proposed variant and quantity to the pending order. A relative request such as `bigger size` selects an available larger variant directly, or offers multiple units when the customer already has the largest size.
 
 ## 9. Guided sales and recommendations
 
@@ -493,3 +527,20 @@ For a webhook problem, inspect these records in order:
 - Messenger and WhatsApp are implemented. Instagram can reuse the shared conversation core but still requires its channel-specific production integration and Meta permissions.
 
 When conversation behavior changes, update this document together with the relevant regression tests.
+# Conversation quality controls
+
+The sales assistant now uses a deterministic action planner before the normal intent flow. A single customer turn can select a product and size, set quantity, and ask delivery or payment questions. Inventory is validated first and the order selection is written atomically, preventing half-applied changes.
+
+Recommendations are intentionally progressive: at most three short, reasoned options are shown and the assistant asks one follow-up question. The saved preferred language controls checkout prompts, including Banglish prompts after a Banglish turn.
+
+USD values are estimates only. Configure `BDT per USD` in Business setup to enable them; without a configured rate, the assistant states that it will not guess.
+
+Seller takeovers retain a bounded history with reason, start time, first seller response, and resolution time. The Analytics page reports total takeovers, waiting conversations, average first-response time, and takeover reasons.
+
+`test/services/conversation_replay_test.rb` contains multi-turn regression scenarios. Add a replay whenever a real conversation exposes a failure, keeping customer text intact after removing personal data.
+
+## Quality evaluation
+
+Every conversation is scored from deterministic evidence rather than an LLM self-review. The evaluator records a 0–100 score, grade, outcome, and flags for repeated bot replies, clarification loops, negative sentiment, long chats without an order, and unresolved seller takeovers. The dashboard supports seller labels (`successful`, `abandoned`, `confusing`, `needs_follow_up`, and `incorrect_reply`) with an optional note.
+
+Every bot message stores `conversation_engine_version`, currently `2026.09.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.

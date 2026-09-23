@@ -18,6 +18,7 @@ class ConversationMemory
       last_offered_options: state["last_offered_options"],
       guided_sales: state["guided_sales"],
       shopping_preferences: state["shopping_preferences"],
+      turn_manager: safe_turn_context(state["turn_manager"]),
       intent_history: Array(state["intent_history"]).last(6),
       customer_profile: remembered_customer_profile,
       previous_order: previous_order_summary
@@ -78,5 +79,12 @@ class ConversationMemory
       quantity: order.quantity,
       status: order.status
     }.compact
+  end
+
+  def safe_turn_context(turn)
+    turn.to_h.slice(
+      "active_goal", "order_step", "pending_question", "paused_task", "reference", "reference_history",
+      "unresolved", "context_switch_count", "last_turn"
+    )
   end
 end

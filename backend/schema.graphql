@@ -2,7 +2,9 @@ type Analytics {
   averageOrderValue: String!
   confirmedOrders: Int!
   conversationToOrderRate: Float!
+  conversationQuality: JSON!
   conversations: Int!
+  handovers: JSON!
   orderingCustomers: Int!
   ordersByChannel: JSON!
   ordersByStatus: JSON!

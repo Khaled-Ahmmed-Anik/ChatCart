@@ -50,6 +50,8 @@ class CompactIntentClassifierTest < ActiveSupport::TestCase
 
   test "leaves a checkout value to the deterministic order flow" do
     assert_nil classify("10 ML", status: :collecting_variant)
+    assert_nil classify("100 ML ache?", status: :collecting_variant)
+    assert_nil classify("bigger size", status: :collecting_variant)
     assert_nil classify("01712345678", status: :collecting_phone)
   end
 
