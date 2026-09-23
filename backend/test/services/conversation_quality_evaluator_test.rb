@@ -40,4 +40,15 @@ class ConversationQualityEvaluatorTest < ActiveSupport::TestCase
     assert_equal "helpful", result.dig(:customer_feedback, "rating")
     assert_equal [ "2026.09.1" ], result[:engine_versions]
   end
+
+  test "supports legacy single handover summaries" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.update!(conversation_state: {
+      "handover_summary" => { "reason" => "seller_takeover", "created_at" => Time.current.iso8601 }
+    })
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+
+    assert_equal 1, result.dig(:metrics, :handovers)
+  end
 end

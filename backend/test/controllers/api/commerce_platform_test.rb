@@ -133,6 +133,18 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert second_conversation.persisted?
   end
 
+  test "analytics accepts legacy single handover summaries" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "legacy-handover")
+    conversation.update!(conversation_state: {
+      "handover_summary" => { "reason" => "seller_takeover", "created_at" => 2.minutes.ago.iso8601 }
+    })
+
+    get api_analytics_path, headers: authorization(@token)
+
+    assert_response :success
+    assert_equal 1, JSON.parse(response.body).dig("handovers", "total")
+  end
+
   private
 
   def create_business(slug)

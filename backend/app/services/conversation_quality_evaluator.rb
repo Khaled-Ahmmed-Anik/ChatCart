@@ -82,7 +82,7 @@ class ConversationQualityEvaluator
 
   def handover_entries
     state = conversation.conversation_state.to_h
-    Array(state["handover_history"]).presence || Array(state["handover_summary"])
+    Array(state["handover_history"]).presence || [ state["handover_summary"] ].compact
   end
 
   def successful_order?

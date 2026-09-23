@@ -48,7 +48,7 @@ class AnalyticsSnapshot
   def handover_metrics(conversations)
     entries = conversations.pluck(:conversation_state).flat_map do |state|
       history = Array(state.to_h["handover_history"])
-      history.presence || Array(state.to_h["handover_summary"])
+      history.presence || [ state.to_h["handover_summary"] ].compact
     end
     response_seconds = entries.filter_map do |entry|
       started = Time.zone.parse(entry["created_at"].to_s)
