@@ -1,5 +1,7 @@
 # Free MVP deployment
 
+> **September 2026 update:** Koyeb now requires new users to subscribe to a paid plan. This document is retained as historical/alternative platform guidance. Use [`oracle-production-deployment.md`](oracle-production-deployment.md) for the current zero-cost backend plan.
+
 This is the recommended zero-cost launch layout for ChatCart:
 
 | Component | Provider | Free-tier behavior |

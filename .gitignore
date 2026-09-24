@@ -15,3 +15,4 @@
 .neon
 .env.local
 node_modules/
+deploy/oracle/.env

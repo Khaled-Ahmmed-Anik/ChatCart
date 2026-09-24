@@ -197,3 +197,8 @@ The main application flow is implemented in:
 - Add password/OAuth login and API-token rotation UX
 - Add delivery-provider-specific adapters and WooCommerce synchronization
 - Deploy the backend and dashboard to permanent HTTPS hosting
+
+## Production deployment
+
+- [Oracle Always Free backend deployment](docs/oracle-production-deployment.md)
+- [Alternative free-platform deployment notes](docs/free-production-deployment.md)
