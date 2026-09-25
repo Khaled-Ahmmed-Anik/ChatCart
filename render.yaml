@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: chatcart-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      - key: RAILS_MAX_THREADS
+        value: "2"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: SOLID_QUEUE_IN_PUMA
+        value: "true"
+      - key: SOLID_QUEUE_SUPERVISOR_MODE
+        value: async
+      - key: JOB_THREADS
+        value: "1"
+      - key: JOB_POLLING_INTERVAL
+        value: "2"
+      - key: JOB_DISPATCH_INTERVAL
+        value: "2"
+      - key: FORCE_SSL
+        value: "true"
+      - key: RAILS_LOG_LEVEL
+        value: info
+      - key: APP_HOST
+        fromService:
+          type: web
+          name: chatcart-api
+          property: host
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_MASTER_KEY
+        sync: false
+      - key: ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
+        sync: false
+      - key: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
+        sync: false
+      - key: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
+        sync: false
+      - key: DASHBOARD_ORIGIN
+        sync: false
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
+        sync: false
+      - key: CHATCART_OWNER_EMAIL
+        sync: false
+      - key: CHATCART_OWNER_PASSWORD
+        sync: false
+      - key: MESSENGER_VERIFY_TOKEN
+        sync: false
+      - key: MESSENGER_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: MESSENGER_APP_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
