@@ -14,6 +14,8 @@ services:
         value: production
       - key: RAILS_MAX_THREADS
         value: "2"
+      - key: DB_POOL
+        value: "5"
       - key: WEB_CONCURRENCY
         value: "0"
       - key: SOLID_QUEUE_IN_PUMA
