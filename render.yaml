@@ -15,7 +15,7 @@ services:
       - key: RAILS_MAX_THREADS
         value: "2"
       - key: WEB_CONCURRENCY
-        value: "1"
+        value: "0"
       - key: SOLID_QUEUE_IN_PUMA
         value: "true"
       - key: SOLID_QUEUE_SUPERVISOR_MODE
