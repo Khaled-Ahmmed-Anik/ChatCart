@@ -10,7 +10,7 @@ if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
 
     if ! ./bin/rails runner "exit(${model}.table_exists? ? 0 : 1)"; then
       echo "Preparing ${task} schema"
-      ./bin/rails "db:schema:load:${task}"
+      DISABLE_DATABASE_ENVIRONMENT_CHECK=1 ./bin/rails "db:schema:load:${task}"
     fi
   }
 
