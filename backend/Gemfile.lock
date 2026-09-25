@@ -114,7 +114,7 @@ GEM
       raabro (~> 1.4)
     globalid (1.4.0)
       activesupport (>= 6.1)
-    graphql (2.6.10)
+    graphql (2.6.11)
       base64
       fiber-storage
       logger
@@ -353,7 +353,7 @@ DEPENDENCIES
   brakeman
   bundler-audit
   debug
-  graphql (~> 2.5)
+  graphql (~> 2.6)
   image_processing (~> 1.2)
   json (~> 2.19.9)
   kamal
