@@ -3,6 +3,7 @@ services:
     name: chatcart-api
     runtime: docker
     plan: free
+    region: singapore
     rootDir: backend
     dockerfilePath: ./Dockerfile
     dockerContext: .

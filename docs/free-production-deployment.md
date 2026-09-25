@@ -55,7 +55,7 @@ No Render database is needed. Render's free PostgreSQL expires after 30 days, so
 5. Supply every value marked `sync: false`. Use the Neon pooled URL for `DATABASE_URL`; never create a Render database.
 6. Apply the Blueprint and follow the first deployment logs.
 
-The Blueprint configures the Docker build context, `/ready` health check, generated `SECRET_KEY_BASE`, safe single-process memory limits, and the public Render hostname. WhatsApp variables can be added later from the service's Environment page when that channel is enabled.
+The Blueprint deploys in Singapore and configures the Docker build context, `/ready` health check, generated `SECRET_KEY_BASE`, safe single-process memory limits, and the public Render hostname. WhatsApp variables can be added later from the service's Environment page when that channel is enabled.
 
 Before deploying, copy `backend/.env.production.example` to a temporary private location, fill it with production values, and run:
 
