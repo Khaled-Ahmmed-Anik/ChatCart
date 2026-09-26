@@ -86,7 +86,12 @@ Create a Pages project from the same GitHub repository:
 - Framework preset: Vite
 - Build command: `npm ci && npm run build`
 - Build output directory: `dist`
-- Environment variable: `VITE_API_URL=https://<render-host>`
+- Runtime environment variable: `API_ORIGIN=https://<render-host>`
+
+Do not define `VITE_API_URL` in the production Pages environment. The production
+dashboard uses same-origin `/auth`, `/api`, and `/graphql` requests, which the
+committed Pages Function proxies to `API_ORIGIN`. Local development continues to
+use `VITE_API_URL=http://localhost:3000`.
 
 The committed `frontend/public/_redirects` makes React routes work on direct navigation.
 
