@@ -1,13 +1,13 @@
 import { GraphQLClient, type Variables } from "graphql-request";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
-import { API_URL } from "./apiBaseUrl";
+import { apiEndpoint } from "./apiBaseUrl";
 
 export async function graphqlRequest<TResult, TVariables extends Variables>(
   document: TypedDocumentNode<TResult, TVariables>,
   variables?: TVariables
 ): Promise<TResult> {
   const token = localStorage.getItem("chatcart_session_token");
-  const client = new GraphQLClient(`${API_URL}/graphql`, {
+  const client = new GraphQLClient(apiEndpoint("/graphql"), {
     headers: token ? { Authorization: `Bearer ${token}` } : {}
   });
 
