@@ -2,6 +2,17 @@
 
 > **Current production architecture:** ChatCart uses a Render Free Web Service, Neon PostgreSQL, and Cloudflare Pages. [`oracle-production-deployment.md`](oracle-production-deployment.md) remains the planned always-on migration path.
 
+Current production endpoints:
+
+| Service | URL |
+| --- | --- |
+| Dashboard and API proxy | [https://chatcart-dashboard.pages.dev](https://chatcart-dashboard.pages.dev) |
+| Rails readiness check | [https://chatcart-api-29oq.onrender.com/ready](https://chatcart-api-29oq.onrender.com/ready) |
+| Privacy Policy | [https://chatcart-dashboard.pages.dev/privacy](https://chatcart-dashboard.pages.dev/privacy) |
+| Data Deletion | [https://chatcart-dashboard.pages.dev/data-deletion](https://chatcart-dashboard.pages.dev/data-deletion) |
+
+The generic placeholders later in this guide are retained so the deployment can be reproduced with replacement hostnames.
+
 This is the recommended zero-cost launch layout for ChatCart:
 
 | Component | Provider | Free-tier behavior |
