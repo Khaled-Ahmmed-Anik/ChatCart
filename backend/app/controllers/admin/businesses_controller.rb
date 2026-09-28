@@ -27,6 +27,8 @@ module Admin
       business = Business.find(params[:id])
       business.update!(params.expect(business: [ :status ]))
       render json: business
+    rescue ActiveRecord::RecordInvalid => error
+      render json: { errors: error.record.errors.to_hash(true) }, status: :unprocessable_entity
     end
 
     private

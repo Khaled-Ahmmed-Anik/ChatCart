@@ -107,3 +107,7 @@
 .quality-review { border-top: 1px solid var(--border); padding: 1rem; display: grid; gap: .65rem; }
 .quality-review > div, .quality-review form, .feedback-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .quality-review form input { flex: 1; min-width: 12rem; }
+.button.danger { background: var(--danger); color: #fff; }
+.button.danger:hover { background: #7f2929; }
+.status.suspended { background: #fff1cf; color: var(--warning); }
+.status.disabled { background: #fde8e8; color: var(--danger); }
