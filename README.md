@@ -43,6 +43,7 @@ Messenger and WhatsApp Cloud API are implemented customer channels. Instagram is
 
 Detailed implementation documentation:
 
+- [Authentication and access lifecycle](docs/authentication-and-access.md) — sessions, revocation, account controls, and business suspension/disable behavior.
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
@@ -168,7 +169,7 @@ review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-p
 | `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
 | `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
-Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. The original API-token path remains temporarily available for backward compatibility.
+Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. Sessions expire after 12 hours; disabling a user or suspending/disabling its business revokes every affected session. Reactivation requires a fresh login. The original API-token path remains temporarily available for backward compatibility. See [Authentication and access lifecycle](docs/authentication-and-access.md) for the complete behavior.
 
 The React dashboard uses GraphQL for its business context, analytics, and product catalog. Authentication, Meta webhooks, health checks, and CSV downloads remain REST endpoints. After changing the GraphQL schema or dashboard operations, regenerate the checked-in client types:
 
@@ -228,7 +229,7 @@ See [Free MVP deployment](docs/free-production-deployment.md#releasing-future-ve
 ## Known next steps
 
 - Implement the Instagram messaging adapter
-- Add password/OAuth login and API-token rotation UX
+- Add password recovery, optional MFA, and legacy API-token rotation/removal UX
 - Add delivery-provider-specific adapters and WooCommerce synchronization
 - Move the backend to always-on infrastructure before offering production uptime commitments
 - Add production monitoring, alerting, backups, and recovery drills
