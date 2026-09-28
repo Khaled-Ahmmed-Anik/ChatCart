@@ -9,7 +9,7 @@ class AuthSession < ApplicationRecord
   validates :token_digest, :expires_at, presence: true
   validate :exactly_one_actor
 
-  scope :active, -> { where("expires_at > ?", Time.current) }
+  scope :active, -> { where(revoked_at: nil).where("expires_at > ?", Time.current) }
 
   def self.issue!(actor:, ip_address: nil, user_agent: nil)
     token = SecureRandom.urlsafe_base64(48)
@@ -30,6 +30,14 @@ class AuthSession < ApplicationRecord
 
   def actor
     user || platform_administrator
+  end
+
+  def revoked?
+    revoked_at.present?
+  end
+
+  def revoke!(reason: nil)
+    update!(revoked_at: Time.current, revocation_reason: reason)
   end
 
   def self.digest(token)
