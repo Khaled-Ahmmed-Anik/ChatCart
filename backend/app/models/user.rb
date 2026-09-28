@@ -23,7 +23,13 @@ class User < ApplicationRecord
   def self.authenticate_token(token)
     return if token.blank?
 
-    find_by(api_token_digest: Digest::SHA256.hexdigest(token))&.then { |user| user if user.active? }
+    find_by(api_token_digest: Digest::SHA256.hexdigest(token))&.then do |user|
+      user if user.authentication_allowed?
+    end
+  end
+
+  def authentication_allowed?
+    super && business.active?
   end
 
   private

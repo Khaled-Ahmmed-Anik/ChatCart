@@ -11,7 +11,7 @@ class AuthSession < ApplicationRecord
   validates :token_digest, :expires_at, presence: true
   validate :exactly_one_actor
 
-  scope :active, -> { where(revoked_at: nil).where("expires_at > ?", Time.current) }
+  scope :active, -> { where(revoked_at: nil).where("auth_sessions.expires_at > ?", Time.current) }
 
   def self.issue!(actor:, ip_address: nil, user_agent: nil)
     token = SecureRandom.urlsafe_base64(48)
@@ -28,7 +28,7 @@ class AuthSession < ApplicationRecord
     return if token.blank?
 
     session = active.includes(:user, :platform_administrator).find_by(token_digest: digest(token))
-    return unless session&.actor&.active?
+    return unless session&.actor&.authentication_allowed?
 
     session.tap { |authenticated| authenticated.touch(:last_used_at) }
   end
