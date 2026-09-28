@@ -121,7 +121,7 @@ class CustomerMessageRecorder
   def feedback_rating
     normalized = content.to_s.downcase.squish
     return "helpful" if normalized.in?([ "helpful", "yes helpful", "ভালো ছিল", "help hoise" ])
-    return "unhelpful" if normalized.in?([ "not helpful", "unhelpful", "helpful na", "ভালো ছিল না" ])
+    "unhelpful" if normalized.in?([ "not helpful", "unhelpful", "helpful na", "ভালো ছিল না" ])
   end
 
   def record_customer_feedback!(conversation, rating)
