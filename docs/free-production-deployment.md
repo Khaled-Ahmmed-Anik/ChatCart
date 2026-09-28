@@ -1,6 +1,6 @@
-# Free MVP deployment
+# Free MVP production deployment
 
-> **September 2026 update:** Koyeb now requires new users to subscribe to a paid plan. ChatCart therefore uses a Render Free Web Service for its initial no-card deployment. [`oracle-production-deployment.md`](oracle-production-deployment.md) remains the planned always-on migration path.
+> **Current production architecture:** ChatCart uses a Render Free Web Service, Neon PostgreSQL, and Cloudflare Pages. [`oracle-production-deployment.md`](oracle-production-deployment.md) remains the planned always-on migration path.
 
 This is the recommended zero-cost launch layout for ChatCart:
 
@@ -24,7 +24,7 @@ Do not deploy until all of these are complete:
 - Rotate the Rails master key because the previous key exists in Git history.
 - Rotate any secret that was ever committed or pasted into a public location.
 - Keep `.env` files local and enter production secrets only in provider dashboards.
-- Keep the GitHub repository private unless the full Git history has been audited or rewritten.
+- Treat the public GitHub repository and its complete history as public information. Never commit credentials, `.env` files, database URLs, customer data, or private exports.
 
 Generate production values locally without printing them into source files:
 
@@ -50,7 +50,7 @@ No Render database is needed. Render's free PostgreSQL expires after 30 days, so
 
 1. Push `render.yaml` to GitHub.
 2. In Render, select **New → Blueprint**.
-3. Connect the GitHub repository and select the production branch.
+3. Connect the GitHub repository and select `main` as the production branch.
 4. Render detects the root `render.yaml` and proposes one Free Web Service named `chatcart-api`.
 5. Supply every value marked `sync: false`. Use the Neon pooled URL for `DATABASE_URL`; never create a Render database.
 6. Apply the Blueprint and follow the first deployment logs.
@@ -81,7 +81,7 @@ Both must succeed. `/ready` additionally confirms that PostgreSQL and Solid Queu
 
 Create a Pages project from the same GitHub repository:
 
-- Production branch: the final merged production branch
+- Production branch: `main`
 - Root directory: `frontend`
 - Framework preset: Vite
 - Build command: `npm ci && npm run build`
@@ -152,11 +152,13 @@ Test in this order:
 
 ChatCart uses `main` as its production branch. Configure Render and Cloudflare Pages to auto-deploy every successful merge to `main`.
 
+GitHub protects `main` with the **Main: owner-reviewed pull requests** ruleset. Direct pushes, force pushes, and branch deletion are blocked. `.github/CODEOWNERS` assigns all paths to `@Khaled-Ahmmed-Anik`: other contributors therefore need the owner's approval, while the owner has a PR-only bypass for their own pull requests. The bypass does not permit direct pushes to `main`.
+
 ### Normal release flow
 
 1. Create a `WC-###-description` feature branch.
 2. Open a pull request and wait for every CI job to pass: Rails security scans, Ruby lint, backend tests, frontend lint, frontend type-check, and frontend build.
-3. Merge the approved pull request to `main`.
+3. Resolve review conversations and merge the pull request to `main`. Pull requests from other contributors require approval from the repository owner.
 4. Render and Cloudflare automatically deploy the new `main` commit.
 5. Confirm `/up`, dashboard login, legal pages, one test conversation, and one test order.
 6. In GitHub, open **Actions → Release → Run workflow**, select `main`, and enter the next semantic version without `v`, such as `0.2.0`.
