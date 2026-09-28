@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version without the v prefix, for example 0.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate_and_release:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+      PRODUCTION_WEB_URL: ${{ vars.PRODUCTION_WEB_URL }}
+
+    steps:
+      - name: Require the production branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Run releases from the main branch."
+            exit 1
+          fi
+
+      - name: Validate semantic version
+        run: |
+          if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Use a semantic version such as 0.2.0 or 1.0.0-rc.1."
+            exit 1
+          fi
+
+      - name: Checkout code and tags
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Ensure version is new
+        run: |
+          if git rev-parse "v${RELEASE_VERSION}" >/dev/null 2>&1; then
+            echo "v${RELEASE_VERSION} already exists."
+            exit 1
+          fi
+
+      - name: Install backend packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: backend
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        run: bin/rails db:test:prepare test
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Validate frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build
+
+      - name: Smoke-test deployed application when URLs are configured
+        run: |
+          if [ -n "${PRODUCTION_API_URL}" ]; then
+            curl --fail --show-error --retry 5 --retry-all-errors --retry-delay 5 "${PRODUCTION_API_URL}/ready" | grep -q '"ready":true'
+          else
+            echo "PRODUCTION_API_URL is not configured; skipping API smoke test."
+          fi
+
+          if [ -n "${PRODUCTION_WEB_URL}" ]; then
+            curl --fail --show-error --retry 3 --retry-all-errors "${PRODUCTION_WEB_URL}/privacy" | grep -q "Privacy Policy"
+          else
+            echo "PRODUCTION_WEB_URL is not configured; skipping frontend smoke test."
+          fi
+
+      - name: Create signed-off release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${RELEASE_VERSION}" -m "ChatCart v${RELEASE_VERSION}"
+          git push origin "v${RELEASE_VERSION}"
+
+      - name: Create GitHub release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${RELEASE_VERSION}" --verify-tag --generate-notes --title "ChatCart v${RELEASE_VERSION}"

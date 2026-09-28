@@ -22,7 +22,13 @@ ChatCart is a multi-business conversational-commerce platform. It receives Messe
 - A tenant-scoped GraphQL dashboard API with generated frontend operation types
 - Seed catalog for the current ChatCart products
 
-Messenger is the currently implemented customer channel. Instagram and WhatsApp are represented in the channel model but require their channel-specific webhook and send adapters.
+Messenger and WhatsApp Cloud API are implemented customer channels. Instagram is represented in the channel model but still requires its channel-specific webhook and send adapter.
+
+Detailed implementation documentation:
+
+- [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
+- [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
+- [Free MVP deployment](docs/free-production-deployment.md) — Koyeb, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
 ## Requirements
 
@@ -110,6 +116,16 @@ https://your-assigned-domain.ngrok-free.dev/webhooks/messenger
 
 Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `messages` field, and keep both Rails and ngrok running during local testing.
 
+Configure the WhatsApp Cloud API callback URL as:
+
+```text
+https://your-assigned-domain.ngrok-free.dev/webhooks/whatsapp
+```
+
+Use `WHATSAPP_VERIFY_TOKEN` during webhook verification, subscribe the WhatsApp Business Account to the `messages`
+field, and configure the app secret, permanent access token, and Phone Number ID from Meta. Production publishing and
+review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-production-checklist.md).
+
 ## API endpoints
 
 | Method | Path | Purpose |
@@ -121,6 +137,8 @@ Use the same `MESSENGER_VERIFY_TOKEN` value in Meta, subscribe the Page to the `
 | `POST` | `/conversation_messages` | Exercise the conversation flow without Messenger |
 | `GET` | `/webhooks/messenger` | Meta webhook verification |
 | `POST` | `/webhooks/messenger` | Receive Messenger events |
+| `GET` | `/webhooks/whatsapp` | Meta WhatsApp webhook verification |
+| `POST` | `/webhooks/whatsapp` | Receive WhatsApp message and status events |
 | `POST` | `/graphql` | Typed business dashboard queries and mutations |
 | `GET` | `/api/analytics` | Business conversion and customer analytics |
 | `GET` | `/api/orders` | Authenticated business order dashboard |
@@ -176,7 +194,11 @@ The main application flow is implemented in:
 ## Known next steps
 
 - Implement the Instagram messaging adapter
-- Implement the WhatsApp Cloud API adapter
 - Add password/OAuth login and API-token rotation UX
 - Add delivery-provider-specific adapters and WooCommerce synchronization
 - Deploy the backend and dashboard to permanent HTTPS hosting
+
+## Production deployment
+
+- [Oracle Always Free backend deployment](docs/oracle-production-deployment.md)
+- [Alternative free-platform deployment notes](docs/free-production-deployment.md)

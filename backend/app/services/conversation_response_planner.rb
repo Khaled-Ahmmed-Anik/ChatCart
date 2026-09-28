@@ -1,15 +1,4 @@
 class ConversationResponsePlanner
-  FOCUSED_OUTCOMES = %i[
-    product_recommendation_requested product_ambiguous variant_not_found clarification_needed
-  ].freeze
-
-  INTERRUPTING_OUTCOMES = %i[
-    price_inquiry stock_inquiry product_details_requested product_recommendation_requested
-    product_comparison_requested product_variants_requested product_images_requested
-    payment_methods_requested cash_on_delivery_requested delivery_charge_requested
-    delivery_area_requested delivery_time_requested
-  ].freeze
-
   Plan = Data.define(:content, :language, :tone, :address_preference, :pending_question, :interrupted)
 
   def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil, secondary_outcomes: [])
@@ -47,7 +36,7 @@ class ConversationResponsePlanner
     return content unless interruption?
     return content if pending_prompt.blank? || content.include?(pending_prompt)
 
-    "#{content}\n\nTo continue your order: #{pending_prompt}"
+    "#{content}\n\n#{continuation_prompt}"
   end
 
   def base_reply
@@ -61,7 +50,7 @@ class ConversationResponsePlanner
   end
 
   def combined_reply
-    return base_reply if outcome.in?(FOCUSED_OUTCOMES)
+    return base_reply if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
 
     replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
@@ -85,13 +74,62 @@ class ConversationResponsePlanner
   end
 
   def interruption?
-    ([ outcome ] + secondary_outcomes).intersect?(INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
-      collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
+    ([ outcome ] + secondary_outcomes).intersect?(Constants::Conversation::INTERRUPTING_OUTCOMES) && pending_order.status.in?(%w[
+      collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
     ])
   end
 
   def pending_prompt
-    BotReplyGenerator.new(pending_order: pending_order).content
+    return banglish_pending_prompt if preferred_language(conversation.conversation_state.to_h) == "banglish"
+
+    case pending_order.status
+    when "collecting_variant"
+      "Which size would you like for #{pending_order.product.name}?"
+    when "collecting_quantity"
+      "How many #{pending_order.product.name} would you like?"
+    when "collecting_name"
+      "What name should I put on the order?"
+    when "collecting_phone"
+      "What phone number should we use?"
+    when "collecting_address"
+      "What’s the delivery address?"
+    when "awaiting_confirmation"
+      "Would you like to confirm the order or change something?"
+    else
+      BotReplyGenerator.new(pending_order: pending_order).content
+    end
+  end
+
+  def continuation_prompt
+    if conversation.conversation_state.to_h["context_switch_count"].to_i.positive? && selected_item.present?
+      return "Apnar #{selected_item} selection-ta save ache. Eta niye continue korben, change korben, naki ekhon pause rakhben?" if
+        preferred_language(conversation.conversation_state.to_h) == "banglish"
+
+      return "Your order is still saved. Would you like to continue with #{selected_item}, change it, or pause it for now?"
+    end
+
+    "To continue your order: #{pending_prompt}"
+  end
+
+  def selected_item
+    [ pending_order.product&.name, pending_order.product_variant&.display_name ].compact.join(" ").presence
+  end
+
+  def banglish_pending_prompt
+    case pending_order.status
+    when "collecting_variant"
+      "#{pending_order.product.name}-er kon size ta niben?"
+    when "collecting_quantity"
+      "#{pending_order.product.name}-er koyta niben?"
+    when "collecting_name"
+      "Order-ta kon name-e dibo?"
+    when "collecting_phone"
+      "Delivery-r jonno phone number-ta diben?"
+    when "collecting_address"
+      "Delivery address-ta diben?"
+    when "awaiting_confirmation"
+      "Order-ta confirm korben, naki kichu change korben?"
+    end
   end
 
   def product_options
@@ -110,12 +148,25 @@ class ConversationResponsePlanner
       "last_outcome" => outcome.to_s,
       "last_sentiment" => interpretation&.sentiment,
       "last_customer_message_id" => customer_message.id,
-      "interrupted" => interruption?
+      "interrupted" => interruption?,
+      "context_switch_count" => next_context_switch_count(previous_state)
     ).compact
+  end
+
+  def next_context_switch_count(previous_state)
+    return previous_state["context_switch_count"].to_i + 1 if interruption?
+    return 0 if outcome.in?(%i[product_selected variant_selected quantity_collected name_collected phone_collected
+      address_collected confirmed cancelled restarted])
+
+    previous_state["context_switch_count"].to_i
   end
 
   def preferred_language(previous_state)
     detected_language = interpretation&.language
+    if customer_message.content.to_s.split.size <= 2 && previous_state["preferred_language"].present? &&
+        outcome != :language_preference
+      return previous_state["preferred_language"]
+    end
     return detected_language if detected_language.in?(%w[english banglish bengali]) && interpretation.confidence >= 0.7
 
     previous_state.fetch("preferred_language", "english")

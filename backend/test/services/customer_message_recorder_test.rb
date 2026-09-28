@@ -14,7 +14,8 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "facebook", result.conversation.channel
     assert_equal "fb-user-123", result.conversation.external_customer_id
     assert_equal "I want Fresh Musk", result.message.content
-    assert_equal({ "source" => "messenger" }, result.message.metadata)
+    assert_equal "messenger", result.message.metadata["source"]
+    assert_equal "product_selected", result.message.metadata.dig("conversation_intelligence", "outcome")
     assert_equal product, result.pending_order.product
     assert_predicate result.pending_order, :collecting_quantity?
     assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", result.bot_reply.content
@@ -184,7 +185,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "customer_requested_human", result.conversation.conversation_state.dig("handover_summary", "reason")
     assert_equal "I want to talk to a human agent",
       result.conversation.conversation_state.dig("handover_summary", "last_customer_message")
-    assert_includes result.bot_reply.content, "passed this conversation to the seller"
+    assert_includes result.bot_reply.content, "আমরা শিগগিরই আপনার সাথে যোগাযোগ করব"
 
     follow_up = record_message("hello?")
     assert_equal :awaiting_human, follow_up.outcome

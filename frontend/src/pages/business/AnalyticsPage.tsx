@@ -27,6 +27,16 @@ export function AnalyticsPage() {
   if (query.isError) return <ErrorState error={query.error} />;
 
   const data = query.data!.analytics;
+  const handovers = asBreakdown(data.handovers);
+  const quality = asBreakdown(data.conversationQuality);
+  const reviewLabels = asBreakdown(quality.review_labels);
+  const qualitySummary = Object.fromEntries(
+    Object.entries(quality).filter(([key]) => key !== "review_labels")
+  );
+  const handoverReasons = asBreakdown(handovers.reasons);
+  const handoverPerformance = Object.fromEntries(
+    Object.entries(handovers).filter(([key]) => key !== "reasons")
+  );
   const metrics: Array<[string, string | number]> = [
     ["Conversations", data.conversations],
     ["Confirmed orders", data.confirmedOrders],
@@ -35,7 +45,11 @@ export function AnalyticsPage() {
     ["Unique customers", data.uniqueCustomers],
     ["Repeat customers", data.repeatCustomers],
     ["Repeat rate", `${data.repeatCustomerRate}%`],
-    ["Average order", `${data.averageOrderValue} BDT`]
+    ["Average order", `${data.averageOrderValue} BDT`],
+    ["Takeovers", handovers.total ?? 0],
+    ["Waiting for seller", handovers.waiting_now ?? 0],
+    ["Chat quality", quality.average_score ?? "—"],
+    ["Needs review", quality.needs_review ?? 0]
   ];
 
   return <>
@@ -45,6 +59,10 @@ export function AnalyticsPage() {
       <Breakdown title="Orders by status" data={asBreakdown(data.ordersByStatus)} />
       <Breakdown title="Orders by channel" data={asBreakdown(data.ordersByChannel)} />
       <Breakdown title="Top products" data={asBreakdown(data.topProducts)} />
+      <Breakdown title="Seller takeover performance" data={handoverPerformance} />
+      <Breakdown title="Takeover reasons" data={handoverReasons} />
+      <Breakdown title="Conversation quality" data={qualitySummary} />
+      <Breakdown title="Review labels" data={reviewLabels} />
     </div>
   </>;
 }

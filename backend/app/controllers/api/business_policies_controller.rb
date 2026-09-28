@@ -19,7 +19,8 @@ module Api
     def policy_params
       params.expect(business_policy: %i[
         payment_methods cash_on_delivery delivery_charges delivery_areas delivery_time
-        return_policy additional_information
+        return_policy additional_information authenticity_statement discount_policy trial_policy
+        trust_information bulk_order_policy
       ])
     end
   end

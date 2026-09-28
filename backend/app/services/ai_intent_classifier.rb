@@ -112,7 +112,7 @@ class AiIntentClassifier
 
   def classification_context
     <<~CONTEXT
-      Registered intents: #{ConversationIntentRegistry::INTENTS.join(", ")}
+      Registered intents: #{ConversationIntentRegistry.intents.join(", ")}
       Current order status: #{pending_order&.status || "none"}
       Remembered conversation state: #{conversation_memory.to_json}
       Available products: #{catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }.map(&:name).join(", ")}
@@ -144,10 +144,10 @@ class AiIntentClassifier
     {
       type: "OBJECT",
       properties: {
-        intent: { type: "STRING", enum: ConversationIntentRegistry::INTENTS },
+        intent: { type: "STRING", enum: ConversationIntentRegistry.intents },
         secondary_intents: {
           type: "ARRAY",
-          items: { type: "STRING", enum: ConversationIntentRegistry::INTENTS }
+          items: { type: "STRING", enum: ConversationIntentRegistry.intents }
         },
         confidence: { type: "NUMBER" },
         entities: {
@@ -179,7 +179,7 @@ class AiIntentClassifier
         needs_clarification: { type: "BOOLEAN" },
         possible_intents: {
           type: "ARRAY",
-          items: { type: "STRING", enum: ConversationIntentRegistry::INTENTS }
+          items: { type: "STRING", enum: ConversationIntentRegistry.intents }
         }
       },
       required: %w[intent secondary_intents confidence entities language sentiment needs_clarification possible_intents]
@@ -192,9 +192,9 @@ class AiIntentClassifier
 
   def valid_secondary_intents(intents, primary:)
     valid = Array(intents).select { |intent| ConversationIntentRegistry.valid?(intent) }.uniq - [ primary ]
-    mutating = valid.select { |intent| intent.in?(ConversationIntentRegistry::MUTATING_INTENTS) }
-    informational = valid.select { |intent| intent.in?(ConversationIntentRegistry::INFORMATIONAL_INTENTS) }
-    allowed_mutating = primary.in?(ConversationIntentRegistry::MUTATING_INTENTS) ? [] : mutating.first(1)
+    mutating = valid.select { |intent| intent.in?(ConversationIntentRegistry.mutating_intents) }
+    informational = valid.select { |intent| intent.in?(ConversationIntentRegistry.informational_intents) }
+    allowed_mutating = primary.in?(ConversationIntentRegistry.mutating_intents) ? [] : mutating.first(1)
     (allowed_mutating + informational).first(3)
   end
 end

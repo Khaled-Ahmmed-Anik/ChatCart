@@ -12,5 +12,7 @@ module Types
     field :orders_by_channel, GraphQL::Types::JSON, null: false
     field :orders_by_status, GraphQL::Types::JSON, null: false
     field :top_products, GraphQL::Types::JSON, null: false
+    field :handovers, GraphQL::Types::JSON, null: false
+    field :conversation_quality, GraphQL::Types::JSON, null: false
   end
 end

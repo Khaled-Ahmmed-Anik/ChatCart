@@ -1,19 +1,4 @@
 class GuidedSalesConversation
-  STAGES = %w[discover compare select configure checkout confirm complete].freeze
-
-  OUTCOME_STAGES = {
-    product_recommendation_requested: "discover",
-    alternative_product_requested: "discover",
-    product_comparison_requested: "compare",
-    recommendations_rejected: "discover",
-    shortlist_updated: "compare",
-    product_selected: "select",
-    variant_selected: "configure",
-    quantity_collected: "checkout",
-    address_collected: "confirm",
-    confirmed: "complete"
-  }.freeze
-
   def initialize(conversation)
     @conversation = conversation
   end
@@ -23,12 +8,14 @@ class GuidedSalesConversation
   end
 
   def active?
-    stage.in?(STAGES - %w[complete])
+    stage.in?(Constants::Conversation::GUIDED_SALES_STAGES - %w[complete])
   end
 
   def transition!(new_stage, context: {})
     new_stage = new_stage.to_s
-    raise ArgumentError, "Unsupported guided sales stage: #{new_stage}" unless new_stage.in?(STAGES)
+    unless new_stage.in?(Constants::Conversation::GUIDED_SALES_STAGES)
+      raise ArgumentError, "Unsupported guided sales stage: #{new_stage}"
+    end
 
     conversation_state = conversation.conversation_state.to_h
     sales_state = state.merge(
@@ -70,8 +57,10 @@ class GuidedSalesConversation
     true
   end
 
-  def remember_recommendations!(product_ids)
-    transition!(stage.presence || "discover", context: { last_recommended_product_ids: Array(product_ids).uniq })
+  def remember_recommendations!(product_ids, offers: nil)
+    recommendation_context = { last_recommended_product_ids: Array(product_ids).uniq }
+    recommendation_context[:last_recommendations] = offers if offers.present?
+    transition!(stage.presence || "discover", context: recommendation_context)
   end
 
   def reject_last_recommendations!
@@ -93,7 +82,7 @@ class GuidedSalesConversation
   end
 
   def sync!(outcome:, pending_order:)
-    next_stage = OUTCOME_STAGES[outcome.to_sym] || stage_for_order(pending_order)
+    next_stage = Constants::Conversation::GUIDED_SALES_OUTCOME_STAGES[outcome.to_sym] || stage_for_order(pending_order)
     transition!(next_stage) if next_stage.present? && next_stage != stage
   end
 

@@ -31,4 +31,22 @@ class FragrancePreferenceExtractorTest < ActiveSupport::TestCase
       assert_includes preferences["scent_families"], "oud", spelling
     end
   end
+
+  test "recognizes comparative recommendation refinements" do
+    preferences = FragrancePreferenceExtractor.new("Ektu cheaper but stronger kichu chai").call
+
+    assert_equal "lower", preferences["price_direction"]
+    assert_equal "stronger", preferences["projection_preference"]
+    assert FragrancePreferenceExtractor.new("Ektu cheaper but stronger kichu chai").refinement?
+  end
+
+  test "clears an earlier price ceiling when the customer says budget is unlimited" do
+    preferences = FragrancePreferenceExtractor.new("unlimitted budget").call(
+      existing: { "maximum_price" => 500.to_d, "scent_families" => [ "oud" ] }
+    )
+
+    assert_nil preferences["maximum_price"]
+    assert preferences["budget_flexible"]
+    assert_equal [ "oud" ], preferences["scent_families"]
+  end
 end

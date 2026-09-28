@@ -15,8 +15,10 @@ class ConversationMemory
       last_intent: state["last_intent"],
       last_outcome: state["last_outcome"],
       last_referenced_product: state["last_referenced_product"],
+      last_offered_options: state["last_offered_options"],
       guided_sales: state["guided_sales"],
       shopping_preferences: state["shopping_preferences"],
+      turn_manager: safe_turn_context(state["turn_manager"]),
       intent_history: Array(state["intent_history"]).last(6),
       customer_profile: remembered_customer_profile,
       previous_order: previous_order_summary
@@ -43,6 +45,23 @@ class ConversationMemory
     conversation.update!(conversation_state: state)
   end
 
+  def remember_options!(kind:, records:, product: nil)
+    options = Array(records).map do |record|
+      {
+        "id" => record.id,
+        "label" => record.respond_to?(:display_name) ? record.display_name : record.name
+      }
+    end
+    state = conversation.conversation_state.to_h
+    state["last_offered_options"] = {
+      "kind" => kind.to_s,
+      "product_id" => product&.id,
+      "options" => options,
+      "shown_at" => Time.current.iso8601
+    }.compact
+    conversation.update!(conversation_state: state)
+  end
+
   private
 
   attr_reader :conversation
@@ -60,5 +79,12 @@ class ConversationMemory
       quantity: order.quantity,
       status: order.status
     }.compact
+  end
+
+  def safe_turn_context(turn)
+    turn.to_h.slice(
+      "active_goal", "order_step", "pending_question", "paused_task", "reference", "reference_history",
+      "unresolved", "context_switch_count", "last_turn"
+    )
   end
 end

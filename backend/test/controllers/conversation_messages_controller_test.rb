@@ -166,7 +166,8 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
 
     response_body = JSON.parse(response.body)
     assert_equal "confirmed", response_body.dig("pending_order", "status")
-    assert_equal "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly.", response_body.dig("bot_reply", "content")
+    assert_equal "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly. Was this chat helpful? Reply “helpful” or “not helpful”.",
+      response_body.dig("bot_reply", "content")
   end
 
   test "create cancels an order awaiting confirmation" do

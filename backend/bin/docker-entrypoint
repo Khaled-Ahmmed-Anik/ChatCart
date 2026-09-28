@@ -3,6 +3,24 @@
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
+  ./bin/rails db:migrate:primary
+
+  ensure_schema() {
+    model="$1"
+    task="$2"
+
+    if ! ./bin/rails runner "exit(${model}.table_exists? ? 0 : 1)"; then
+      echo "Preparing ${task} schema"
+      DISABLE_DATABASE_ENVIRONMENT_CHECK=1 ./bin/rails "db:schema:load:${task}"
+    fi
+  }
+
+  # Rails treats these as separate databases. In production they intentionally
+  # share Neon's DATABASE_URL, so db:prepare sees an existing physical database
+  # and does not load their schemas on the first deploy.
+  ensure_schema "SolidCache::Entry" "cache"
+  ensure_schema "SolidQueue::Job" "queue"
+  ensure_schema "SolidCable::Message" "cable"
 fi
 
 exec "${@}"

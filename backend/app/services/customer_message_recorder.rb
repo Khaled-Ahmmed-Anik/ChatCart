@@ -29,6 +29,16 @@ class CustomerMessageRecorder
         content: content,
         metadata: metadata
       )
+      if feedback_rating.present?
+        record_customer_feedback!(conversation, feedback_rating)
+        outcome = :feedback_recorded
+        bot_reply = conversation.messages.create!(
+          sender_type: :bot,
+          content: feedback_rating == "helpful" ? "Thank you—glad I could help! 😊" : "Thank you for telling us. We’ll use this to improve the experience.",
+          metadata: { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+        )
+        next
+      end
       if conversation.handed_over?
         outcome = :awaiting_human
         next
@@ -44,6 +54,7 @@ class CustomerMessageRecorder
       )
       processor.process
       outcome = processor.outcome
+      record_outcome(message, outcome)
       GuidedSalesConversation.new(conversation).sync!(outcome: outcome, pending_order: pending_order)
       escalation = ConversationEscalationPolicy.new(
         conversation: conversation,
@@ -71,6 +82,14 @@ class CustomerMessageRecorder
         interpretation: interpretation,
         secondary_outcomes: processor.secondary_outcomes
       ).plan
+      ConversationTurnManager.new(conversation).record_turn!(
+        message: message,
+        pending_order: pending_order,
+        outcome: outcome,
+        interpretation: interpretation,
+        secondary_outcomes: processor.secondary_outcomes,
+        interrupted: response_plan.interrupted
+      )
       ConversationMemory.new(conversation).remember!(
         interpretation: interpretation,
         pending_order: pending_order,
@@ -79,14 +98,8 @@ class CustomerMessageRecorder
       log_decision(conversation, message, interpretation, outcome, processor.secondary_outcomes)
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
-        content: AiConversationAssistant.new(
-          customer_message: message,
-          pending_order: pending_order,
-          outcome: outcome,
-          language: response_plan.language,
-          tone: response_plan.tone,
-          address_preference: response_plan.address_preference
-        ).rewrite(fallback: response_plan.content)
+        content: final_reply_content(message, pending_order, outcome, interpretation, response_plan),
+        metadata: { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
       )
     end
 
@@ -104,6 +117,35 @@ class CustomerMessageRecorder
   private
 
   attr_reader :channel, :external_customer_id, :content, :metadata, :business
+
+  def feedback_rating
+    normalized = content.to_s.downcase.squish
+    return "helpful" if normalized.in?([ "helpful", "yes helpful", "ভালো ছিল", "help hoise" ])
+    "unhelpful" if normalized.in?([ "not helpful", "unhelpful", "helpful na", "ভালো ছিল না" ])
+  end
+
+  def record_customer_feedback!(conversation, rating)
+    state = conversation.conversation_state.to_h.merge("customer_feedback" => {
+      "rating" => rating,
+      "recorded_at" => Time.current.iso8601,
+      "source" => "customer_message"
+    })
+    conversation.update!(conversation_state: state)
+  end
+
+  def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
+    return response_plan.content if interpretation.blank?
+    return response_plan.content if message.metadata["intent_classifier"] == "local"
+
+    AiConversationAssistant.new(
+      customer_message: message,
+      pending_order: pending_order,
+      outcome: outcome,
+      language: response_plan.language,
+      tone: response_plan.tone,
+      address_preference: response_plan.address_preference
+    ).rewrite(fallback: response_plan.content)
+  end
 
   def find_or_create_conversation
     business.conversations.find_or_create_by!(
@@ -132,6 +174,12 @@ class CustomerMessageRecorder
   end
 
   def classify_intent(message, pending_order, conversation)
+    local = CompactIntentClassifier.new(message: message, pending_order: pending_order).classify
+    if local.interpretation.present?
+      message.update!(metadata: message.metadata.merge("intent_classifier" => "local"))
+      return local.interpretation
+    end
+
     AiIntentClassifier.new(
       message: message,
       pending_order: pending_order,
@@ -159,6 +207,11 @@ class CustomerMessageRecorder
       "needs_clarification" => interpretation.needs_clarification
     }
     message.update!(metadata: message.metadata.merge("conversation_intelligence" => safe_decision))
+  end
+
+  def record_outcome(message, outcome)
+    intelligence = message.metadata.to_h["conversation_intelligence"].to_h.merge("outcome" => outcome.to_s)
+    message.update!(metadata: message.metadata.merge("conversation_intelligence" => intelligence))
   end
 
   def log_decision(conversation, message, interpretation, outcome, secondary_outcomes)
