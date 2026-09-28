@@ -25,6 +25,23 @@ class AuthSessionTest < ActiveSupport::TestCase
     assert_nil AuthSession.authenticate(token)
   end
 
+  test "sessions belonging to inactive users do not authenticate" do
+    token, = AuthSession.issue!(actor: user)
+    user.update!(active: false)
+
+    assert_nil AuthSession.authenticate(token)
+  end
+
+  test "sessions belonging to inactive platform administrators do not authenticate" do
+    administrator = PlatformAdministrator.create!(
+      name: "Inactive Admin", email: "inactive-admin@example.com", password: "Strong-Test-Password-2026!"
+    )
+    token, = AuthSession.issue!(actor: administrator)
+    administrator.update!(active: false)
+
+    assert_nil AuthSession.authenticate(token)
+  end
+
   private
 
   def user

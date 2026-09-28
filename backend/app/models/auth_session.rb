@@ -25,7 +25,10 @@ class AuthSession < ApplicationRecord
   def self.authenticate(token)
     return if token.blank?
 
-    active.find_by(token_digest: digest(token))&.tap { |session| session.touch(:last_used_at) }
+    session = active.includes(:user, :platform_administrator).find_by(token_digest: digest(token))
+    return unless session&.actor&.active?
+
+    session.tap { |authenticated| authenticated.touch(:last_used_at) }
   end
 
   def actor
