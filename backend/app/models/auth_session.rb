@@ -2,6 +2,8 @@ require "digest"
 
 class AuthSession < ApplicationRecord
   DEFAULT_LIFETIME = 12.hours
+  ACCOUNT_DISABLED_REASON = "account_disabled"
+  BUSINESS_INACTIVE_REASON = "business_inactive"
 
   belongs_to :user, optional: true
   belongs_to :platform_administrator, optional: true
@@ -41,6 +43,10 @@ class AuthSession < ApplicationRecord
 
   def revoke!(reason: nil)
     update!(revoked_at: Time.current, revocation_reason: reason)
+  end
+
+  def self.revoke_all!(reason:)
+    update_all(revoked_at: Time.current, revocation_reason: reason, updated_at: Time.current)
   end
 
   def self.digest(token)
