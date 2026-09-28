@@ -1,5 +1,7 @@
 # Oracle Always Free backend deployment
 
+> **Planned migration, not the current production environment.** ChatCart currently runs its Rails backend on Render. Use this guide when moving to an always-on Oracle VM; verify Oracle's current free-tier availability and account requirements before migration.
+
 This deployment runs the Rails API, Meta webhooks, and Solid Queue on one Oracle Cloud VM. Neon remains the PostgreSQL provider, and Cloudflare Pages hosts the React frontend.
 
 ## 1. Create the VM
@@ -56,7 +58,8 @@ docker compose version
 ```bash
 git clone https://github.com/Khaled-Ahmmed-Anik/wintobono-chat-helper-v1.git
 cd wintobono-chat-helper-v1
-git checkout WC-017-improve-conversation-recovery
+git checkout main
+git pull --ff-only origin main
 cp deploy/oracle/.env.example deploy/oracle/.env
 nano deploy/oracle/.env
 ```

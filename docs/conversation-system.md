@@ -1,6 +1,6 @@
 # ChatCart Conversation System
 
-This document describes how customer conversations currently work in ChatCart. It reflects the implemented behavior on branch `WC-017-improve-conversation-recovery`, rather than a future design.
+This document describes how customer conversations currently work in ChatCart. It reflects the production implementation on `main`, rather than a future design.
 
 ## 1. Purpose and scope
 
