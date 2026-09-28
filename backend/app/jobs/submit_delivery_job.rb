@@ -6,6 +6,7 @@ class SubmitDeliveryJob < ApplicationJob
 
   def perform(submission)
     return if submission.status == "submitted"
+    return submission.update!(status: "skipped", last_error: "business_inactive") unless submission.order.business.active?
 
     submission.update!(status: "submitting", attempts: submission.attempts + 1, last_error: nil)
     result = DeliverySubmissionSender.new(submission).deliver

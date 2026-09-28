@@ -5,6 +5,7 @@ class ProcessMessengerEventJob < ApplicationJob
 
   def perform(webhook_event)
     return unless webhook_event.event_type == "customer_text"
+    return skip_inactive_business(webhook_event) unless webhook_event.business.active?
     return enqueue_existing_delivery(webhook_event) if webhook_event.messenger_delivery.present?
     return if webhook_event.status == "processed"
 
@@ -26,6 +27,10 @@ class ProcessMessengerEventJob < ApplicationJob
   end
 
   private
+
+  def skip_inactive_business(webhook_event)
+    webhook_event.update!(status: "ignored", processed_at: Time.current, last_error: "business_inactive")
+  end
 
   def enqueue_existing_delivery(webhook_event)
     delivery = webhook_event.messenger_delivery

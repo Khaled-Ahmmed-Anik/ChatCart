@@ -81,6 +81,20 @@ class ProcessMessengerEventJobTest < ActiveJob::TestCase
     end
   end
 
+  test "ignores an event queued before its business became inactive" do
+    event = create_webhook_event(text: "Hello", message_id: "mid-inactive")
+    event.business.update!(status: "disabled")
+
+    assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { MessengerDelivery.count } ] do
+      assert_no_enqueued_jobs only: SendMessengerReplyJob do
+        ProcessMessengerEventJob.perform_now(event)
+      end
+    end
+
+    assert_equal "ignored", event.reload.status
+    assert_equal "business_inactive", event.last_error
+  end
+
   private
 
   def create_webhook_event(text:, message_id: "mid-123")
