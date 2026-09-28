@@ -24,7 +24,10 @@ module Webhooks
 
     def record_messaging_event(entry_id, event)
       event_type = MessengerEventClassifier.new(event).type
-      business = ChannelConnection.find_by(channel: "facebook", external_account_id: entry_id)&.business || Business.default
+      business = ChannelConnection.active.find_by(channel: "facebook", external_account_id: entry_id)&.business ||
+        Business.default
+      return { type: event_type, status: "ignored" } unless business.active?
+
       result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
 
       if result.created && event_type == :customer_text
