@@ -17,7 +17,7 @@ Public legal pages:
 - [Privacy Policy](https://chatcart-dashboard.pages.dev/privacy)
 - [Data Deletion](https://chatcart-dashboard.pages.dev/data-deletion)
 
-The current production baseline is [`v0.1.0`](https://github.com/Khaled-Ahmmed-Anik/wintobono-chat-helper-v1/tree/v0.1.0). Render and Cloudflare Pages deploy automatically from `main`; Render's free service can take about a minute to wake after inactivity.
+The current production baseline is [`v0.1.0`](https://github.com/Khaled-Ahmmed-Anik/ChatCart/tree/v0.1.0). Render and Cloudflare Pages deploy automatically from `main`; Render's free service can take about a minute to wake after inactivity.
 
 ## Current capabilities
 

@@ -56,8 +56,8 @@ docker compose version
 ## 5. Clone and configure ChatCart
 
 ```bash
-git clone https://github.com/Khaled-Ahmmed-Anik/wintobono-chat-helper-v1.git
-cd wintobono-chat-helper-v1
+git clone https://github.com/Khaled-Ahmmed-Anik/ChatCart.git
+cd ChatCart
 git checkout main
 git pull --ff-only origin main
 cp deploy/oracle/.env.example deploy/oracle/.env
@@ -84,7 +84,7 @@ bin/rails db:encryption:init
 On the Oracle VM:
 
 ```bash
-cd ~/wintobono-chat-helper-v1/deploy/oracle
+cd ~/ChatCart/deploy/oracle
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail=100 backend
@@ -124,7 +124,7 @@ Meta's verify tokens must exactly match the values in `deploy/oracle/.env`.
 ## Release updates
 
 ```bash
-cd ~/wintobono-chat-helper-v1
+cd ~/ChatCart
 git pull --ff-only
 cd deploy/oracle
 docker compose up -d --build
