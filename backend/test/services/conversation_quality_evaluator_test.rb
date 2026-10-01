@@ -51,4 +51,29 @@ class ConversationQualityEvaluatorTest < ActiveSupport::TestCase
 
     assert_equal 1, result.dig(:metrics, :handovers)
   end
+
+  test "reports planner tool fallback guardrail and latency metrics" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.messages.create!(sender_type: :bot, content: "First", metadata: {
+      "ai_assistant" => {
+        "planner_used" => true, "tool_names" => %w[search_products get_business_policy],
+        "fallback_reason" => nil, "latency_ms" => 100
+      }
+    })
+    conversation.messages.create!(sender_type: :bot, content: "Second", metadata: {
+      "ai_assistant" => {
+        "planner_used" => true, "tool_names" => [],
+        "fallback_reason" => "guardrail_rejected", "latency_ms" => 200
+      }
+    })
+
+    metrics = ConversationQualityEvaluator.new(conversation: conversation).call.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:ai_assisted_turns)
+    assert_equal 2, metrics.fetch(:planner_turns)
+    assert_equal 2, metrics.fetch(:tool_calls)
+    assert_equal 1, metrics.fetch(:ai_fallbacks)
+    assert_equal 1, metrics.fetch(:guardrail_rejections)
+    assert_equal 150, metrics.fetch(:average_ai_latency_ms)
+  end
 end
