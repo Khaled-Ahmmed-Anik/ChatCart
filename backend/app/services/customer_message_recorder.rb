@@ -135,7 +135,10 @@ class CustomerMessageRecorder
 
   def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
     return response_plan.content if interpretation.blank?
-    return response_plan.content if message.metadata["intent_classifier"] == "local"
+    if message.metadata["intent_classifier"] == "local" &&
+        !ConversationAiRollout.enabled?(:naturalizer_all_turns, conversation: pending_order.conversation)
+      return response_plan.content
+    end
 
     assistant = AiConversationAssistant.new(
       customer_message: message,

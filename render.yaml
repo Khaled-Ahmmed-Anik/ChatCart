@@ -69,3 +69,15 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
+      - key: CONVERSATION_PLANNER_ENABLED
+        value: "false"
+      - key: CONVERSATION_PLANNER_ROLLOUT_PERCENT
+        value: "0"
+      - key: CONVERSATION_NATURALIZER_ENABLED
+        value: "true"
+      - key: CONVERSATION_NATURALIZER_ROLLOUT_PERCENT
+        value: "100"
+      - key: CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED
+        value: "false"
+      - key: CONVERSATION_NATURALIZER_ALL_TURNS_ROLLOUT_PERCENT
+        value: "0"

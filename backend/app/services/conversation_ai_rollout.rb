@@ -3,7 +3,12 @@ require "zlib"
 class ConversationAiRollout
   FEATURES = {
     planner: { flag: "CONVERSATION_PLANNER_ENABLED", percentage: "CONVERSATION_PLANNER_ROLLOUT_PERCENT", default: false },
-    naturalizer: { flag: "CONVERSATION_NATURALIZER_ENABLED", percentage: "CONVERSATION_NATURALIZER_ROLLOUT_PERCENT", default: true }
+    naturalizer: { flag: "CONVERSATION_NATURALIZER_ENABLED", percentage: "CONVERSATION_NATURALIZER_ROLLOUT_PERCENT", default: true },
+    naturalizer_all_turns: {
+      flag: "CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED",
+      percentage: "CONVERSATION_NATURALIZER_ALL_TURNS_ROLLOUT_PERCENT",
+      default: false
+    }
   }.freeze
 
   def self.enabled?(feature, conversation:, environment: ENV)

@@ -6,6 +6,7 @@ class ConversationAiRolloutTest < ActiveSupport::TestCase
 
     assert ConversationAiRollout.enabled?(:naturalizer, conversation: conversation, environment: {})
     assert_not ConversationAiRollout.enabled?(:planner, conversation: conversation, environment: {})
+    assert_not ConversationAiRollout.enabled?(:naturalizer_all_turns, conversation: conversation, environment: {})
   end
 
   test "supports deterministic percentage rollout" do
