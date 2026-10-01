@@ -98,8 +98,10 @@ can reach the conversation system as one message separated by a newline. Metadat
 10. Capture a permanent order if confirmation is complete.
 11. Build the deterministic response plan.
 12. Update conversation memory.
-13. Optionally rewrite the planned wording with `AiConversationAssistant`.
-14. Store the final bot message.
+13. Optionally let Gemini request up to two tenant-safe, read-only conversation tools.
+14. Rewrite the approved wording with `AiConversationAssistant` when its rollout permits.
+15. Validate the generated reply with `ConversationReplyGuard` and fall back when it is not grounded.
+16. Store the final bot message with safe planner telemetry.
 
 If Gemini is unavailable, times out, or fails, deterministic processing and fallback replies remain available.
 
@@ -455,8 +457,11 @@ Important keys in `Conversation#conversation_state` include:
 | `AiIntentClassifier` | Structured multilingual intent classification |
 | `ConversationMessageProcessor` | Deterministic actions and state transitions |
 | `ConversationResponsePlanner` | Context, interruption, and language planning |
+| `ConversationToolGateway` | Tenant-safe product, variant, policy, and order-summary tools |
 | `BotReplyGenerator` | Grounded deterministic replies |
 | `AiConversationAssistant` | Optional natural-language rewrite |
+| `ConversationReplyGuard` | Generated-price, product, claim, question, and repetition validation |
+| `ConversationAiRollout` | Stable feature and percentage rollout decisions |
 | `ConversationMemory` | Safe persistent conversation context |
 | `GuidedSalesConversation` | Sales-stage and recommendation context |
 | `ProductResolutionService` | Product-name and contextual reference matching |
@@ -476,6 +481,10 @@ Important environment variables include:
 | `WHATSAPP_ACCESS_TOKEN` | Fallback WhatsApp API token |
 | `GEMINI_API_KEY` | Enables intent classification and optional rewriting |
 | `GEMINI_MODEL` | Overrides the default Gemini model |
+| `CONVERSATION_PLANNER_ENABLED` | Enables allowlisted Gemini tool planning |
+| `CONVERSATION_PLANNER_ROLLOUT_PERCENT` | Percentage of conversations eligible for tool planning |
+| `CONVERSATION_NATURALIZER_ENABLED` | Enables natural rewrites for eligible turns |
+| `CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED` | Extends rewriting to local-classifier turns |
 
 Per-business channel tokens should normally be stored in `ChannelConnection`, rather than relying on global fallback environment variables.
 
@@ -523,10 +532,13 @@ For a webhook problem, inspect these records in order:
 - Product advice is only as accurate as the product descriptions, attributes, variants, prices, and stock stored by the business.
 - Business-policy answers are only available when administrators configure them.
 - Gemini improves classification and wording but does not replace deterministic order validation.
+- Gemini tools are read-only and tenant-scoped; models cannot directly mutate orders or query arbitrary data.
 - Automated handover records and summarizes the request; a seller-facing notification workflow can be expanded later.
 - Messenger and WhatsApp are implemented. Instagram can reuse the shared conversation core but still requires its channel-specific production integration and Meta permissions.
 
 When conversation behavior changes, update this document together with the relevant regression tests.
+
+The planner, tools, guardrails, telemetry, feature controls, and staged rollout procedure are documented in [Structured conversation planner](structured-conversation-planner.md).
 # Conversation quality controls
 
 The sales assistant now uses a deterministic action planner before the normal intent flow. A single customer turn can select a product and size, set quantity, and ask delivery or payment questions. Inventory is validated first and the order selection is written atomically, preventing half-applied changes.
