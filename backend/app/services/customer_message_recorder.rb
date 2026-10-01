@@ -99,7 +99,7 @@ class CustomerMessageRecorder
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
         content: final_reply_content(message, pending_order, outcome, interpretation, response_plan),
-        metadata: { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+        metadata: bot_reply_metadata
       )
     end
 
@@ -135,16 +135,29 @@ class CustomerMessageRecorder
 
   def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
     return response_plan.content if interpretation.blank?
-    return response_plan.content if message.metadata["intent_classifier"] == "local"
+    if message.metadata["intent_classifier"] == "local" &&
+        !ConversationAiRollout.enabled?(:naturalizer_all_turns, conversation: pending_order.conversation)
+      return response_plan.content
+    end
 
-    AiConversationAssistant.new(
+    assistant = AiConversationAssistant.new(
       customer_message: message,
       pending_order: pending_order,
       outcome: outcome,
       language: response_plan.language,
       tone: response_plan.tone,
-      address_preference: response_plan.address_preference
-    ).rewrite(fallback: response_plan.content)
+      address_preference: response_plan.address_preference,
+      response_plan: response_plan
+    )
+    content = assistant.rewrite(fallback: response_plan.content)
+    @ai_reply_metadata = assistant.telemetry.compact
+    content
+  end
+
+  def bot_reply_metadata
+    metadata = { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+    metadata["ai_assistant"] = @ai_reply_metadata if @ai_reply_metadata.present?
+    metadata
   end
 
   def find_or_create_conversation

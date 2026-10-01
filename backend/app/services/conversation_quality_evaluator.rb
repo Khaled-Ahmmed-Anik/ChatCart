@@ -31,12 +31,20 @@ class ConversationQualityEvaluator
   def build_metrics(customer_messages, bot_messages)
     intelligence = customer_messages.map { |message| message.metadata.to_h["conversation_intelligence"].to_h }
     bot_replies = bot_messages.map { |message| normalize(message.content) }
+    assistant_events = bot_messages.filter_map { |message| message.metadata.to_h["ai_assistant"].presence }
+    latencies = assistant_events.filter_map { |event| event["latency_ms"] }
     {
       customer_turns: customer_messages.count,
       bot_turns: bot_messages.count,
       clarification_turns: intelligence.count { |item| item["needs_clarification"] || item["outcome"] == "clarification_needed" },
       negative_turns: intelligence.count { |item| item["sentiment"] == "negative" },
       repeated_bot_replies: bot_replies.tally.values.sum { |count| [ count - 1, 0 ].max },
+      ai_assisted_turns: assistant_events.count,
+      planner_turns: assistant_events.count { |event| event["planner_used"] },
+      tool_calls: assistant_events.sum { |event| Array(event["tool_names"]).count },
+      ai_fallbacks: assistant_events.count { |event| event["fallback_reason"].present? },
+      guardrail_rejections: assistant_events.count { |event| event["fallback_reason"] == "guardrail_rejected" },
+      average_ai_latency_ms: latencies.any? ? (latencies.sum.fdiv(latencies.count)).round : nil,
       handovers: handover_entries.count,
       currently_waiting_for_seller: conversation.handed_over?,
       order_confirmed: successful_order?
@@ -50,6 +58,8 @@ class ConversationQualityEvaluator
     flags << "customer_frustration" if metrics[:negative_turns].positive?
     flags << "waiting_for_seller" if metrics[:currently_waiting_for_seller]
     flags << "high_turn_count_without_order" if metrics[:customer_turns] >= 8 && !metrics[:order_confirmed]
+    flags << "frequent_ai_fallback" if metrics[:ai_assisted_turns] >= 3 &&
+      metrics[:ai_fallbacks].fdiv(metrics[:ai_assisted_turns]) >= 0.5
     flags
   end
 
@@ -60,6 +70,7 @@ class ConversationQualityEvaluator
     value -= [ metrics[:negative_turns] * 6, 18 ].min
     value -= 20 if metrics[:currently_waiting_for_seller]
     value -= 10 if metrics[:customer_turns] >= 8 && !metrics[:order_confirmed]
+    value -= [ metrics[:guardrail_rejections] * 4, 12 ].min
     value += 5 if metrics[:order_confirmed]
     value.clamp(SCORE_FLOOR, SCORE_CEILING)
   end
