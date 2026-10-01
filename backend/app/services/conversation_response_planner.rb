@@ -1,5 +1,25 @@
 class ConversationResponsePlanner
-  Plan = Data.define(:content, :language, :tone, :address_preference, :pending_question, :interrupted)
+  Plan = Data.define(
+    :content, :language, :tone, :address_preference, :pending_question, :interrupted,
+    :goal, :actions, :facts, :confidence, :needs_clarification, :handover_required
+  ) do
+    def to_h
+      {
+        content: content,
+        language: language,
+        tone: tone,
+        address_preference: address_preference,
+        pending_question: pending_question,
+        interrupted: interrupted,
+        goal: goal,
+        actions: actions,
+        facts: facts,
+        confidence: confidence,
+        needs_clarification: needs_clarification,
+        handover_required: handover_required
+      }.compact
+    end
+  end
 
   def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil, secondary_outcomes: [])
     @conversation = conversation
@@ -21,7 +41,13 @@ class ConversationResponsePlanner
       tone: state.fetch("preferred_tone", "friendly"),
       address_preference: state["address_preference"],
       pending_question: state["pending_question"],
-      interrupted: interruption?
+      interrupted: interruption?,
+      goal: response_goal,
+      actions: planned_actions,
+      facts: approved_facts,
+      confidence: interpretation&.confidence || 1.0,
+      needs_clarification: outcome == :clarification_needed || interpretation&.needs_clarification == true,
+      handover_required: outcome == :human_handover_started
     )
   end
 
@@ -190,5 +216,36 @@ class ConversationResponsePlanner
       "collecting_address" => "address",
       "awaiting_confirmation" => "confirmation"
     }[pending_order.status]
+  end
+
+  def response_goal
+    return "handover_to_seller" if outcome == :human_handover_started
+    return "clarify_customer_request" if outcome == :clarification_needed
+    return "complete_order" if outcome == :confirmed
+    return "answer_and_resume_order" if interruption?
+    return "collect_#{pending_question}" if pending_question.present?
+
+    "answer_customer"
+  end
+
+  def planned_actions
+    actions = [ { "type" => outcome.to_s } ]
+    secondary_outcomes.each { |secondary| actions << { "type" => secondary.to_s } }
+    actions << { "type" => "ask", "field" => pending_question } if pending_question.present?
+    actions.uniq
+  end
+
+  def approved_facts
+    {
+      "business_name" => conversation.business.name,
+      "product_id" => pending_order.product_id,
+      "product_name" => pending_order.product&.name,
+      "variant_id" => pending_order.product_variant_id,
+      "variant_name" => pending_order.product_variant&.display_name,
+      "quantity" => pending_order.quantity,
+      "unit_price" => pending_order.product.present? ? pending_order.unit_price.to_s : nil,
+      "total_price" => pending_order.product.present? && pending_order.quantity.present? ? pending_order.total_price.to_s : nil,
+      "order_status" => pending_order.status
+    }.compact
   end
 end

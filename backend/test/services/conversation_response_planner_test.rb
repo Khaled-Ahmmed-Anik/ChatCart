@@ -13,6 +13,9 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     ).plan
 
     assert plan.interrupted
+    assert_equal "answer_and_resume_order", plan.goal
+    assert_equal "phone", plan.pending_question
+    assert_includes plan.actions, { "type" => "ask", "field" => "phone" }
     assert_includes plan.content, "To continue your order: Delivery-r jonno phone number-ta diben?"
     assert_equal "banglish", plan.language
     assert_equal "phone", order.conversation.reload.conversation_state["pending_question"]
@@ -85,6 +88,51 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
 
     assert_equal "calm_and_helpful", plan.tone
     assert_equal "calm_and_helpful", order.conversation.reload.conversation_state["preferred_tone"]
+  end
+
+  test "returns an auditable structured plan with approved order facts" do
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    order = create_pending_order(product: product, quantity: 2, status: :collecting_name)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "two bottles")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :quantity_collected,
+      interpretation: interpretation(intent: "select_quantity", confidence: 0.91)
+    ).plan
+
+    assert_equal "collect_customer_name", plan.goal
+    assert_equal 0.91, plan.confidence
+    assert_equal "Fresh Musk", plan.facts.fetch("product_name")
+    assert_equal 2, plan.facts.fetch("quantity")
+    assert_equal "1500.0", plan.facts.fetch("total_price")
+    assert_equal false, plan.needs_clarification
+    assert_equal false, plan.handover_required
+    assert_equal plan.content, plan.to_h.fetch(:content)
+  end
+
+  test "marks clarification and handover plans explicitly" do
+    order = create_pending_order
+    message = order.conversation.messages.create!(sender_type: :customer, content: "something else")
+
+    clarification = build_planner(
+      order: order,
+      message: message,
+      outcome: :clarification_needed,
+      interpretation: interpretation(intent: "unclear", needs_clarification: true)
+    ).plan
+    handover = build_planner(
+      order: order,
+      message: message,
+      outcome: :human_handover_started,
+      interpretation: interpretation(intent: "human_agent")
+    ).plan
+
+    assert clarification.needs_clarification
+    assert_equal "clarify_customer_request", clarification.goal
+    assert handover.handover_required
+    assert_equal "handover_to_seller", handover.goal
   end
 
   test "keeps the remembered language when detection confidence is weak" do
