@@ -59,6 +59,7 @@ class AiConversationAssistant
     gateway = ConversationToolGateway.new(conversation: pending_order.conversation, pending_order: pending_order)
     tool_parts = calls.map do |call|
       result = gateway.call(call.fetch("name"), call.fetch("args", {}))
+      (@tool_evidence ||= []) << result
       telemetry["tool_names"] << call.fetch("name")
       { functionResponse: { name: call.fetch("name"), response: result } }
     end
@@ -163,42 +164,14 @@ class AiConversationAssistant
   end
 
   def safe_reply?(candidate, fallback)
-    return false if candidate.blank? || candidate.length > MAX_REPLY_LENGTH
-
-    protected_facts(fallback).all? { |fact| candidate.include?(fact) }
-  end
-
-  def protected_facts(fallback)
-    order_facts = [
-      pending_order.product&.name,
-      pending_order.quantity&.to_s,
-      pending_order.customer_name,
-      pending_order.phone,
-      pending_order.address,
-      formatted_total
-    ].compact
-    catalog_facts = pending_order.conversation.business.products.find_each.flat_map do |product|
-      variant_facts = product.product_variants.flat_map do |variant|
-        [ variant.display_name, formatted_price(variant.price) ]
-      end
-      [ product.name, formatted_price(product.price), *variant_facts ]
-    end
-
-    (order_facts + catalog_facts).uniq.select { |fact| fallback.include?(fact) }
-  end
-
-  def formatted_total
-    return if pending_order.product.blank? || pending_order.quantity.blank?
-
-    amount = pending_order.total_price
-    amount = amount.to_i if amount.frac.zero?
-    "৳#{amount}"
-  end
-
-  def formatted_price(value)
-    amount = value.to_d
-    amount = amount.to_i if amount.frac.zero?
-    "৳#{amount}"
+    ConversationReplyGuard.new(
+      candidate: candidate,
+      fallback: fallback,
+      pending_order: pending_order,
+      response_plan: response_plan,
+      tool_evidence: @tool_evidence,
+      recent_replies: recent_bot_replies
+    ).valid?
   end
 
   def log_fallback(error)
