@@ -60,6 +60,19 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
     assert_equal 503, delivery.response_code
   end
 
+  test "skips delivery without an API call when the business is inactive" do
+    delivery = create_delivery
+    delivery.messenger_webhook_event.business.update!(status: "disabled")
+
+    with_http_post_stub(->(*) { flunk("Messenger API must not be called") }) do
+      SendMessengerReplyJob.perform_now(delivery)
+    end
+
+    assert_equal "skipped", delivery.reload.status
+    assert_equal "business_inactive", delivery.last_error
+    assert_equal 0, delivery.attempts
+  end
+
   private
 
   def create_delivery

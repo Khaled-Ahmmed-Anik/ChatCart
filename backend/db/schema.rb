@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -20,12 +20,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
     t.string "ip_address"
     t.datetime "last_used_at"
     t.bigint "platform_administrator_id"
+    t.string "revocation_reason"
+    t.datetime "revoked_at"
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.string "user_agent"
     t.bigint "user_id"
     t.index ["expires_at"], name: "index_auth_sessions_on_expires_at"
     t.index ["platform_administrator_id"], name: "index_auth_sessions_on_platform_administrator_id"
+    t.index ["revoked_at"], name: "index_auth_sessions_on_revoked_at"
     t.index ["token_digest"], name: "index_auth_sessions_on_token_digest", unique: true
     t.index ["user_id"], name: "index_auth_sessions_on_user_id"
     t.check_constraint "user_id IS NOT NULL AND platform_administrator_id IS NULL OR user_id IS NULL AND platform_administrator_id IS NOT NULL", name: "auth_sessions_exactly_one_actor"

@@ -142,6 +142,23 @@ module Webhooks
       assert_equal({ "accepted" => 0, "ignored" => 0, "duplicates" => 0, "events" => [] }, JSON.parse(response.body))
     end
 
+    test "create acknowledges but does not record or enqueue events for an inactive business" do
+      business = Business.create!(name: "Disabled Shop", slug: "disabled-shop", status: "disabled")
+      business.channel_connections.create!(
+        channel: "facebook", external_account_id: "page-1", status: "active", access_token: "secret"
+      )
+      payload = messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "mid-disabled")
+
+      assert_no_difference -> { MessengerWebhookEvent.count } do
+        assert_no_enqueued_jobs only: ProcessMessengerEventJob do
+          post_signed_payload payload
+        end
+      end
+
+      assert_response :ok
+      assert_equal({ "type" => "customer_text", "status" => "ignored" }, JSON.parse(response.body))
+    end
+
     test "create rejects a missing webhook signature without recording events" do
       post webhooks_messenger_url,
         params: messenger_payload(sender_id: "fb-user-123", text: "Hello", message_id: "mid-1").to_json,

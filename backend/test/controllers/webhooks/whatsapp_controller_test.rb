@@ -129,6 +129,25 @@ module Webhooks
       assert_equal 1, JSON.parse(response.body).fetch("duplicates")
     end
 
+    test "acknowledges but does not record or enqueue events for an inactive business" do
+      business = Business.create!(name: "Suspended Shop", slug: "suspended-shop", status: "suspended")
+      business.channel_connections.create!(
+        channel: "whatsapp", external_account_id: "phone-number-1", status: "active", access_token: "secret"
+      )
+
+      assert_no_difference -> { WhatsappWebhookEvent.count } do
+        assert_no_enqueued_jobs only: ProcessWhatsappEventJob do
+          post_signed_payload(message_payload)
+        end
+      end
+
+      assert_response :ok
+      body = JSON.parse(response.body)
+      assert_equal 0, body.fetch("accepted")
+      assert_equal 1, body.fetch("ignored")
+      assert_equal "ignored", body.fetch("events").first.fetch("status")
+    end
+
     test "rejects missing and invalid signatures" do
       post webhooks_whatsapp_url,
         params: message_payload.to_json,

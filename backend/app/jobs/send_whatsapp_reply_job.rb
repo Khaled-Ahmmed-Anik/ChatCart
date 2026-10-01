@@ -11,6 +11,7 @@ class SendWhatsappReplyJob < ApplicationJob
 
   def perform(delivery)
     return if delivery.status.in?(%w[sent delivered read])
+    return skip_inactive_business(delivery) unless delivery.whatsapp_webhook_event.business.active?
 
     delivery.increment!(:attempts)
     result = WhatsappReplySender.new(
@@ -39,6 +40,10 @@ class SendWhatsappReplyJob < ApplicationJob
   end
 
   private
+
+  def skip_inactive_business(delivery)
+    delivery.update!(status: "skipped", last_error: "business_inactive")
+  end
 
   def access_token_for(delivery)
     business = delivery.whatsapp_webhook_event.business
