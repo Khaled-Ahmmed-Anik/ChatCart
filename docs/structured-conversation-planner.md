@@ -107,7 +107,7 @@ Bot message metadata stores only safe operational information:
 - fallback reason; and
 - AI latency in milliseconds.
 
-`ConversationQualityEvaluator` aggregates AI-assisted turns, planner turns, tool-call count, fallbacks, guardrail rejections, and average AI latency alongside clarification, repetition, frustration, handover, and conversion metrics. Tool results, API keys, access tokens, and raw credentials are not stored in this telemetry.
+`ConversationQualityEvaluator` aggregates AI-assisted turns, planner turns, tool-call count, fallbacks, guardrail rejections, and average AI latency alongside clarification, correction, repair, repetition, frustration, handover, conversion, and abandoned-checkout-stage metrics. Tool results, API keys, access tokens, raw credentials, and additional copies of customer messages are not stored in this telemetry.
 
 ## Quality benchmark
 

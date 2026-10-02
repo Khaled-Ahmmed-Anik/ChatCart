@@ -567,10 +567,12 @@ USD values are estimates only. Configure `BDT per USD` in Business setup to enab
 
 Seller takeovers retain a bounded history with reason, start time, first seller response, and resolution time. The Analytics page reports total takeovers, waiting conversations, average first-response time, and takeover reasons.
 
-`test/services/conversation_replay_test.rb` contains multi-turn regression scenarios. Add a replay whenever a real conversation exposes a failure, keeping customer text intact after removing personal data.
+`test/services/conversation_replay_test.rb` contains multi-turn regression scenarios. Production failures are replayed through the local classifier and deterministic processor, including exact product selection, negated sizes, invalid-name recovery, natural corrections, previous-detail reuse, and policy questions. Add a replay whenever a real conversation exposes a failure, keeping customer text intact after removing personal data.
 
 ## Quality evaluation
 
 Every conversation is scored from deterministic evidence rather than an LLM self-review. The evaluator records a 0–100 score, grade, outcome, and flags for repeated bot replies, clarification loops, negative sentiment, long chats without an order, and unresolved seller takeovers. The dashboard supports seller labels (`successful`, `abandoned`, `confusing`, `needs_follow_up`, and `incorrect_reply`) with an optional note.
 
-Every bot message stores `conversation_engine_version`, currently `2026.09.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.
+Quality telemetry also records clarification, order-correction, and conversation-repair counts and rates. A repair is a turn where the assistant must recover from an invalid or ambiguous answer, such as an invalid phone number, missing customer name, unknown product, or unclear confirmation. Closed conversations without an order retain the checkout stage where they were abandoned. Business analytics aggregate these signals without storing additional message content.
+
+Every bot message stores `conversation_engine_version`, currently `2026.10.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.
