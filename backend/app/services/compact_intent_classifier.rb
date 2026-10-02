@@ -3,6 +3,7 @@ class CompactIntentClassifier
   # probabilities. Held-out multilingual phrases generally match at 0.45–0.75.
   MINIMUM_CONFIDENCE = 0.44
   MAXIMUM_EXAMPLES_PER_INTENT = 40
+  DATASET_PATH = Rails.root.join("config/intent_examples.yml")
   PREFIXES = [ "please ", "bhai ", "apni ", "ektu " ].freeze
   SUFFIXES = [ "?", " please", " bhai" ].freeze
   SEEDS = {
@@ -45,10 +46,23 @@ class CompactIntentClassifier
     "refund_request" => [ "need refund", "money back", "taka ferot chai", "refund chai", "টাকা ফেরত চাই", "রিফান্ড চাই" ]
   }.freeze
 
+  def self.dataset_seeds
+    @dataset_seeds ||= begin
+      data = YAML.safe_load_file(DATASET_PATH, aliases: false)
+      data.fetch("intents").transform_values { |examples| Array(examples).map(&:to_s) }
+    end
+  end
+
+  def self.seeds
+    SEEDS.merge(dataset_seeds) do |_intent, built_in, configured|
+      (built_in + configured).uniq
+    end
+  end
+
   Result = Data.define(:interpretation, :score, :runner_up_score, :source)
 
   def self.examples
-    @examples ||= SEEDS.transform_values do |seeds|
+    @examples ||= seeds.transform_values do |seeds|
       variants = seeds.dup
       PREFIXES.each { |prefix| seeds.each { |seed| variants << "#{prefix}#{seed}" } }
       SUFFIXES.each { |suffix| seeds.each { |seed| variants << "#{seed}#{suffix}" } }
