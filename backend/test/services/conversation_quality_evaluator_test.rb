@@ -76,4 +76,32 @@ class ConversationQualityEvaluatorTest < ActiveSupport::TestCase
     assert_equal 1, metrics.fetch(:guardrail_rejections)
     assert_equal 150, metrics.fetch(:average_ai_latency_ms)
   end
+
+  test "reports correction repair and abandoned checkout metrics" do
+    conversation = Conversation.create!(
+      channel: "facebook", external_customer_id: SecureRandom.uuid, status: :closed
+    )
+    conversation.create_pending_order!(status: :collecting_phone)
+    %w[order_updated confirmed_order_updated invalid_phone name_required clarification_needed].each do |outcome|
+      conversation.messages.create!(
+        sender_type: :customer,
+        content: outcome,
+        metadata: { "conversation_intelligence" => {
+          "outcome" => outcome, "needs_clarification" => outcome == "clarification_needed"
+        } }
+      )
+    end
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+    metrics = result.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:correction_turns)
+    assert_equal 40.0, metrics.fetch(:correction_rate)
+    assert_equal 3, metrics.fetch(:repair_turns)
+    assert_equal 60.0, metrics.fetch(:repair_rate)
+    assert_equal 20.0, metrics.fetch(:clarification_rate)
+    assert_equal "collecting_phone", metrics.fetch(:abandoned_checkout_stage)
+    assert_includes result.fetch(:flags), "conversation_repair_loop"
+    assert_includes result.fetch(:flags), "repeated_order_correction"
+  end
 end

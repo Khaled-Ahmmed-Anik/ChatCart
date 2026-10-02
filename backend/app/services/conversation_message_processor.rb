@@ -18,6 +18,7 @@ class ConversationMessageProcessor
     return pending_order if apply_action_plan
     return pending_order if handle_order_update_request
     return pending_order if collect_remembered_checkout_value
+    return pending_order if collect_explicit_checkout_value
     return pending_order if select_exact_catalog_product
     return pending_order if handle_conversational_intent
     return pending_order if handle_ai_intent
@@ -1234,6 +1235,14 @@ class ConversationMessageProcessor
     advance_after_collection(next_status)
     @outcome = outcome
     true
+  end
+
+  def collect_explicit_checkout_value
+    return false unless pending_order.collecting_name?
+    return false unless content.match?(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\b/i)
+
+    collect_name
+    outcome == :name_collected
   end
 
   def select_exact_catalog_product

@@ -74,12 +74,22 @@ class AnalyticsSnapshot
     scores = evaluations.map { |evaluation| evaluation[:score] }
     reviews = evaluations.filter_map { |evaluation| evaluation[:review]&.dig("label") }
     feedback = evaluations.filter_map { |evaluation| evaluation[:customer_feedback]&.dig("rating") }
+    metrics = evaluations.map { |evaluation| evaluation[:metrics] }
+    customer_turns = metrics.sum { |item| item[:customer_turns] }
+    ai_assisted_turns = metrics.sum { |item| item[:ai_assisted_turns] }
 
     {
       average_score: scores.any? ? (scores.sum.to_f / scores.count).round(1) : nil,
       needs_review: evaluations.count { |evaluation| evaluation[:flags].any? || evaluation[:grade].in?(%w[needs_review poor]) },
       repeated_reply_cases: evaluations.count { |evaluation| evaluation[:flags].include?("repeated_bot_reply") },
       clarification_loop_cases: evaluations.count { |evaluation| evaluation[:flags].include?("clarification_loop") },
+      conversation_repair_loop_cases: evaluations.count { |evaluation| evaluation[:flags].include?("conversation_repair_loop") },
+      repeated_order_correction_cases: evaluations.count { |evaluation| evaluation[:flags].include?("repeated_order_correction") },
+      clarification_rate: percentage(metrics.sum { |item| item[:clarification_turns] }, customer_turns),
+      correction_rate: percentage(metrics.sum { |item| item[:correction_turns] }, customer_turns),
+      repair_rate: percentage(metrics.sum { |item| item[:repair_turns] }, customer_turns),
+      ai_fallback_rate: percentage(metrics.sum { |item| item[:ai_fallbacks] }, ai_assisted_turns),
+      abandoned_checkout_stages: metrics.filter_map { |item| item[:abandoned_checkout_stage] }.tally,
       reviewed: reviews.count,
       review_labels: reviews.tally,
       helpful_feedback: feedback.count("helpful"),
