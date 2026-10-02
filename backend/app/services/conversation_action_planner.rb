@@ -56,9 +56,16 @@ class ConversationActionPlanner
     return if product.blank? || product.available_variants.empty?
 
     product.available_variants.find do |variant|
-      [ variant.name, variant.size ].compact.any? do |label|
+      !variant_explicitly_rejected?(variant) && [ variant.name, variant.size ].compact.any? do |label|
         content.downcase.delete(" ").include?(label.downcase.delete(" "))
       end
+    end
+  end
+
+  def variant_explicitly_rejected?(variant)
+    [ variant.name, variant.size ].compact.any? do |label|
+      pattern = Regexp.escape(label.downcase).gsub("\\ ", "\\s*")
+      content.downcase.match?(/\b#{pattern}\b\s*(?:na|no|not|না)\b/)
     end
   end
 
