@@ -147,14 +147,32 @@ Locally classified turns use deterministic wording and do not call Gemini again 
 
 `ConversationMessageProcessor` deliberately applies rules in this order:
 
-1. Order update or correction requests.
-2. High-confidence deterministic conversational behaviors.
-3. AI-classified informational intent.
-4. Combined checkout-detail collection.
-5. The current pending-order state.
-6. Additional explicitly extracted entities.
+1. Accept a pending multiple-bottle offer.
+2. Apply an atomic product, variant, quantity, and checkout-detail action plan.
+3. Apply order updates or correction requests.
+4. Reuse an explicitly requested value from the previous completed order.
+5. Select an exact catalog product name when the customer is choosing a product.
+6. Handle high-confidence deterministic conversational behaviors and policy questions.
+7. Handle an AI-classified informational intent.
+8. Collect a combined checkout-detail bundle.
+9. Collect the field required by the current pending-order state.
+10. Apply remaining explicitly extracted entities.
 
 This order prevents an AI label from overriding a safe order mutation or a clearly recognized command.
+
+### Order-state integrity safeguards
+
+Product, size, quantity, and checkout facts are authoritative application state. AI classification may extract candidates, but it cannot replace deterministic validation against the current business catalog, available variants, inventory, or pending-order step.
+
+The processor therefore:
+
+- treats an exact catalog product name as a selection rather than another recommendation request;
+- rejects explicitly negated variants, such as `30 ML, not 10 ML`;
+- applies compatible product, variant, quantity, name, phone, and address details atomically;
+- does not save greetings or agreement phrases such as `that works for me` as customer names;
+- understands labelled and natural name corrections while the order is being reviewed;
+- reuses previous checkout details only when the customer explicitly asks for the same or previous value; and
+- separates policy questions from after-sales requests, so `return policy ase?` explains the configured policy without opening a return workflow.
 
 ### Conversation turn manager
 
