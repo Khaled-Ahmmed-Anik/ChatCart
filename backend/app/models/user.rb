@@ -13,6 +13,8 @@ class User < ApplicationRecord
   normalizes :email, with: ->(email) { email.strip.downcase }
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
 
+  before_update :revoke_auth_sessions_when_deactivated
+
   def self.issue_token
     token = SecureRandom.urlsafe_base64(32)
     [ token, Digest::SHA256.hexdigest(token) ]
@@ -21,6 +23,20 @@ class User < ApplicationRecord
   def self.authenticate_token(token)
     return if token.blank?
 
-    find_by(api_token_digest: Digest::SHA256.hexdigest(token))&.then { |user| user if user.active? }
+    find_by(api_token_digest: Digest::SHA256.hexdigest(token))&.then do |user|
+      user if user.authentication_allowed?
+    end
+  end
+
+  def authentication_allowed?
+    super && business.active?
+  end
+
+  private
+
+  def revoke_auth_sessions_when_deactivated
+    return unless will_save_change_to_active? && !active?
+
+    auth_sessions.active.revoke_all!(reason: AuthSession::ACCOUNT_DISABLED_REASON)
   end
 end

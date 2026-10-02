@@ -393,6 +393,20 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert office.persisted? && bleu.persisted?
   end
 
+  test "answers a return policy question without starting a return request" do
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.business.create_business_policy!(return_policy: "Replacement is available within 7 days.")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      outcome: :return_policy_requested
+    ).content
+
+    assert_includes reply, "Replacement is available within 7 days."
+    assert_not_includes reply, "what happened"
+    assert_not_includes reply, "order number"
+  end
+
   private
 
   def create_pending_order(attributes = {})

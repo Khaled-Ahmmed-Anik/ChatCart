@@ -21,6 +21,7 @@ class SendMessengerReplyJob < ApplicationJob
 
   def perform(delivery)
     return if delivery.status == "delivered"
+    return skip_inactive_business(delivery) unless delivery.messenger_webhook_event.business.active?
 
     delivery.increment!(:attempts)
     result = MessengerReplySender.new(
@@ -36,6 +37,10 @@ class SendMessengerReplyJob < ApplicationJob
   end
 
   private
+
+  def skip_inactive_business(delivery)
+    delivery.update!(status: "skipped", last_error: "business_inactive")
+  end
 
   def page_access_token_for(delivery)
     business = delivery.messenger_webhook_event.business

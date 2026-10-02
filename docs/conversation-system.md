@@ -1,6 +1,6 @@
 # ChatCart Conversation System
 
-This document describes how customer conversations currently work in ChatCart. It reflects the implemented behavior on branch `WC-017-improve-conversation-recovery`, rather than a future design.
+This document describes how customer conversations currently work in ChatCart. It reflects the production implementation on `main`, rather than a future design.
 
 ## 1. Purpose and scope
 
@@ -98,8 +98,10 @@ can reach the conversation system as one message separated by a newline. Metadat
 10. Capture a permanent order if confirmation is complete.
 11. Build the deterministic response plan.
 12. Update conversation memory.
-13. Optionally rewrite the planned wording with `AiConversationAssistant`.
-14. Store the final bot message.
+13. Optionally let Gemini request up to two tenant-safe, read-only conversation tools.
+14. Rewrite the approved wording with `AiConversationAssistant` when its rollout permits.
+15. Validate the generated reply with `ConversationReplyGuard` and fall back when it is not grounded.
+16. Store the final bot message with safe planner telemetry.
 
 If Gemini is unavailable, times out, or fails, deterministic processing and fallback replies remain available.
 
@@ -145,14 +147,32 @@ Locally classified turns use deterministic wording and do not call Gemini again 
 
 `ConversationMessageProcessor` deliberately applies rules in this order:
 
-1. Order update or correction requests.
-2. High-confidence deterministic conversational behaviors.
-3. AI-classified informational intent.
-4. Combined checkout-detail collection.
-5. The current pending-order state.
-6. Additional explicitly extracted entities.
+1. Accept a pending multiple-bottle offer.
+2. Apply an atomic product, variant, quantity, and checkout-detail action plan.
+3. Apply order updates or correction requests.
+4. Reuse an explicitly requested value from the previous completed order.
+5. Select an exact catalog product name when the customer is choosing a product.
+6. Handle high-confidence deterministic conversational behaviors and policy questions.
+7. Handle an AI-classified informational intent.
+8. Collect a combined checkout-detail bundle.
+9. Collect the field required by the current pending-order state.
+10. Apply remaining explicitly extracted entities.
 
 This order prevents an AI label from overriding a safe order mutation or a clearly recognized command.
+
+### Order-state integrity safeguards
+
+Product, size, quantity, and checkout facts are authoritative application state. AI classification may extract candidates, but it cannot replace deterministic validation against the current business catalog, available variants, inventory, or pending-order step.
+
+The processor therefore:
+
+- treats an exact catalog product name as a selection rather than another recommendation request;
+- rejects explicitly negated variants, such as `30 ML, not 10 ML`;
+- applies compatible product, variant, quantity, name, phone, and address details atomically;
+- does not save greetings or agreement phrases such as `that works for me` as customer names;
+- understands labelled and natural name corrections while the order is being reviewed;
+- reuses previous checkout details only when the customer explicitly asks for the same or previous value; and
+- separates policy questions from after-sales requests, so `return policy ase?` explains the configured policy without opening a return workflow.
 
 ### Conversation turn manager
 
@@ -455,8 +475,11 @@ Important keys in `Conversation#conversation_state` include:
 | `AiIntentClassifier` | Structured multilingual intent classification |
 | `ConversationMessageProcessor` | Deterministic actions and state transitions |
 | `ConversationResponsePlanner` | Context, interruption, and language planning |
+| `ConversationToolGateway` | Tenant-safe product, variant, policy, and order-summary tools |
 | `BotReplyGenerator` | Grounded deterministic replies |
 | `AiConversationAssistant` | Optional natural-language rewrite |
+| `ConversationReplyGuard` | Generated-price, product, claim, question, and repetition validation |
+| `ConversationAiRollout` | Stable feature and percentage rollout decisions |
 | `ConversationMemory` | Safe persistent conversation context |
 | `GuidedSalesConversation` | Sales-stage and recommendation context |
 | `ProductResolutionService` | Product-name and contextual reference matching |
@@ -476,6 +499,10 @@ Important environment variables include:
 | `WHATSAPP_ACCESS_TOKEN` | Fallback WhatsApp API token |
 | `GEMINI_API_KEY` | Enables intent classification and optional rewriting |
 | `GEMINI_MODEL` | Overrides the default Gemini model |
+| `CONVERSATION_PLANNER_ENABLED` | Enables allowlisted Gemini tool planning |
+| `CONVERSATION_PLANNER_ROLLOUT_PERCENT` | Percentage of conversations eligible for tool planning |
+| `CONVERSATION_NATURALIZER_ENABLED` | Enables natural rewrites for eligible turns |
+| `CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED` | Extends rewriting to local-classifier turns |
 
 Per-business channel tokens should normally be stored in `ChannelConnection`, rather than relying on global fallback environment variables.
 
@@ -523,10 +550,13 @@ For a webhook problem, inspect these records in order:
 - Product advice is only as accurate as the product descriptions, attributes, variants, prices, and stock stored by the business.
 - Business-policy answers are only available when administrators configure them.
 - Gemini improves classification and wording but does not replace deterministic order validation.
+- Gemini tools are read-only and tenant-scoped; models cannot directly mutate orders or query arbitrary data.
 - Automated handover records and summarizes the request; a seller-facing notification workflow can be expanded later.
 - Messenger and WhatsApp are implemented. Instagram can reuse the shared conversation core but still requires its channel-specific production integration and Meta permissions.
 
 When conversation behavior changes, update this document together with the relevant regression tests.
+
+The planner, tools, guardrails, telemetry, feature controls, and staged rollout procedure are documented in [Structured conversation planner](structured-conversation-planner.md).
 # Conversation quality controls
 
 The sales assistant now uses a deterministic action planner before the normal intent flow. A single customer turn can select a product and size, set quantity, and ask delivery or payment questions. Inventory is validated first and the order selection is written atomically, preventing half-applied changes.
@@ -537,10 +567,12 @@ USD values are estimates only. Configure `BDT per USD` in Business setup to enab
 
 Seller takeovers retain a bounded history with reason, start time, first seller response, and resolution time. The Analytics page reports total takeovers, waiting conversations, average first-response time, and takeover reasons.
 
-`test/services/conversation_replay_test.rb` contains multi-turn regression scenarios. Add a replay whenever a real conversation exposes a failure, keeping customer text intact after removing personal data.
+`test/services/conversation_replay_test.rb` contains multi-turn regression scenarios. Production failures are replayed through the local classifier and deterministic processor, including exact product selection, negated sizes, invalid-name recovery, natural corrections, previous-detail reuse, and policy questions. Add a replay whenever a real conversation exposes a failure, keeping customer text intact after removing personal data.
 
 ## Quality evaluation
 
 Every conversation is scored from deterministic evidence rather than an LLM self-review. The evaluator records a 0–100 score, grade, outcome, and flags for repeated bot replies, clarification loops, negative sentiment, long chats without an order, and unresolved seller takeovers. The dashboard supports seller labels (`successful`, `abandoned`, `confusing`, `needs_follow_up`, and `incorrect_reply`) with an optional note.
 
-Every bot message stores `conversation_engine_version`, currently `2026.09.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.
+Quality telemetry also records clarification, order-correction, and conversation-repair counts and rates. A repair is a turn where the assistant must recover from an invalid or ambiguous answer, such as an invalid phone number, missing customer name, unknown product, or unclear confirmation. Closed conversations without an order retain the checkout stage where they were abandoned. Business analytics aggregate these signals without storing additional message content.
+
+Every bot message stores `conversation_engine_version`, currently `2026.10.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.

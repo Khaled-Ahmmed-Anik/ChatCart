@@ -62,7 +62,7 @@ class ConversationEscalationPolicy
     return "delivery_dispute" if latest.match?(
       /\b(delivered|delivery|parcel)\b.*\b(not received|did not receive|didn'?t receive|missing|lost|pai nai|painai)\b|ডেলিভারি.*পাইনি/
     )
-    return "damaged_or_wrong_product" if latest.match?(
+    "damaged_or_wrong_product" if latest.match?(
       /\b(damaged|broken|leak(?:ed|ing)?|wrong product|incorrect item|vanga|noshto)\b|ভাঙা|নষ্ট|ভুল পণ্য/
     )
   end

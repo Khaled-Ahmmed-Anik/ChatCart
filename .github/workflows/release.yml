@@ -93,7 +93,7 @@ jobs:
       - name: Smoke-test deployed application when URLs are configured
         run: |
           if [ -n "${PRODUCTION_API_URL}" ]; then
-            curl --fail --show-error --retry 5 --retry-all-errors --retry-delay 5 "${PRODUCTION_API_URL}/up"
+            curl --fail --show-error --retry 5 --retry-all-errors --retry-delay 5 "${PRODUCTION_API_URL}/ready" | grep -q '"ready":true'
           else
             echo "PRODUCTION_API_URL is not configured; skipping API smoke test."
           fi

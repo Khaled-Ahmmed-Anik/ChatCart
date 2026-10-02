@@ -101,6 +101,8 @@ class BotReplyGenerator
       "I understand—you’d like a more affordable option.\n\n#{product_recommendation_reply}"
     when :return_requested
       after_sales_reply("return")
+    when :return_policy_requested
+      configured_policy("return policy", policy.return_policy || ENV["SHOP_RETURN_POLICY"])
     when :replacement_requested
       after_sales_reply("replacement")
     when :refund_requested
@@ -132,6 +134,8 @@ class BotReplyGenerator
       "Perfect—#{pending_order.quantity} #{bottle_word(pending_order.quantity)}. What name should I put on the order?"
     when :name_collected
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
+    when :name_required
+      "What name should I put on the order? Please send the customer name only."
     when :invalid_phone
       invalid_phone_reply
     when :phone_collected

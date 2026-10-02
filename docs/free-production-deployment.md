@@ -1,16 +1,31 @@
-# Free MVP deployment
+# Free MVP production deployment
+
+> **Current production architecture:** ChatCart uses a Render Free Web Service, Neon PostgreSQL, and Cloudflare Pages. [`oracle-production-deployment.md`](oracle-production-deployment.md) remains the planned always-on migration path.
+
+Current production endpoints:
+
+| Service | URL |
+| --- | --- |
+| Dashboard and API proxy | [https://chatcart-dashboard.pages.dev](https://chatcart-dashboard.pages.dev) |
+| Rails readiness check | [https://chatcart-api-29oq.onrender.com/ready](https://chatcart-api-29oq.onrender.com/ready) |
+| Privacy Policy | [https://chatcart-dashboard.pages.dev/privacy](https://chatcart-dashboard.pages.dev/privacy) |
+| Data Deletion | [https://chatcart-dashboard.pages.dev/data-deletion](https://chatcart-dashboard.pages.dev/data-deletion) |
+
+The generic placeholders later in this guide are retained so the deployment can be reproduced with replacement hostnames.
 
 This is the recommended zero-cost launch layout for ChatCart:
 
 | Component | Provider | Free-tier behavior |
 | --- | --- | --- |
 | React dashboard and legal pages | Cloudflare Pages | Static hosting with HTTPS and SPA routing |
-| Rails API, webhooks, and Solid Queue | Koyeb Free Web Service | One 512 MB instance; sleeps after one hour without inbound traffic |
-| PostgreSQL | Neon Free | Persistent serverless PostgreSQL with scale-to-zero |
+| Rails API, webhooks, and Solid Queue | Render Free Web Service | One 512 MB/0.1 CPU instance; sleeps after 15 minutes without inbound traffic |
+| PostgreSQL | Neon Free | Serverless PostgreSQL with scale-to-zero; current free allowance is sufficient for an MVP |
 | Conversation AI | Google AI Studio / Gemini | Existing API key and free quota |
 | Messaging | Meta Messenger and WhatsApp Cloud API | Meta app and business assets |
 
-This is suitable for an MVP and Meta review. Free compute can sleep, restart, reach quotas, or change terms. Move the Rails service to paid always-on compute before promising production uptime to businesses.
+This is suitable for an MVP and Meta review. Free compute can sleep, restart, reach quotas, or change terms. Move the Rails service to Oracle or paid always-on compute before promising production uptime to businesses.
+
+The repository includes `render.yaml`, which creates only the Rails web service. It deliberately does not create a Render database because Neon is the permanent database.
 
 ## 1. Security gate
 
@@ -20,7 +35,7 @@ Do not deploy until all of these are complete:
 - Rotate the Rails master key because the previous key exists in Git history.
 - Rotate any secret that was ever committed or pasted into a public location.
 - Keep `.env` files local and enter production secrets only in provider dashboards.
-- Keep the GitHub repository private unless the full Git history has been audited or rewritten.
+- Treat the public GitHub repository and its complete history as public information. Never commit credentials, `.env` files, database URLs, customer data, or private exports.
 
 Generate production values locally without printing them into source files:
 
@@ -30,91 +45,64 @@ bin/rails db:encryption:init
 bin/rails secret
 ```
 
-The first command supplies the three Active Record encryption values. The second supplies `SECRET_KEY_BASE`. Store all results in a password manager and the Koyeb environment settings.
+The first command supplies the three Active Record encryption values. The second supplies `SECRET_KEY_BASE`. Store all results in a password manager and Render's environment settings.
 
 ## 2. Create the Neon database
 
 1. Create a free Neon account and a project named `chatcart-production`.
-2. Select the region nearest the backend when possible. Koyeb Free currently offers Frankfurt or Washington, D.C.; use the matching/nearest Neon region.
-3. Copy the pooled PostgreSQL connection string.
-4. Keep it private. It becomes Koyeb's `DATABASE_URL`.
+2. Select the region nearest the backend when possible.
+3. Set the compute to the smallest practical size with scale-to-zero enabled.
+4. Copy the pooled PostgreSQL connection string. Confirm it includes `sslmode=require`.
+5. Keep it private. It becomes Render's `DATABASE_URL`.
 
 No Render database is needed. Render's free PostgreSQL expires after 30 days, so it is not used in this plan.
 
-## 3. Deploy the Rails backend to Koyeb
+## 3. Deploy the Rails backend to Render
 
-Create a Web Service from the GitHub repository with:
+1. Push `render.yaml` to GitHub.
+2. In Render, select **New → Blueprint**.
+3. Connect the GitHub repository and select `main` as the production branch.
+4. Render detects the root `render.yaml` and proposes one Free Web Service named `chatcart-api`.
+5. Supply every value marked `sync: false`. Use the Neon pooled URL for `DATABASE_URL`; never create a Render database.
+6. Apply the Blueprint and follow the first deployment logs.
 
-- App: `chatcart`
-- Service: `chatcart-api`
-- Branch: the final merged production branch
-- Builder: Dockerfile
-- Work directory: `backend`
-- Dockerfile: `backend/Dockerfile` (or `Dockerfile` when the work directory is already `backend`)
-- Instance: Free
-- Port: use the platform-provided `PORT`
-- Health check path: `/up`
+The Blueprint deploys in Singapore and configures the Docker build context, `/ready` health check, generated `SECRET_KEY_BASE`, safe single-process memory limits, and the public Render hostname. WhatsApp variables can be added later from the service's Environment page when that channel is enabled.
 
-Set these environment variables:
-
-```text
-RAILS_ENV=production
-RAILS_MAX_THREADS=2
-WEB_CONCURRENCY=1
-SOLID_QUEUE_IN_PUMA=true
-JOB_THREADS=2
-JOB_POLLING_INTERVAL=1
-JOB_DISPATCH_INTERVAL=1
-FORCE_SSL=true
-DATABASE_URL=<Neon pooled connection string>
-SECRET_KEY_BASE=<generated Rails secret>
-RAILS_MASTER_KEY=<new local backend/config/master.key value>
-ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=<generated value>
-ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=<generated value>
-ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=<generated value>
-DASHBOARD_ORIGIN=<Cloudflare Pages production URL, added after frontend creation>
-APP_HOST=<Koyeb hostname without https://>
-PLATFORM_ADMIN_EMAIL=<private administrator email>
-PLATFORM_ADMIN_PASSWORD=<unique password of at least 12 characters>
-CHATCART_OWNER_EMAIL=<business owner email>
-CHATCART_OWNER_PASSWORD=<different unique password of at least 12 characters>
-MESSENGER_VERIFY_TOKEN=<new random value>
-MESSENGER_PAGE_ACCESS_TOKEN=<Meta Page token>
-MESSENGER_APP_SECRET=<Meta app secret>
-WHATSAPP_VERIFY_TOKEN=<new random value>
-WHATSAPP_ACCESS_TOKEN=<Meta permanent system-user token>
-WHATSAPP_APP_SECRET=<Meta app secret>
-WHATSAPP_PHONE_NUMBER_ID=<Meta phone number ID>
-GEMINI_API_KEY=<Google AI Studio key>
-GEMINI_MODEL=gemini-3.5-flash-lite
-```
-
-After the first successful deploy, run the seed command once using Koyeb's console/command facility:
+Before deploying, copy `backend/.env.production.example` to a temporary private location, fill it with production values, and run:
 
 ```bash
-./bin/rails db:seed
+cd backend
+RAILS_ENV=production mise exec -- bin/rails deployment:preflight
 ```
 
-The container entrypoint automatically runs `db:prepare` whenever the Rails server starts. Solid Queue runs inside Puma so a separate paid worker is not required.
+Do not commit the filled file. The preflight checks presence and structure without printing secret values.
+
+The container entrypoint automatically runs `db:prepare` whenever the Rails server starts. Solid Queue runs inside Puma, so a separate paid worker is not required. After the first healthy deploy, use Render Shell if available or a temporary Docker command deployment to run `./bin/rails db:seed` once; alternatively seed the Neon database locally using the same production `DATABASE_URL`.
 
 Verify:
 
 ```text
-https://<koyeb-host>/up
+https://<render-host>/up
+https://<render-host>/ready
 ```
 
-It must return a successful response.
+Both must succeed. `/ready` additionally confirms that PostgreSQL and Solid Queue tables are available.
 
 ## 4. Deploy the React frontend to Cloudflare Pages
 
 Create a Pages project from the same GitHub repository:
 
-- Production branch: the final merged production branch
+- Production branch: `main`
 - Root directory: `frontend`
 - Framework preset: Vite
 - Build command: `npm ci && npm run build`
 - Build output directory: `dist`
-- Environment variable: `VITE_API_URL=https://<koyeb-host>`
+- Runtime environment variable: `API_ORIGIN=https://<render-host>`
+
+Do not define `VITE_API_URL` in the production Pages environment. The production
+dashboard uses same-origin `/auth`, `/api`, and `/graphql` requests, which the
+committed Pages Function proxies to `API_ORIGIN`. Local development continues to
+use `VITE_API_URL=http://localhost:3000`.
 
 The committed `frontend/public/_redirects` makes React routes work on direct navigation.
 
@@ -125,27 +113,27 @@ https://<cloudflare-host>/privacy
 https://<cloudflare-host>/data-deletion
 ```
 
-Then set Koyeb's `DASHBOARD_ORIGIN` to the exact Cloudflare production origin and redeploy the backend.
+Then set Render's `DASHBOARD_ORIGIN` to the exact Cloudflare production origin and redeploy the backend.
 
 ## 5. Configure Meta Messenger
 
 In the Meta app dashboard, set:
 
-- Callback URL: `https://<koyeb-host>/webhooks/messenger`
-- Verify token: the exact `MESSENGER_VERIFY_TOKEN` stored in Koyeb
+- Callback URL: `https://<render-host>/webhooks/messenger`
+- Verify token: the exact `MESSENGER_VERIFY_TOKEN` stored in Render
 - Privacy Policy URL: `https://<cloudflare-host>/privacy`
 - User Data Deletion URL: `https://<cloudflare-host>/data-deletion`
 
-Subscribe the Page to the required Messenger webhook fields and make sure the correct Page access token is in Koyeb. Complete Meta business/app review and switch the app to Live before expecting replies for the general public.
+Subscribe the Page to the required Messenger webhook fields and make sure the correct Page access token is in Render. Complete Meta business/app review and switch the app to Live before expecting replies for the general public.
 
 ## 6. Configure WhatsApp
 
 In WhatsApp Configuration, set:
 
-- Callback URL: `https://<koyeb-host>/webhooks/whatsapp`
-- Verify token: the exact `WHATSAPP_VERIFY_TOKEN` stored in Koyeb
+- Callback URL: `https://<render-host>/webhooks/whatsapp`
+- Verify token: the exact `WHATSAPP_VERIFY_TOKEN` stored in Render
 
-Add the permanent system-user access token, app secret, and phone number ID to Koyeb. Complete business verification and production phone-number setup where Meta requires it.
+Add the permanent system-user access token, app secret, and phone number ID to Render. Complete business verification and production phone-number setup where Meta requires it.
 
 ## 7. Launch verification
 
@@ -164,22 +152,25 @@ Test in this order:
 
 ## Free-tier operational limits
 
-- Koyeb Free sleeps after one hour without inbound traffic. Its documented deep-sleep wake is normally 1–5 seconds.
-- Background jobs run inside the Rails web process. They do not run while the free instance is asleep, but an inbound webhook wakes the service.
-- Neon can scale to zero. The production queue polls once per second to reduce database compute use.
+- Render Free sleeps after 15 minutes without inbound HTTP or WebSocket traffic. A cold start can take about one minute.
+- Background jobs run inside the Rails web process in Solid Queue's async supervisor mode. This avoids several forked Ruby processes on the 512 MB instance. Jobs do not run while the free instance is asleep, but an inbound webhook wakes the service.
+- Meta may retry a webhook that encounters a Render cold start. Incoming-event deduplication prevents the retry from being processed twice, but the first customer reply can be delayed.
+- Neon can scale to zero. The production queue polls every two seconds to reduce database compute use. Monitor the current free-plan compute, storage, and egress allowances in Neon because provider limits can change.
 - Cloudflare Pages is static and remains available even while the backend sleeps, so Meta can access the legal pages.
-- Monitor Koyeb memory and Neon storage/compute. Upgrade the backend first if real customers depend on timely replies.
+- Monitor Render memory, bandwidth, build minutes, and Neon storage/compute. Move to Oracle or paid always-on compute when real customers depend on timely replies.
 
 ## Releasing future versions
 
-ChatCart uses `main` as its production branch. Configure Koyeb and Cloudflare Pages to auto-deploy every successful merge to `main`.
+ChatCart uses `main` as its production branch. Configure Render and Cloudflare Pages to auto-deploy every successful merge to `main`.
+
+GitHub protects `main` with the **Main: owner-reviewed pull requests** ruleset. Direct pushes, force pushes, and branch deletion are blocked. `.github/CODEOWNERS` assigns all paths to `@Khaled-Ahmmed-Anik`: other contributors therefore need the owner's approval, while the owner has a PR-only bypass for their own pull requests. The bypass does not permit direct pushes to `main`.
 
 ### Normal release flow
 
 1. Create a `WC-###-description` feature branch.
 2. Open a pull request and wait for every CI job to pass: Rails security scans, Ruby lint, backend tests, frontend lint, frontend type-check, and frontend build.
-3. Merge the approved pull request to `main`.
-4. Koyeb and Cloudflare automatically deploy the new `main` commit.
+3. Resolve review conversations and merge the pull request to `main`. Pull requests from other contributors require approval from the repository owner.
+4. Render and Cloudflare automatically deploy the new `main` commit.
 5. Confirm `/up`, dashboard login, legal pages, one test conversation, and one test order.
 6. In GitHub, open **Actions → Release → Run workflow**, select `main`, and enter the next semantic version without `v`, such as `0.2.0`.
 7. The release workflow repeats the backend and frontend checks, optionally smoke-tests production, creates tag `v0.2.0`, and publishes generated GitHub release notes.
@@ -193,7 +184,7 @@ Use semantic versions consistently:
 In GitHub repository settings, add these Actions variables after deployment so releases can verify the live system:
 
 ```text
-PRODUCTION_API_URL=https://<koyeb-host>
+PRODUCTION_API_URL=https://<render-host>
 PRODUCTION_WEB_URL=https://<cloudflare-host>
 ```
 
@@ -210,6 +201,12 @@ The backend container runs `db:prepare` before starting. Production migrations m
 
 Never rely on an automatic destructive rollback for customer orders or conversations.
 
+After primary migrations run, the container executes `deployment:verify_schema`. The command fails startup when Rails still reports a pending primary migration or when a runtime-critical table or column is missing. The `/ready` endpoint performs the same checks and returns `503` for schema drift instead of reporting a false healthy deployment.
+
+When a migration introduces a column or table required by authentication, tenancy, ordering, or webhook processing, add it to `DatabaseSchemaHealth::REQUIRED_SCHEMA` in the same pull request. This contract also detects cases where `schema_migrations` says a migration ran but the corresponding Neon object is absent.
+
+Do not repair normal deployments with ad-hoc SQL in Neon. First inspect the Render startup output for `db:migrate:primary` and `deployment:verify_schema`. If an emergency SQL repair is unavoidable, apply the equivalent Rails migration state deliberately and follow it with a forward-fix pull request; otherwise the next automated migration may fail because the schema and `schema_migrations` disagree.
+
 ### Rollback
 
-If a release fails before a GitHub version is created, use Koyeb and Cloudflare's deployment history to redeploy the last working commit. If a tagged release is faulty, redeploy the previous tag/commit and then create a forward-fix branch. Do not reverse a production database migration unless its data impact has been reviewed and a backup is available.
+If a release fails before a GitHub version is created, use Render and Cloudflare's deployment history to redeploy the last working commit. If a tagged release is faulty, redeploy the previous tag/commit and then create a forward-fix branch. Do not reverse a production database migration unless its data impact has been reviewed and a backup is available.

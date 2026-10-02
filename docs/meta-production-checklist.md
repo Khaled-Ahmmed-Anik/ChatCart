@@ -1,17 +1,33 @@
 # ChatCart Meta production checklist
 
-This checklist records the remaining owner-controlled steps for publishing ChatCart on Facebook Messenger and
-WhatsApp Cloud API. Never paste access tokens or app secrets into review notes, screenshots, or source control.
+This checklist records the production status and owner-controlled publishing steps for ChatCart's Meta channels.
+Never paste access tokens or app secrets into review notes, screenshots, or source control.
+
+## Current status
+
+| Channel | Application support | Production status |
+| --- | --- | --- |
+| Facebook Messenger | Implemented | Live and verified for public users |
+| WhatsApp Cloud API | Implemented | Production account, phone-number, token, and Meta configuration remain owner-controlled |
+| Instagram Messaging | Not implemented | Requires a channel-specific webhook/send adapter and Meta permissions |
+
+Current public endpoints:
+
+- Dashboard: `https://chatcart-dashboard.pages.dev`
+- API readiness: `https://chatcart-api-29oq.onrender.com/ready`
+- Privacy Policy: `https://chatcart-dashboard.pages.dev/privacy`
+- Data Deletion: `https://chatcart-dashboard.pages.dev/data-deletion`
 
 ## 1. Deploy ChatCart
 
-- Deploy `chatcart-api` with PostgreSQL and `SOLID_QUEUE_IN_PUMA=true` (or run `bin/jobs` as a separate worker).
-- Deploy `chatcart-dashboard` with `VITE_API_URL` set to the permanent API origin.
+- Deploy `chatcart-api` on Render with Neon PostgreSQL and `SOLID_QUEUE_IN_PUMA=true`.
+- Deploy `chatcart-dashboard` on Cloudflare Pages with `API_ORIGIN` set to the permanent Render API origin. The Pages Function proxies same-origin application requests; do not set production `VITE_API_URL`.
 - Set `DASHBOARD_ORIGIN` on Rails to the exact dashboard origin, without a trailing slash.
 - Confirm all of these return over trusted HTTPS:
-  - `GET https://API_HOST/up`
-  - `GET https://DASHBOARD_HOST/privacy`
-  - `GET https://DASHBOARD_HOST/data-deletion`
+  - `GET https://chatcart-api-29oq.onrender.com/up`
+  - `GET https://chatcart-api-29oq.onrender.com/ready`
+  - `GET https://chatcart-dashboard.pages.dev/privacy`
+  - `GET https://chatcart-dashboard.pages.dev/data-deletion`
 - Keep production secrets only in the hosting provider's encrypted environment settings.
 
 ## 2. Complete Meta App settings
@@ -19,9 +35,9 @@ WhatsApp Cloud API. Never paste access tokens or app secrets into review notes, 
 In **Meta for Developers → App settings → Basic**, configure:
 
 - App display name: `ChatCart`
-- App domains: the dashboard domain and API domain
-- Privacy Policy URL: `https://DASHBOARD_HOST/privacy`
-- User data deletion URL: `https://DASHBOARD_HOST/data-deletion`
+- App domains: `chatcart-dashboard.pages.dev` and `chatcart-api-29oq.onrender.com`
+- Privacy Policy URL: `https://chatcart-dashboard.pages.dev/privacy`
+- User data deletion URL: `https://chatcart-dashboard.pages.dev/data-deletion`
 - Category and contact email
 - App icon
 
@@ -30,7 +46,9 @@ be used for the privacy-policy field.
 
 ## 3. Facebook Messenger
 
-- Callback URL: `https://API_HOST/webhooks/messenger`
+Messenger is live. Retain the following configuration and repeat the verification after changing Meta credentials, webhook code, or hosting:
+
+- Callback URL: `https://chatcart-api-29oq.onrender.com/webhooks/messenger`
 - Verify token: the production `MESSENGER_VERIFY_TOKEN`
 - Subscribe the Page to `messages`, `messaging_postbacks`, `message_deliveries`, and `message_reads` as applicable.
 - Store the Page access token as `MESSENGER_PAGE_ACCESS_TOKEN` or in the business's encrypted Facebook channel connection.
@@ -42,13 +60,15 @@ be used for the privacy-policy field.
   3. ChatCart replying through Messenger.
   4. Product selection and order confirmation.
   5. Human takeover pausing automation and a staff reply being sent.
-- Switch the app to Live only after the required access is approved.
+- Keep the app in Live mode after the required access is approved. Confirm replies using a Facebook account with no app role after every material integration change.
 
 ## 4. WhatsApp Cloud API
 
+The application-side webhook, event processing, delivery tracking, retries, and send adapter are implemented. The following Meta-owned production activation steps remain:
+
 - Add the WhatsApp product to the same Meta business app or an approved dedicated business app.
 - Connect the WhatsApp Business Account and verify the production phone number.
-- Callback URL: `https://API_HOST/webhooks/whatsapp`
+- Callback URL: `https://chatcart-api-29oq.onrender.com/webhooks/whatsapp`
 - Verify token: the production `WHATSAPP_VERIFY_TOKEN`
 - Subscribe the WhatsApp Business Account to the `messages` webhook field.
 - Configure `WHATSAPP_APP_SECRET`, `WHATSAPP_PHONE_NUMBER_ID`, and a permanent system-user access token.

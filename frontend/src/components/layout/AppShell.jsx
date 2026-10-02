@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/useAuth";
 import { apiRequest } from "../../lib/apiClient";
 import { graphqlRequest } from "../../lib/graphqlClient";
 import { DashboardContextDocument } from "../../graphql/generated/graphql";
+import { pollInterval } from "../../lib/polling";
 
 const businessNavigation = [
   ["/app", "Overview", true], ["/app/orders", "Orders"], ["/app/conversations", "Conversations"],
@@ -43,7 +44,8 @@ export function AppShell() {
     queryKey: ["conversations"],
     queryFn: () => apiRequest("/api/conversations"),
     enabled: auth.actorType === "business_user",
-    refetchInterval: 5000
+    refetchInterval: pollInterval,
+    refetchIntervalInBackground: false
   });
   const conversations = conversationsQuery.data || [];
   const handovers = conversations.filter((conversation) => conversation.needs_attention);

@@ -24,4 +24,26 @@ class ProcessWhatsappEventJobTest < ActiveJob::TestCase
     assert_equal "phone-number-1", delivery.phone_number_id
     assert_includes delivery.message.content, "Fresh Musk"
   end
+
+  test "ignores an event queued before its business became inactive" do
+    business = Business.create!(name: "Disabled Shop", slug: "disabled-shop")
+    event = WhatsappWebhookEvent.create!(
+      business: business,
+      event_type: "customer_text",
+      external_event_id: "wamid.inactive",
+      sender_id: "8801712345678",
+      phone_number_id: "phone-number-1",
+      payload: { text: { body: "Hello" } }
+    )
+    business.update!(status: "disabled")
+
+    assert_no_difference [ -> { Conversation.count }, -> { Message.count }, -> { WhatsappDelivery.count } ] do
+      assert_no_enqueued_jobs only: SendWhatsappReplyJob do
+        ProcessWhatsappEventJob.perform_now(event)
+      end
+    end
+
+    assert_equal "ignored", event.reload.status
+    assert_equal "business_inactive", event.last_error
+  end
 end

@@ -1,12 +1,16 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.09.1"
+    ENGINE_VERSION = "2026.10.1"
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
       "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
       "ekta" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
     }.freeze
+    NON_NAME_REPLIES = %w[
+      yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
+      ha haa ji jii thik thikache accha acha
+    ].freeze
     AI_OUTCOMES = {
       "greeting" => :greeting, "thanks" => :thanks, "help" => :help, "wellbeing" => :wellbeing,
       "goodbye" => :goodbye, "bot_identity" => :bot_identity, "language_preference" => :language_preference,
@@ -36,7 +40,8 @@ module Constants
       payment_methods_requested cash_on_delivery_requested delivery_charge_requested
       delivery_area_requested delivery_time_requested product_weather_requested
       alternative_product_requested discount_requested authenticity_requested trust_information_requested
-      trial_requested delivery_price_objection price_objection return_requested replacement_requested refund_requested
+      trial_requested delivery_price_objection price_objection return_policy_requested return_requested
+      replacement_requested refund_requested
     ].freeze
     GUIDED_SALES_STAGES = %w[discover compare select configure checkout confirm complete].freeze
     GUIDED_SALES_OUTCOME_STAGES = {

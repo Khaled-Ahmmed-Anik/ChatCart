@@ -17,6 +17,9 @@ class ConversationMessageProcessor
     return pending_order if accept_variant_bundle_offer
     return pending_order if apply_action_plan
     return pending_order if handle_order_update_request
+    return pending_order if collect_remembered_checkout_value
+    return pending_order if collect_explicit_checkout_value
+    return pending_order if select_exact_catalog_product
     return pending_order if handle_conversational_intent
     return pending_order if handle_ai_intent
     return pending_order if collect_checkout_bundle
@@ -50,8 +53,6 @@ class ConversationMessageProcessor
   attr_reader :message, :pending_order, :content, :interpretation
 
   def apply_action_plan
-    return false if interpretation&.entities&.values_at(:customer_name, :phone, :address)&.any?(&:present?)
-
     plan = ConversationActionPlanner.new(
       message: message,
       business: pending_order.conversation.business,
@@ -72,19 +73,21 @@ class ConversationMessageProcessor
 
     attributes = { product: product, product_variant: variant }
     attributes[:quantity] = plan.quantity if plan.quantity.present?
-    attributes[:status] = next_planned_status(product, variant, plan.quantity)
+    checkout_details = trustworthy_planned_checkout_details
+    attributes.merge!(checkout_details)
+    attributes[:status] = next_planned_status(product, variant, plan.quantity, checkout_details)
     pending_order.update!(attributes)
     @planned_secondary_outcomes = plan.informational_outcomes
     @outcome = :multiple_details_collected
     true
   end
 
-  def next_planned_status(product, variant, quantity)
+  def next_planned_status(product, variant, quantity, checkout_details = {})
     return :collecting_variant if product.available_variants.any? && variant.blank?
     return :collecting_quantity if quantity.blank?
-    return :collecting_name if pending_order.customer_name.blank?
-    return :collecting_phone if pending_order.phone.blank?
-    return :collecting_address if pending_order.address.blank?
+    return :collecting_name if checkout_details[:customer_name].blank? && pending_order.customer_name.blank?
+    return :collecting_phone if checkout_details[:phone].blank? && pending_order.phone.blank?
+    return :collecting_address if checkout_details[:address].blank? && pending_order.address.blank?
 
     :awaiting_confirmation
   end
@@ -179,8 +182,11 @@ class ConversationMessageProcessor
   end
 
   def collect_name
-    name = interpreted_entity(:customer_name, for_intent: "provide_name") || remembered_value(:customer_name) || content
-    return if name.blank?
+    name = interpreted_entity(:customer_name, for_intent: "provide_name") || remembered_value(:customer_name) || extracted_customer_name
+    if name.blank? || non_name_reply?(name)
+      @outcome = :name_required
+      return
+    end
 
     pending_order.customer_name = name
     advance_after_collection(:collecting_phone)
@@ -355,6 +361,8 @@ class ConversationMessageProcessor
       :first_time_scent_guidance
     elsif repeated_recommendation_input?
       :recommendation_choice_reminder
+    elsif return_policy_question?
+      :return_policy_requested
     elsif discount_request?
       :discount_requested
     elsif authenticity_question?
@@ -444,7 +452,8 @@ class ConversationMessageProcessor
       update_quantity(Regexp.last_match(1))
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:my\s+)?phone\s+(?:number\s+)?(?:to\s+)?(.+)\z/i
       update_phone(Regexp.last_match(1))
-    when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:my\s+)?name\s+(?:to\s+)?(.+)\z/i
+    when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:my\s+)?name\s+(?:to\s+)?(.+)\z/i,
+      /\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s+(.+?)(?:\s+(?:update|change)(?:\s+(?:it\s+)?(?:on|in))?\s+(?:my\s+|the\s+)?order)?[?!. ]*\z/i
       record_change(:customer_name, Regexp.last_match(1).strip)
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+)?address\s+(?:to\s+)?(.+)\z/i,
       /\A(?:actually[\s,]*)?address(?:\s+ta)?\s+(.+?)\s+(?:hobe|হবে)\z/i
@@ -694,12 +703,17 @@ class ConversationMessageProcessor
     requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
     exact = product.available_variants.find do |variant|
       candidates = [ variant.name, variant.size ].compact.map(&:downcase)
-      candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate|
+      !variant_explicitly_rejected?(variant) && (candidates.include?(requested.to_s.downcase) || candidates.any? { |candidate|
         content.downcase.include?(candidate) || content.downcase.delete(" ").include?(candidate.delete(" "))
       } ||
-        content.match?(/\b#{Regexp.escape(variant.price.to_i.to_s)}\b/)
+        content.match?(/\b#{Regexp.escape(variant.price.to_i.to_s)}\b/))
     end
     exact || contextual_variant_selection(product)
+  end
+
+  def variant_explicitly_rejected?(variant)
+    labels = [ variant.name, variant.size ].compact.map { |value| Regexp.escape(value.downcase).gsub("\\ ", "\\s*") }
+    labels.any? { |label| content.downcase.match?(/\b#{label}\b\s*(?:na|no|not|না)\b/) }
   end
 
   def contextual_variant_selection(product)
@@ -1153,6 +1167,7 @@ class ConversationMessageProcessor
   def correction_command?
     content.match?(/\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+quantity|quantity|my\s+phone|phone|my\s+name|name|the\s+address|address)\b/i) ||
       content.match?(/\A(?:actually[\s,]*)?make\s+it\b/i) ||
+      content.match?(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s+.+(?:update|change).*(?:order)\b/i) ||
       variant_correction_request? || product_correction_request? ||
       content.match?(/\A(?:actually[\s,]*)?address(?:\s+ta)?\s+.+\s+(?:hobe|হবে)\z/i)
   end
@@ -1204,6 +1219,90 @@ class ConversationMessageProcessor
     return unless content.downcase.match?(/\b(same|previous|ager|আগের)\b/)
 
     previous_completed_order&.public_send(field)
+  end
+
+  def collect_remembered_checkout_value
+    field, outcome, next_status = case pending_order.status
+    when "collecting_name" then [ :customer_name, :name_collected, :collecting_phone ]
+    when "collecting_phone" then [ :phone, :phone_collected, :collecting_address ]
+    when "collecting_address" then [ :address, :address_collected, :awaiting_confirmation ]
+    else return false
+    end
+    value = remembered_value(field)
+    return false if value.blank?
+
+    pending_order.public_send("#{field}=", value)
+    advance_after_collection(next_status)
+    @outcome = outcome
+    true
+  end
+
+  def collect_explicit_checkout_value
+    return false unless pending_order.collecting_name?
+    return false unless content.match?(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\b/i)
+
+    collect_name
+    outcome == :name_collected
+  end
+
+  def select_exact_catalog_product
+    return false unless pending_order.collecting_product?
+    return false if pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
+
+    normalized = normalize_catalog_name(content)
+    product = catalog.available_for_sale.find do |candidate|
+      candidate.searchable_names.any? { |name| normalize_catalog_name(name) == normalized }
+    end
+    return false if product.blank?
+
+    collect_product
+    true
+  end
+
+  def normalize_catalog_name(value)
+    value.to_s.downcase.gsub(/[^a-z0-9]+/, " ").squish
+  end
+
+  def trustworthy_planned_checkout_details
+    can_accept_explicit_entities = confident_ai_intent?(%w[select_product select_quantity provide_name provide_phone provide_address])
+    return {} unless pending_order.status.in?(%w[collecting_name collecting_phone collecting_address]) || can_accept_explicit_entities
+
+    details = {}
+    name = interpretation&.entities&.[](:customer_name).presence || leading_customer_name
+    details[:customer_name] = name unless name.blank? || non_name_reply?(name)
+    phone = valid_phone_candidate(interpretation&.entities&.[](:phone), content)
+    details[:phone] = phone if phone.present?
+    address = interpretation&.entities&.[](:address).presence
+    details[:address] = address if address.present?
+    details
+  end
+
+  def leading_customer_name
+    return unless pending_order.collecting_name? && content.include?(",")
+
+    candidate = content.split(",", 2).first.to_s.strip
+    candidate if candidate.match?(/\A[[:alpha:] .'-]{2,60}\z/u)
+  end
+
+  def extracted_customer_name
+    match = content.match(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s*[:=-]?\s*(.+?)[?!. ]*\z/i)
+    match ? match[1].strip : content
+  end
+
+  def non_name_reply?(value)
+    normalized = value.to_s.downcase.gsub(/[^a-z]/, "")
+    return true if normalized.blank? || greeting?
+    return true if Constants::Conversation::NON_NAME_REPLIES.include?(normalized)
+
+    value.to_s.downcase.match?(/\A(that|it|this)\s+(works|is fine|is good)(\s+for\s+me)?[?!. ]*\z/)
+  end
+
+  def return_policy_question?
+    normalized = content.downcase.squish
+    policy_terms = normalized.match?(/\b(return|replacement|exchange|ferot|ফেরত)\b.*\b(policy|rules?|niyom|ase|ache|ki|what|how)\b/) ||
+      normalized.match?(/\b(policy|rules?|niyom|ki)\b.*\b(return|replacement|exchange|ferot|ফেরত)\b/)
+    explicit_request = normalized.match?(/\b(i want|want to|need to|please|korbo|korte chai|ferot dibo)\b.*\b(return|replace|exchange|ferot)\b/)
+    policy_terms && !explicit_request
   end
 
   def previous_completed_order

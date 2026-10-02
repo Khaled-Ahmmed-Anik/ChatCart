@@ -4,6 +4,7 @@ import { apiRequest } from "../../lib/apiClient";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/Feedback";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
+import { pollInterval } from "../../lib/polling";
 
 const reasonLabels = {
   customer_requested_human: "Customer requested a person",
@@ -30,14 +31,14 @@ export function ConversationsPage() {
   const client = useQueryClient();
   const list = useQuery({
     queryKey: ["conversations"],
-    queryFn: () => apiRequest("/api/conversations"),
-    refetchInterval: 5000
+    queryFn: () => apiRequest("/api/conversations")
   });
   const detail = useQuery({
     queryKey: ["conversation", selectedId],
     queryFn: () => apiRequest(`/api/conversations/${selectedId}`),
     enabled: Boolean(selectedId),
-    refetchInterval: selectedId ? 5000 : false
+    refetchInterval: selectedId ? pollInterval : false,
+    refetchIntervalInBackground: false
   });
   const action = useMutation({
     mutationFn: ({ id, path, body }) => apiRequest(`/api/conversations/${id}/${path}`, {
