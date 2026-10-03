@@ -79,16 +79,34 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
 
   test "seller can review a conversation and record feedback" do
     conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "review-buyer")
+    message = conversation.messages.create!(sender_type: :customer, content: "show me something", metadata: {
+      "classification_feedback" => { "predicted_intent" => "list_products" }
+    })
 
-    post review_api_conversation_path(conversation), params: { label: "confusing", notes: "Repeated question" },
+    post review_api_conversation_path(conversation), params: {
+      label: "confusing", notes: "Repeated question", message_id: message.id, corrected_intent: "product_search"
+    },
       headers: authorization(@token), as: :json
     assert_response :success
     assert_equal "confusing", JSON.parse(response.body).dig("quality", "review", "label")
+    assert_equal "product_search", message.reload.metadata.dig("classification_feedback", "corrected_intent")
 
     post feedback_api_conversation_path(conversation), params: { rating: "unhelpful" },
       headers: authorization(@token), as: :json
     assert_response :success
     assert_equal "unhelpful", JSON.parse(response.body).dig("quality", "customer_feedback", "rating")
+  end
+
+  test "seller cannot attach an invalid intent correction" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "invalid-review")
+    message = conversation.messages.create!(sender_type: :customer, content: "show me something")
+
+    post review_api_conversation_path(conversation), params: {
+      label: "incorrect_reply", message_id: message.id, corrected_intent: "invented_intent"
+    }, headers: authorization(@token), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "Invalid corrected intent", JSON.parse(response.body).fetch("error")
   end
 
   test "conversation quality endpoints are tenant isolated" do

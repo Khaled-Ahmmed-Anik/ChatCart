@@ -111,6 +111,12 @@ If Gemini is unavailable, times out, or fails, deterministic processing and fall
 
 The local classifier is evaluated with separate multilingual phrases. The automated quality gate currently requires at least 80% classification coverage and 72% correct intent accuracy. Adding training examples without passing this held-out check is not considered an improvement.
 
+### Classification feedback loop
+
+Each classified customer turn stores safe classifier telemetry in message metadata: classifier source, predicted intent, confidence, the compact classifier's top two candidates and scores, disagreement with Gemini, processing outcome, and whether the next turn followed a repair. It does not duplicate message content, phone numbers, addresses, access tokens, or extracted customer entities.
+
+Conversation reviews may optionally attach a corrected registered intent to a specific customer message. Corrections are tenant-scoped, validated against the intent registry, and retain the reviewer and timestamp. Quality analytics report local-classifier usage, classifier disagreement, reviewed classifications, and correction rates. These signals provide a free, business-owned source for improving examples; they are review data, not automatically trusted training labels.
+
 `AiIntentClassifier` sends Gemini:
 
 - the current order status;

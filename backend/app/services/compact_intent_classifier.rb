@@ -59,7 +59,7 @@ class CompactIntentClassifier
     end
   end
 
-  Result = Data.define(:interpretation, :score, :runner_up_score, :source)
+  Result = Data.define(:interpretation, :score, :runner_up_score, :source, :candidate_intent, :runner_up_intent)
 
   def self.examples
     @examples ||= seeds.transform_values do |seeds|
@@ -82,24 +82,30 @@ class CompactIntentClassifier
       [ intent, examples.map { |example| similarity(normalized, normalize(example)) }.max ]
     end.sort_by { |_intent, score| -score }
     intent, score = ranked.first
-    runner_up = ranked.second&.last.to_f
+    runner_up_intent, runner_up = ranked.second
+    runner_up = runner_up.to_f
     adjusted = [ score + context_bonus(intent), 1.0 ].min
-    return empty_result(score: adjusted, runner_up_score: runner_up) if yield_to_checkout?(intent)
-    return empty_result(score: adjusted, runner_up_score: runner_up) if
-      adjusted < MINIMUM_CONFIDENCE || adjusted - runner_up < 0.04
+    return empty_result(score: adjusted, runner_up_score: runner_up,
+      candidate_intent: intent, runner_up_intent: runner_up_intent) if yield_to_checkout?(intent)
+    if adjusted < MINIMUM_CONFIDENCE || adjusted - runner_up < 0.04
+      return empty_result(score: adjusted, runner_up_score: runner_up,
+        candidate_intent: intent, runner_up_intent: runner_up_intent)
+    end
 
     Result.new(interpretation: AiIntentClassifier::Result.new(
       intent: intent, secondary_intents: [], confidence: adjusted, entities: {}.with_indifferent_access,
       language: detected_language, sentiment: "neutral", needs_clarification: false, possible_intents: []
-    ), score: adjusted, runner_up_score: runner_up, source: "local")
+    ), score: adjusted, runner_up_score: runner_up, source: "local",
+      candidate_intent: intent, runner_up_intent: runner_up_intent)
   end
 
   private
 
   attr_reader :message, :pending_order
   def normalized = @normalized ||= normalize(message.content)
-  def empty_result(score: 0.0, runner_up_score: 0.0) = Result.new(
-    interpretation: nil, score: score, runner_up_score: runner_up_score, source: "local"
+  def empty_result(score: 0.0, runner_up_score: 0.0, candidate_intent: nil, runner_up_intent: nil) = Result.new(
+    interpretation: nil, score: score, runner_up_score: runner_up_score, source: "local",
+    candidate_intent: candidate_intent, runner_up_intent: runner_up_intent
   )
 
   def checkout_value?

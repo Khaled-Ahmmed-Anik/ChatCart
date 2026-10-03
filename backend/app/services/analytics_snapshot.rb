@@ -77,6 +77,8 @@ class AnalyticsSnapshot
     metrics = evaluations.map { |evaluation| evaluation[:metrics] }
     customer_turns = metrics.sum { |item| item[:customer_turns] }
     ai_assisted_turns = metrics.sum { |item| item[:ai_assisted_turns] }
+    classified_turns = metrics.sum { |item| item[:classified_turns] }
+    reviewed_classifications = metrics.sum { |item| item[:reviewed_classifications] }
 
     {
       average_score: scores.any? ? (scores.sum.to_f / scores.count).round(1) : nil,
@@ -89,6 +91,12 @@ class AnalyticsSnapshot
       correction_rate: percentage(metrics.sum { |item| item[:correction_turns] }, customer_turns),
       repair_rate: percentage(metrics.sum { |item| item[:repair_turns] }, customer_turns),
       ai_fallback_rate: percentage(metrics.sum { |item| item[:ai_fallbacks] }, ai_assisted_turns),
+      local_classification_rate: percentage(metrics.sum { |item| item[:local_classifications] }, classified_turns),
+      classifier_disagreement_rate: percentage(metrics.sum { |item| item[:classifier_disagreements] }, classified_turns),
+      reviewed_classifications: reviewed_classifications,
+      classification_correction_rate: percentage(
+        metrics.sum { |item| item[:incorrect_classifications] }, reviewed_classifications
+      ),
       abandoned_checkout_stages: metrics.filter_map { |item| item[:abandoned_checkout_stage] }.tally,
       reviewed: reviews.count,
       review_labels: reviews.tally,
