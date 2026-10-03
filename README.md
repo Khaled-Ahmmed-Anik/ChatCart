@@ -2,6 +2,14 @@
 
 ChatCart helps businesses sell through messaging with minimal human staffing. It receives Messenger and WhatsApp webhooks, conducts English/Bengali/Banglish sales conversations, recommends catalog products, confirms durable orders, exposes an authenticated business dashboard, exports orders, and can submit confirmed orders to a delivery provider.
 
+## Product demo
+
+Watch the 62-second walkthrough to see customer product discovery, conversational ordering, the business dashboard, conversations, human takeover, orders, catalog management, and business setup.
+
+[![Watch the ChatCart product demo](docs/assets/chatcart-demo-cover.png)](docs/assets/ChatCart_Demo.mp4)
+
+[Watch the demo](docs/assets/ChatCart_Demo.mp4) · [Download the MP4](docs/assets/ChatCart_Demo.mp4?raw=1) · [Open the live dashboard](https://chatcart-dashboard.pages.dev)
+
 ## Production status
 
 The MVP is live on the following free-tier stack:
