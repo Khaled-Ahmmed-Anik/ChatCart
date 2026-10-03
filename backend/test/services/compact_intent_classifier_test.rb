@@ -65,6 +65,10 @@ class CompactIntentClassifierTest < ActiveSupport::TestCase
     assert_nil classify("01712345678", status: :collecting_phone)
   end
 
+  test "classifies a confirmed-order quantity correction as a change" do
+    assert_equal "change_quantity", classify("actually make it two", status: :confirmed)&.intent
+  end
+
   private
 
   def classify(content, status: :collecting_product)

@@ -126,6 +126,7 @@ intents:
     - "অন্য পণ্য নিতে চাই"
   change_quantity:
     - "make it three"
+    - "actually make it two"
     - "quantity ta two koren"
     - "add one more"
     - "পরিমাণ তিন করুন"
