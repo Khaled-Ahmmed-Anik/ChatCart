@@ -104,4 +104,31 @@ class ConversationQualityEvaluatorTest < ActiveSupport::TestCase
     assert_includes result.fetch(:flags), "conversation_repair_loop"
     assert_includes result.fetch(:flags), "repeated_order_correction"
   end
+
+  test "reports classification feedback metrics" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.messages.create!(sender_type: :customer, content: "show products", metadata: {
+      "classification_feedback" => {
+        "classifier" => "local", "predicted_intent" => "list_products", "repeated_intent" => false
+      }
+    })
+    conversation.messages.create!(sender_type: :customer, content: "find a shirt", metadata: {
+      "classification_feedback" => {
+        "classifier" => "gemini", "predicted_intent" => "list_products",
+        "classifier_disagreement" => true, "corrected_intent" => "product_search", "was_correct" => false,
+        "repeated_intent" => true, "follows_repair" => true
+      }
+    })
+
+    metrics = ConversationQualityEvaluator.new(conversation: conversation).call.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:classified_turns)
+    assert_equal 1, metrics.fetch(:local_classifications)
+    assert_equal 1, metrics.fetch(:gemini_classifications)
+    assert_equal 1, metrics.fetch(:classifier_disagreements)
+    assert_equal 1, metrics.fetch(:reviewed_classifications)
+    assert_equal 1, metrics.fetch(:incorrect_classifications)
+    assert_equal 1, metrics.fetch(:repeated_intents)
+    assert_equal 1, metrics.fetch(:followups_after_repair)
+  end
 end

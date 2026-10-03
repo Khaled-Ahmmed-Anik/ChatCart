@@ -35,6 +35,7 @@ class ConversationQualityEvaluator
 
   def build_metrics(customer_messages, bot_messages)
     intelligence = customer_messages.map { |message| message.metadata.to_h["conversation_intelligence"].to_h }
+    classifications = customer_messages.map { |message| message.metadata.to_h["classification_feedback"].to_h }
     bot_replies = bot_messages.map { |message| normalize(message.content) }
     assistant_events = bot_messages.filter_map { |message| message.metadata.to_h["ai_assistant"].presence }
     latencies = assistant_events.filter_map { |event| event["latency_ms"] }
@@ -52,6 +53,14 @@ class ConversationQualityEvaluator
       repair_turns: repair_turns,
       repair_rate: percentage(repair_turns, customer_turn_count),
       negative_turns: intelligence.count { |item| item["sentiment"] == "negative" },
+      classified_turns: classifications.count { |item| item["predicted_intent"].present? },
+      local_classifications: classifications.count { |item| item["classifier"] == "local" },
+      gemini_classifications: classifications.count { |item| item["classifier"] == "gemini" },
+      classifier_disagreements: classifications.count { |item| item["classifier_disagreement"] },
+      reviewed_classifications: classifications.count { |item| item["corrected_intent"].present? },
+      incorrect_classifications: classifications.count { |item| item["was_correct"] == false },
+      repeated_intents: classifications.count { |item| item["repeated_intent"] },
+      followups_after_repair: classifications.count { |item| item["follows_repair"] },
       repeated_bot_replies: bot_replies.tally.values.sum { |count| [ count - 1, 0 ].max },
       ai_assisted_turns: assistant_events.count,
       planner_turns: assistant_events.count { |event| event["planner_used"] },

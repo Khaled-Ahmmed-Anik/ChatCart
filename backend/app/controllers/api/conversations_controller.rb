@@ -50,6 +50,7 @@ module Api
     def review
       label = params.require(:label)
       return render json: { error: "Invalid review label" }, status: :unprocessable_entity unless label.in?(REVIEW_LABELS)
+      return unless record_intent_correction
 
       update_conversation_state!("quality_review", {
         "label" => label,
@@ -73,6 +74,27 @@ module Api
     end
 
     private
+
+    def record_intent_correction
+      corrected_intent = params[:corrected_intent].presence
+      return true if corrected_intent.blank?
+      unless ConversationIntentRegistry.valid?(corrected_intent)
+        render json: { error: "Invalid corrected intent" }, status: :unprocessable_entity
+        return false
+      end
+
+      message = @conversation.messages.customer.find_by(id: params[:message_id])
+      unless message
+        render json: { error: "Customer message not found" }, status: :unprocessable_entity
+        return false
+      end
+
+      ConversationClassificationFeedback.new(message: message).record_correction!(
+        corrected_intent: corrected_intent,
+        reviewer_id: current_user.id
+      )
+      true
+    end
 
     def update_handover_timing!(field)
       state = @conversation.conversation_state.to_h
