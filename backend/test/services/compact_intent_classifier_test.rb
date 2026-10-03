@@ -30,10 +30,20 @@ class CompactIntentClassifierTest < ActiveSupport::TestCase
   }.freeze
 
   test "keeps 20 to 50 balanced multilingual examples per intent" do
+    assert_equal ConversationIntentRegistry.intents.sort, CompactIntentClassifier.examples.keys.sort
+
     CompactIntentClassifier.examples.each do |intent, examples|
       assert_includes 20..50, examples.size, intent
       assert examples.any? { |example| example.match?(/\p{Bengali}/) }, "#{intent} has no Bangla example"
       assert examples.any? { |example| example.ascii_only? }, "#{intent} has no English or Banglish example"
+    end
+  end
+
+  test "loads sector-neutral examples for different kinds of businesses" do
+    seeds = CompactIntentClassifier.dataset_seeds.values.flatten
+
+    %w[shirt laptop cake service food].each do |sector_term|
+      assert seeds.any? { |example| example.downcase.include?(sector_term) }, "missing #{sector_term} example"
     end
   end
 
@@ -53,6 +63,10 @@ class CompactIntentClassifierTest < ActiveSupport::TestCase
     assert_nil classify("100 ML ache?", status: :collecting_variant)
     assert_nil classify("bigger size", status: :collecting_variant)
     assert_nil classify("01712345678", status: :collecting_phone)
+  end
+
+  test "classifies a confirmed-order quantity correction as a change" do
+    assert_equal "change_quantity", classify("actually make it two", status: :confirmed)&.intent
   end
 
   private

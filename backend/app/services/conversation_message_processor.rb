@@ -466,7 +466,7 @@ class ConversationMessageProcessor
   def apply_ai_correction
     case interpretation.intent
     when "change_quantity"
-      update_quantity(interpretation.entities[:quantity].to_s)
+      update_quantity(interpretation.entities[:quantity].presence || content)
     when "change_phone"
       update_phone(valid_phone_candidate(interpretation.entities[:phone], content).to_s)
     when "change_name"
