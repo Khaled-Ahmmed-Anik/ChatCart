@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "55b7f865-d4fc-4b55-8538-c48e24865f4c",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/private/tmp/chatcart-wc036-diagrams/.archify/architecture-chatcart-production-20261005-021600/candidate.json",
+  "output": "/private/tmp/chatcart-wc036-diagrams/.archify/architecture-chatcart-production-20261005-021600/chatcart-production-architecture.html",
+  "specification": {
+    "sha256": "1ffc7d79ecd5ab51efa8e553cd1997a3e115810358b519acbaf8a92eafabf830",
+    "bytes": 7342
+  },
+  "artifact": {
+    "sha256": "a3e470a8b610620a0d01d6b7196880f28e629e62afcda387553c21e5a9544374",
+    "bytes": 769320
+  }
+}

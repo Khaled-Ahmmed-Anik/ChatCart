@@ -1,0 +1,144 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "ChatCart Intent and Context Resolution",
+    "output": ".archify/workflow-chatcart-intent-resolution-20261005-021600/chatcart-intent-context-workflow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:Khaled-Ahmmed-Anik/ChatCart.git",
+      "revision": "184ece40d6961fe588cbde0bc70953dd4b8e94a2",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    { "id": "input", "label": "Customer turn" },
+    { "id": "understanding", "label": "Intent and reference resolution" },
+    { "id": "state", "label": "Deterministic conversation state" },
+    { "id": "response", "label": "Grounded response and delivery" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "Intake", "fromCol": 0, "toCol": 1 },
+    { "id": "decide", "label": "Understand + decide", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "reply", "label": "Respond", "fromCol": 3, "toCol": 4, "variant": "dashed" }
+  ],
+  "nodes": [
+    {
+      "id": "message",
+      "lane": "input",
+      "col": 0,
+      "type": "external",
+      "label": "Customer Message",
+      "width": 140,
+      "sources": [{ "path": "backend/app/services/customer_message_recorder.rb", "line": 24, "end_line": 31, "label": "Persist message" }]
+    },
+    {
+      "id": "compact",
+      "lane": "understanding",
+      "col": 1,
+      "type": "backend",
+      "label": "Compact Classifier",
+      "width": 150,
+      "sources": [{ "path": "backend/app/services/compact_intent_classifier.rb", "line": 1, "end_line": 6, "label": "Classifier contract" }, { "path": "backend/app/services/compact_intent_classifier.rb", "line": 73, "end_line": 100, "label": "Ranking + threshold" }]
+    },
+    {
+      "id": "intent",
+      "lane": "understanding",
+      "col": 2,
+      "type": "backend",
+      "label": "Intent Interpretation",
+      "width": 150,
+      "sources": [{ "path": "backend/app/services/customer_message_recorder.rb", "line": 46, "end_line": 59, "label": "Classify + telemetry" }]
+    },
+    {
+      "id": "clarify",
+      "lane": "understanding",
+      "col": 3,
+      "type": "security",
+      "label": "Clarification Gate",
+      "width": 148,
+      "sources": [{ "path": "backend/app/services/conversation_message_processor.rb", "line": 95, "end_line": 100, "label": "Unclear intent" }, { "path": "backend/app/services/conversation_response_planner.rb", "line": 93, "end_line": 100, "label": "Focused clarification" }]
+    },
+    {
+      "id": "processor",
+      "lane": "state",
+      "col": 3,
+      "type": "backend",
+      "label": "Message Processor",
+      "width": 160,
+      "sources": [{ "path": "backend/app/services/conversation_message_processor.rb", "line": 11, "end_line": 48, "label": "Decision order" }]
+    },
+    {
+      "id": "order_state",
+      "lane": "state",
+      "col": 2,
+      "type": "database",
+      "label": "Pending Order",
+      "width": 148,
+      "sources": [{ "path": "backend/app/models/pending_order.rb", "line": 1, "end_line": 46, "label": "Order state" }]
+    },
+    {
+      "id": "turn_state",
+      "lane": "state",
+      "col": 4,
+      "type": "database",
+      "label": "Turn Manager",
+      "width": 156,
+      "sources": [{ "path": "backend/app/services/conversation_turn_manager.rb", "line": 25, "end_line": 54, "label": "Structured context" }, { "path": "backend/app/services/conversation_turn_manager.rb", "line": 86, "end_line": 145, "label": "Pause + repair" }]
+    },
+    {
+      "id": "planner",
+      "lane": "response",
+      "col": 3,
+      "type": "backend",
+      "label": "Response Planner",
+      "width": 164,
+      "sources": [{ "path": "backend/app/services/conversation_response_planner.rb", "line": 33, "end_line": 51, "label": "Structured plan" }, { "path": "backend/app/services/conversation_response_planner.rb", "line": 58, "end_line": 90, "label": "Compose reply" }]
+    },
+    {
+      "id": "guarded_reply",
+      "lane": "response",
+      "col": 4,
+      "yOffset": -55,
+      "type": "external",
+      "label": "Gemini + Guardrail",
+      "width": 160,
+      "sources": [{ "path": "backend/app/services/ai_conversation_assistant.rb", "line": 24, "end_line": 38, "label": "Fallback + guard" }, { "path": "backend/app/services/ai_conversation_assistant.rb", "line": 132, "end_line": 174, "label": "Grounded prompt" }]
+    },
+    {
+      "id": "delivery",
+      "lane": "response",
+      "col": 4,
+      "yOffset": 55,
+      "type": "messagebus",
+      "label": "Queued Reply",
+      "width": 150,
+      "sources": [{ "path": "backend/app/jobs/send_messenger_reply_job.rb", "line": 1, "end_line": 37, "label": "Retry delivery" }]
+    }
+  ],
+  "edges": [
+    { "id": "message-classifier", "from": "message", "to": "compact", "label": "normalize + score", "variant": "emphasis" },
+    { "id": "classifier-intent", "from": "compact", "to": "intent", "label": "confident local match" },
+    { "id": "intent-clarify", "from": "intent", "to": "clarify", "label": "ambiguous", "variant": "security", "role": "branch" },
+    { "id": "intent-processor", "from": "intent", "to": "processor", "label": "intent + entities", "variant": "emphasis" },
+    { "id": "clarify-processor", "from": "clarify", "to": "processor", "label": "one focused question", "variant": "security", "role": "branch" },
+    { "id": "state-processor", "from": "order_state", "to": "processor", "label": "current facts" },
+    { "id": "processor-state", "from": "processor", "to": "turn_state", "label": "outcome + references" },
+    { "id": "processor-planner", "from": "processor", "to": "planner", "label": "deterministic outcome", "variant": "emphasis" },
+    { "id": "turn-planner", "from": "turn_state", "to": "planner", "label": "active goal + pending question" },
+    { "id": "planner-ai", "from": "planner", "to": "guarded_reply", "label": "approved factual reply", "variant": "dashed" },
+    { "id": "reply-delivery", "from": "guarded_reply", "to": "delivery", "label": "safe candidate or fallback", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Priority rule",
+      "items": ["The newest customer intent selects the action", "Pending order and turn memory provide context, not control", "Ambiguity asks one focused question"]
+    },
+    {
+      "dot": "violet",
+      "title": "AI boundary",
+      "items": ["Deterministic services approve facts and next steps", "Gemini may naturalize wording but cannot invent order facts", "Failures return the deterministic reply"]
+    }
+  ]
+}

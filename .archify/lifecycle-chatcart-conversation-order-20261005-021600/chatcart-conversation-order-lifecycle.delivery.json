@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "4c7235b9-fb5e-4925-b658-7c4cf8766e39",
+  "status": "current",
+  "command": "deliver",
+  "type": "lifecycle",
+  "input": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/candidate.json",
+  "output": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.html",
+  "specification": {
+    "sha256": "2f4be0b85925fc013618db1a29b714b3422cda935d7c39b8c788a728b52cd0d4",
+    "bytes": 7166
+  },
+  "artifact": {
+    "sha256": "8e8e855cf66063e2ea2845b52d5e3bce714a97c3953f2cd26173b1a0a640376f",
+    "bytes": 770829
+  }
+}

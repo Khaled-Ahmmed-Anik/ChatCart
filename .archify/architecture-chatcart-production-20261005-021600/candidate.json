@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ChatCart Production Architecture",
+    "output": ".archify/architecture-chatcart-production-20261005-021600/chatcart-production-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:Khaled-Ahmmed-Anik/ChatCart.git",
+      "revision": "184ece40d6961fe588cbde0bc70953dd4b8e94a2",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "customers",
+      "type": "external",
+      "label": "Customers",
+      "sublabel": "Messenger / WhatsApp",
+      "pos": [40, 300],
+      "size": [150, 64],
+      "sources": [{ "path": "README.md", "line": 30, "end_line": 50, "label": "Supported channels" }]
+    },
+    {
+      "id": "meta",
+      "type": "cloud",
+      "label": "Meta Platform",
+      "sublabel": "Webhooks + Send APIs",
+      "pos": [280, 300],
+      "size": [160, 64],
+      "sources": [
+        { "path": "backend/app/controllers/webhooks/messenger_controller.rb", "line": 5, "end_line": 38, "label": "Messenger ingestion" },
+        { "path": "backend/app/controllers/webhooks/whatsapp_controller.rb", "line": 3, "end_line": 84, "label": "WhatsApp ingestion" }
+      ]
+    },
+    {
+      "id": "cloudflare",
+      "type": "frontend",
+      "label": "Cloudflare Pages",
+      "sublabel": "React dashboard + API proxy",
+      "pos": [500, 90],
+      "size": [180, 68],
+      "sources": [
+        { "path": "README.md", "line": 15, "end_line": 28, "label": "Production hosting" },
+        { "path": "frontend/functions/[[path]].js", "line": 17, "end_line": 62, "label": "Same-origin proxy" },
+        { "path": "frontend/src/app/App.jsx", "line": 14, "end_line": 29, "label": "Dashboard routes" }
+      ]
+    },
+    {
+      "id": "rails",
+      "type": "backend",
+      "label": "Rails API",
+      "sublabel": "Render web service",
+      "pos": [580, 300],
+      "size": [160, 64],
+      "sources": [
+        { "path": "README.md", "line": 15, "end_line": 28, "label": "Render deployment" },
+        { "path": "backend/app/controllers/webhooks/messenger_controller.rb", "line": 15, "end_line": 38, "label": "Fast acknowledge" }
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Solid Queue",
+      "sublabel": "Inbound + outbound jobs",
+      "pos": [900, 300],
+      "size": [170, 64],
+      "sources": [
+        { "path": "backend/config/queue.yml", "line": 1, "end_line": 24, "label": "Queue workers" },
+        { "path": "backend/app/jobs/process_messenger_event_job.rb", "line": 1, "end_line": 16, "label": "Inbound job" },
+        { "path": "backend/app/jobs/send_messenger_reply_job.rb", "line": 1, "end_line": 37, "label": "Outbound retries" }
+      ]
+    },
+    {
+      "id": "conversation_engine",
+      "type": "backend",
+      "label": "Conversation Engine",
+      "sublabel": "Intent, state, order, reply",
+      "pos": [1220, 300],
+      "size": [190, 68],
+      "sources": [
+        { "path": "backend/app/services/customer_message_recorder.rb", "line": 24, "end_line": 105, "label": "Turn orchestration" },
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 11, "end_line": 48, "label": "Deterministic flow" },
+        { "path": "backend/app/services/conversation_turn_manager.rb", "line": 25, "end_line": 54, "label": "Conversation state" }
+      ]
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Google Gemini",
+      "sublabel": "Optional grounded rewrite",
+      "pos": [1225, 80],
+      "size": [180, 64],
+      "sources": [{ "path": "backend/app/services/ai_conversation_assistant.rb", "line": 24, "end_line": 87, "label": "Guarded AI path" }]
+    },
+    {
+      "id": "neon",
+      "type": "database",
+      "label": "Neon PostgreSQL",
+      "sublabel": "Business + queue state",
+      "pos": [1225, 520],
+      "size": [180, 64],
+      "sources": [
+        { "path": "README.md", "line": 15, "end_line": 22, "label": "Database provider" },
+        { "path": "backend/config/database.yml", "line": 90, "end_line": 105, "label": "Production databases" }
+      ]
+    },
+    {
+      "id": "delivery_provider",
+      "type": "external",
+      "label": "Delivery Provider",
+      "sublabel": "Manual or HTTPS API",
+      "pos": [1570, 520],
+      "size": [180, 64],
+      "sources": [
+        { "path": "backend/app/jobs/submit_delivery_job.rb", "line": 4, "end_line": 22, "label": "Submission lifecycle" },
+        { "path": "backend/app/services/delivery_submission_sender.rb", "line": 11, "end_line": 34, "label": "Provider request" }
+      ]
+    },
+    {
+      "id": "business_users",
+      "type": "external",
+      "label": "Business Users",
+      "sublabel": "Owner / sales / fulfilment",
+      "pos": [40, 100],
+      "size": [170, 64],
+      "sources": [
+        { "path": "README.md", "line": 34, "end_line": 47, "label": "Dashboard capabilities" },
+        { "path": "frontend/src/app/App.jsx", "line": 20, "end_line": 27, "label": "Protected workspace" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "ChatCart production",
+      "wraps": ["cloudflare", "rails", "queue", "conversation_engine", "neon"]
+    }
+  ],
+  "connections": [
+    { "id": "customer-meta", "from": "customers", "to": "meta", "label": "messages", "variant": "emphasis" },
+    { "id": "meta-webhook", "from": "meta", "to": "rails", "label": "signed webhook", "variant": "security" },
+    { "id": "owner-dashboard", "from": "business_users", "to": "cloudflare", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "dashboard-api", "from": "cloudflare", "to": "rails", "label": "REST / GraphQL proxy", "fromSide": "bottom", "toSide": "top" },
+    { "id": "api-enqueue", "from": "rails", "to": "queue", "label": "enqueue + acknowledge", "variant": "dashed" },
+    { "id": "queue-process", "from": "queue", "to": "conversation_engine", "label": "process customer turn", "variant": "emphasis" },
+    { "id": "engine-gemini", "from": "conversation_engine", "to": "gemini", "label": "optional rewrite / tools", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "id": "engine-store", "from": "conversation_engine", "to": "neon", "label": "persist state + orders", "fromSide": "bottom", "toSide": "top" },
+    { "id": "queue-store", "from": "queue", "to": "neon", "label": "durable jobs", "variant": "dashed", "fromSide": "bottom", "toSide": "left" },
+    { "id": "engine-reply", "from": "conversation_engine", "to": "meta", "label": "queued reply", "variant": "emphasis" },
+    { "id": "order-delivery", "from": "neon", "to": "delivery_provider", "label": "confirmed order submission", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Fast webhook path",
+      "items": ["Validate signature", "Record and deduplicate event", "Enqueue work before replying 200 OK"]
+    },
+    {
+      "dot": "violet",
+      "title": "Grounded conversation",
+      "items": ["Deterministic order state owns facts", "Gemini is optional and guarded", "Every tenant uses its own catalog and policy"]
+    },
+    {
+      "dot": "amber",
+      "title": "Durability",
+      "items": ["PostgreSQL stores conversations, orders, deliveries, and jobs", "Temporary Meta and delivery failures retry asynchronously"]
+    }
+  ]
+}

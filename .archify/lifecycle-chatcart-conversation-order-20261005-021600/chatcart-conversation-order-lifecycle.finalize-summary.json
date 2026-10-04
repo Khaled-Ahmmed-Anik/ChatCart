@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "lifecycle",
+  "quality": "showcase",
+  "specification": {
+    "path": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/candidate.json",
+    "sha256": "2f4be0b85925fc013618db1a29b714b3422cda935d7c39b8c788a728b52cd0d4",
+    "bytes": 7166
+  },
+  "artifact": {
+    "path": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.html",
+    "sha256": "8e8e855cf66063e2ea2845b52d5e3bce714a97c3953f2cd26173b1a0a640376f",
+    "bytes": 770829
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.finalize.json",
+    "summaryReceipt": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.finalize-summary.json",
+    "browserCheckReceipt": "/private/tmp/chatcart-wc036-diagrams/.archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-04T20:30:50.610Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1989,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "routesOverSuggestedBends": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [],
+      "detours": [
+        {
+          "relationship": {
+            "id": "cancel-order",
+            "from": "review",
+            "to": "cancelled",
+            "label": "cancel",
+            "collectionIndex": 10,
+            "artifactIndex": 11
+          },
+          "bends": 4,
+          "stretch": 1.292,
+          "directCorridorBlockers": [
+            {
+              "id": "handover",
+              "label": "Seller Takeover",
+              "box": [
+                795,
+                424,
+                140,
+                64
+              ]
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

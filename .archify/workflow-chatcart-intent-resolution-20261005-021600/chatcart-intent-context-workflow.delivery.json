@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "8b695a6b-ecf7-4a3a-84d3-03f38d44707b",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/private/tmp/chatcart-wc036-diagrams/.archify/workflow-chatcart-intent-resolution-20261005-021600/candidate.json",
+  "output": "/private/tmp/chatcart-wc036-diagrams/.archify/workflow-chatcart-intent-resolution-20261005-021600/chatcart-intent-context-workflow.html",
+  "specification": {
+    "sha256": "da5214e49345f82e2badd3875c3d8dbddefb7e2644b5783a08ffe7e2f20c2fa0",
+    "bytes": 6557
+  },
+  "artifact": {
+    "sha256": "853067b3287cb868520132c5890f43c1d52a2e91413e36980c5ad330d735578b",
+    "bytes": 764511
+  }
+}
