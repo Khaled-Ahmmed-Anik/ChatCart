@@ -37,6 +37,19 @@ class ConversationToolGatewayTest < ActiveSupport::TestCase
     assert_equal 4, variants.fetch("variants").first.fetch("stock_quantity")
   end
 
+  test "searches only approved knowledge from the current business" do
+    BusinessKnowledgeIndexer.new(business: @business).sync!
+    BusinessKnowledgeIndexer.new(business: @other_business).sync!
+
+    response = @gateway.call("search_business_knowledge", query: "warm woody", limit: 2).fetch("result")
+
+    assert_equal [ "The Oud" ], response.fetch("matches").pluck("title")
+    match = response.fetch("matches").first
+    assert_includes match.fetch("content"), "Warm woody oud"
+    assert_equal @product.id, match.dig("citation", :source_id)
+    assert_not_includes response.to_json, "Private Product"
+  end
+
   test "does not expose another business product by id" do
     private_product = @other_business.products.find_by!(name: "Private Product")
 

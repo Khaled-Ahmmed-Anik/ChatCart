@@ -32,6 +32,12 @@ This makes the decision behind a response testable without depending on its exac
 
 ## Conversation tools
 
+Descriptive product questions and business FAQs can use the tenant-scoped
+`search_business_knowledge` tool. Exact prices, stock, variants, delivery
+charges, and order state continue to use their structured tools. Knowledge
+results include internal citations, which are recorded in assistant telemetry
+for diagnostics but are not shown to customers.
+
 `ConversationToolGateway` exposes a deliberately small, read-only allowlist:
 
 | Tool | Purpose |

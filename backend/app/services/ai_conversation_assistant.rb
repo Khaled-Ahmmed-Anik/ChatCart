@@ -61,6 +61,7 @@ class AiConversationAssistant
       result = gateway.call(call.fetch("name"), call.fetch("args", {}))
       (@tool_evidence ||= []) << result
       telemetry["tool_names"] << call.fetch("name")
+      telemetry["knowledge_citations"].concat(knowledge_citations(result))
       { functionResponse: { name: call.fetch("name"), response: result } }
     end
     telemetry["planner_used"] = true
@@ -140,6 +141,9 @@ class AiConversationAssistant
       Never infer gender or invent a title that was not supplied.
       Preserve every product name, quantity, price, phone number, address, and instruction exactly as provided.
       Never add discounts, promises, products, prices, stock, delivery times, or order facts.
+      Use search_business_knowledge for descriptive product guidance, FAQs, and explanatory policy questions.
+      Use the exact product, variant, policy, and order tools for prices, stock, delivery charges, and order facts.
+      Treat tool citations as evidence metadata; do not expose internal IDs or claim knowledge not returned by a tool.
       Do not change the meaning or next requested order field. Return only the requested JSON object.
     PROMPT
   end
@@ -191,7 +195,16 @@ class AiConversationAssistant
   end
 
   def base_telemetry
-    { "planner_used" => false, "tool_names" => [], "fallback_reason" => nil, "latency_ms" => nil }
+    {
+      "planner_used" => false, "tool_names" => [], "knowledge_citations" => [],
+      "fallback_reason" => nil, "latency_ms" => nil
+    }
+  end
+
+  def knowledge_citations(tool_result)
+    return [] unless tool_result["tool"] == "search_business_knowledge"
+
+    Array(tool_result.dig("result", "matches")).filter_map { |match| match["citation"] }
   end
 
   def fallback_with_reason(fallback, reason)
