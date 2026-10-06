@@ -6,4 +6,13 @@ namespace :knowledge do
       puts "Indexed #{business.slug}: #{business.knowledge_documents.active.count} active documents"
     end
   end
+
+
+  desc "Queue embeddings for active knowledge documents that do not have one"
+  task embed: :environment do
+    KnowledgeDocument.active.where(embedding: []).find_each do |document|
+      EmbedKnowledgeDocumentJob.perform_later(document.id)
+    end
+    puts "Queued missing knowledge embeddings"
+  end
 end

@@ -20,10 +20,19 @@ charges must continue to come from their structured records. Retrieved text is
 context for explanation and recommendation; it is not authority to mutate an
 order.
 
-## Planned hybrid retrieval
+## Optional hybrid retrieval
 
-A later PR can add embeddings and vector similarity to the same document model.
-That semantic result set should be combined with the existing lexical ranking,
-then passed through the response planner and reply guard with the stored source
-citations. Keeping vector infrastructure out of this foundation avoids making
-CI or local development depend on an unavailable PostgreSQL extension.
+Set `KNOWLEDGE_EMBEDDINGS_ENABLED=true` alongside `GEMINI_API_KEY` to enqueue
+768-dimensional Gemini embeddings when indexed knowledge changes. Existing
+documents can be queued with:
+
+```bash
+mise exec -- bin/rails knowledge:embed
+```
+
+`HybridBusinessKnowledgeRetriever` combines lexical and semantic result ranks
+using reciprocal-rank fusion. It computes similarity only over the current
+business's active documents, falls back to lexical search when embedding calls
+fail, and preserves source citations. The initial Ruby similarity path is
+appropriate for small MVP catalogs; a later pgvector migration can replace it
+when tenant catalogs require indexed nearest-neighbor search.
