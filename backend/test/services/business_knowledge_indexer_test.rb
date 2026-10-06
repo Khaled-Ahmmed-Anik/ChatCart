@@ -46,4 +46,21 @@ class BusinessKnowledgeIndexerTest < ActiveSupport::TestCase
 
     assert_not business.knowledge_documents.find_by!(source_type: "product").active?
   end
+
+  test "clears stale embeddings when indexed content changes" do
+    business = Business.create!(name: "Embedding Refresh Shop", slug: "embedding-refresh-shop")
+    product = business.products.create!(name: "Cotton Shirt", price: 500, stock_quantity: 2, description: "Blue")
+    indexer = BusinessKnowledgeIndexer.new(business: business)
+    indexer.sync!
+    document = business.knowledge_documents.find_by!(source_type: "product")
+    document.update!(embedding: [ 0.1, 0.2 ], embedding_model: "old", embedded_at: Time.current)
+
+    product.update!(description: "Green")
+    indexer.sync!
+
+    document.reload
+    assert_empty document.embedding
+    assert_nil document.embedding_model
+    assert_nil document.embedded_at
+  end
 end

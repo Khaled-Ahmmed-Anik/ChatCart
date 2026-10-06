@@ -49,8 +49,14 @@ class BusinessKnowledgeIndexer
     checksum = KnowledgeDocument.checksum_for(title: title, content: content, metadata: metadata)
     return document if document.persisted? && document.checksum == checksum && document.active == active
 
-    document.update!(title: title, content: content, metadata: metadata, checksum: checksum, active: active)
+    document.update!(title: title, content: content, metadata: metadata, checksum: checksum, active: active,
+      embedding: [], embedding_model: nil, embedded_at: nil)
+    EmbedKnowledgeDocumentJob.perform_later(document.id) if embeddings_enabled? && active
     document
+  end
+
+  def embeddings_enabled?
+    ActiveModel::Type::Boolean.new.cast(ENV.fetch("KNOWLEDGE_EMBEDDINGS_ENABLED", "false"))
   end
 
   def deactivate_missing_products!
