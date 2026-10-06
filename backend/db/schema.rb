@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_000200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -144,6 +144,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_000100) do
     t.string "checksum", null: false
     t.text "content", null: false
     t.datetime "created_at", null: false
+    t.datetime "embedded_at"
+    t.jsonb "embedding", default: [], null: false
+    t.string "embedding_model"
     t.jsonb "metadata", default: {}, null: false
     t.bigint "source_id"
     t.string "source_type", null: false
