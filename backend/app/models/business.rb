@@ -9,6 +9,7 @@ class Business < ApplicationRecord
   has_many :orders, dependent: :destroy
   has_many :channel_connections, dependent: :destroy
   has_many :messenger_webhook_events, dependent: :destroy
+  has_many :knowledge_documents, dependent: :destroy
   has_one :business_policy, dependent: :destroy
   has_one :delivery_integration, dependent: :destroy
 
