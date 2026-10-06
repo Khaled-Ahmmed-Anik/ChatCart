@@ -111,3 +111,6 @@
 .button.danger:hover { background: #7f2929; }
 .status.suspended { background: #fff1cf; color: var(--warning); }
 .status.disabled { background: #fde8e8; color: var(--danger); }
+.knowledge-notice{margin:0 0 18px;padding:12px 14px;border:1px solid #efd99c;border-radius:12px;background:#fff7df;color:var(--warning)}
+.knowledge-grid{margin-bottom:18px}.knowledge-form textarea{min-height:150px}.preview-query{grid-template-columns:1fr auto;align-items:end}.knowledge-results{display:grid;gap:10px;margin-top:18px}.knowledge-results article{padding:13px;border:1px solid var(--line);border-radius:12px;background:#f8faf8}.knowledge-results article strong{margin-right:8px}.knowledge-results article p{white-space:pre-wrap}.knowledge-results article small{color:var(--muted)}
+@media(max-width:720px){.preview-query{grid-template-columns:1fr}.knowledge-metrics{grid-template-columns:1fr 1fr}}

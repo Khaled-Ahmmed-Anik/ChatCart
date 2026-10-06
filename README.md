@@ -178,6 +178,10 @@ review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-p
 | `POST` | `/api/conversations/:id/handover` | Pause automation for human takeover |
 | `GET/POST` | `/api/products` | Manage the current business's catalog |
 | `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
+| `GET/POST` | `/api/knowledge_documents` | Manage tenant-scoped manual FAQs and indexed sources |
+| `GET` | `/api/knowledge_documents/status` | Inspect knowledge and embedding readiness |
+| `GET` | `/api/knowledge_documents/preview` | Preview grounded retrieval for a customer question |
+| `POST` | `/api/knowledge_documents/sync` | Refresh indexed product and policy knowledge |
 | `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
 Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. Sessions expire after 12 hours; disabling a user or suspending/disabling its business revokes every affected session. Reactivation requires a fresh login. The original API-token path remains temporarily available for backward compatibility. See [Authentication and access lifecycle](docs/authentication-and-access.md) for the complete behavior.
