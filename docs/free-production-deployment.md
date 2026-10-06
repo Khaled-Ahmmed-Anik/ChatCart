@@ -194,6 +194,12 @@ These are public URLs, not secrets.
 
 The backend container runs `db:prepare` before starting. Production migrations must therefore be backward-compatible with the previous release:
 
+The entrypoint detects `bin/rails server` even when the hosting platform appends
+bind or port arguments. A successful startup prints `Preparing primary database
+schema` before Puma boots. If `/ready` rejects a release, search the logs for
+`deployment_readiness_failed`; it lists only the failed check names and missing
+schema objects, never connection credentials.
+
 1. Add new columns/tables as nullable or with safe defaults.
 2. Deploy code that can handle old and new data.
 3. Backfill data separately when needed.
