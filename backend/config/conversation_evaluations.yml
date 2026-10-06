@@ -1,0 +1,78 @@
+schema_version: 1
+cases:
+  - id: greeting_en
+    message: "hello, is anyone there?"
+    expected_intent: greeting
+    locale: english
+    tags: [social]
+  - id: greeting_bn
+    message: "আসসালামু আলাইকুম"
+    expected_intent: greeting
+    locale: bengali
+    tags: [social]
+  - id: product_price_banglish
+    message: "bhai ei shirt tar dam koto?"
+    expected_intent: product_price
+    locale: banglish
+    tags: [catalog, fashion]
+  - id: product_stock_bn
+    message: "এই কেকটা কি এখন পাওয়া যাবে?"
+    expected_intent: product_availability
+    locale: bengali
+    tags: [catalog, food]
+  - id: recommendation_en
+    message: "suggest a laptop for office work"
+    expected_intent: product_recommendation
+    locale: english
+    tags: [recommendation, electronics]
+  - id: recommendation_banglish
+    message: "amar budget er moddhe valo kichu suggest koren"
+    expected_intent: product_recommendation
+    locale: banglish
+    tags: [recommendation]
+  - id: delivery_charge_bn
+    message: "ঢাকার বাইরে ডেলিভারি চার্জ কত?"
+    expected_intent: delivery_charge
+    locale: bengali
+    tags: [delivery]
+  - id: delivery_time_banglish
+    message: "order ta kobe pabo?"
+    expected_intent: delivery_time
+    locale: banglish
+    tags: [delivery]
+  - id: payment_en
+    message: "can I pay with a card?"
+    expected_intent: payment_methods
+    locale: english
+    tags: [payment]
+  - id: new_order_banglish
+    message: "arekta notun order korte chai"
+    expected_intent: new_order
+    locale: banglish
+    tags: [order]
+  - id: correction_quantity_en
+    message: "actually make that three"
+    expected_intent: change_quantity
+    locale: english
+    pending_order_status: confirmed
+    tags: [order, correction]
+  - id: human_handover_bn
+    message: "আমি একজন মানুষের সাথে কথা বলতে চাই"
+    expected_intent: human_agent
+    locale: bengali
+    tags: [handover]
+  - id: complaint_banglish
+    message: "service ta valo na, complaint korte chai"
+    expected_intent: complaint
+    locale: banglish
+    tags: [support]
+  - id: return_en
+    message: "I need to return this product"
+    expected_intent: return_request
+    locale: english
+    tags: [post_purchase]
+  - id: language_bn
+    message: "বাংলায় উত্তর দিন"
+    expected_intent: language_preference
+    locale: bengali
+    tags: [language]
