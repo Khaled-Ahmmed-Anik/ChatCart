@@ -54,6 +54,7 @@ Detailed implementation documentation:
 - [Authentication and access lifecycle](docs/authentication-and-access.md) — sessions, revocation, account controls, and business suspension/disable behavior.
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
+- [Conversation evaluation](docs/conversation-evaluation.md) — reviewed multilingual benchmark cases, quality thresholds, and the regression command.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
