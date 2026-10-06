@@ -111,6 +111,7 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
     assert_equal "get_product_details", requests.second.dig("contents", 2, "parts", 0, "functionResponse", "name")
     assert_equal true, assistant.telemetry.fetch("planner_used")
     assert_equal [ "get_product_details" ], assistant.telemetry.fetch("tool_names")
+    assert_empty assistant.telemetry.fetch("knowledge_citations")
     assert_nil assistant.telemetry.fetch("fallback_reason")
   end
 

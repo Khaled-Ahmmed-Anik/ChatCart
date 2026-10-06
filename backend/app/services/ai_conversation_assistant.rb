@@ -61,6 +61,7 @@ class AiConversationAssistant
       result = gateway.call(call.fetch("name"), call.fetch("args", {}))
       (@tool_evidence ||= []) << result
       telemetry["tool_names"] << call.fetch("name")
+      telemetry["knowledge_citations"].concat(knowledge_citations(result))
       { functionResponse: { name: call.fetch("name"), response: result } }
     end
     telemetry["planner_used"] = true
@@ -194,7 +195,16 @@ class AiConversationAssistant
   end
 
   def base_telemetry
-    { "planner_used" => false, "tool_names" => [], "fallback_reason" => nil, "latency_ms" => nil }
+    {
+      "planner_used" => false, "tool_names" => [], "knowledge_citations" => [],
+      "fallback_reason" => nil, "latency_ms" => nil
+    }
+  end
+
+  def knowledge_citations(tool_result)
+    return [] unless tool_result["tool"] == "search_business_knowledge"
+
+    Array(tool_result.dig("result", "matches")).filter_map { |match| match["citation"] }
   end
 
   def fallback_with_reason(fallback, reason)
