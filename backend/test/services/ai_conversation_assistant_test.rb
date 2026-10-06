@@ -22,6 +22,7 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
 
     assert_includes captured_request.body, "Customer's preferred form of address: bhai"
     assert_includes captured_request.body, "Never infer gender"
+    assert_includes captured_request.body, "Use search_business_knowledge"
   end
 
   test "uses the deterministic reply when no API key is configured" do
@@ -105,6 +106,8 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
     end
 
     assert_equal 2, requests.size
+    tool_names = requests.first.fetch("tools").first.fetch("functionDeclarations").pluck("name")
+    assert_includes tool_names, "search_business_knowledge"
     assert_equal "get_product_details", requests.second.dig("contents", 2, "parts", 0, "functionResponse", "name")
     assert_equal true, assistant.telemetry.fetch("planner_used")
     assert_equal [ "get_product_details" ], assistant.telemetry.fetch("tool_names")

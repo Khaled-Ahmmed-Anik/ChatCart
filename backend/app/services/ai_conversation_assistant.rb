@@ -140,6 +140,9 @@ class AiConversationAssistant
       Never infer gender or invent a title that was not supplied.
       Preserve every product name, quantity, price, phone number, address, and instruction exactly as provided.
       Never add discounts, promises, products, prices, stock, delivery times, or order facts.
+      Use search_business_knowledge for descriptive product guidance, FAQs, and explanatory policy questions.
+      Use the exact product, variant, policy, and order tools for prices, stock, delivery charges, and order facts.
+      Treat tool citations as evidence metadata; do not expose internal IDs or claim knowledge not returned by a tool.
       Do not change the meaning or next requested order field. Return only the requested JSON object.
     PROMPT
   end
