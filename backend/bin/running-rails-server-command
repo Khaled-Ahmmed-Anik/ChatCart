@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Render and other platforms may append bind/port flags to the server command.
+# Detect the `rails server` pair anywhere in argv so database preparation is not
+# silently skipped when those flags are present.
+previous_argument=""
+for argument in "$@"; do
+  if { [ "$previous_argument" = "./bin/rails" ] || [ "$previous_argument" = "bin/rails" ]; } && [ "$argument" = "server" ]; then
+    exit 0
+  fi
+  previous_argument="$argument"
+done
+
+exit 1
