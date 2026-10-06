@@ -21,4 +21,13 @@ class KnowledgeSourceRefreshTest < ActiveSupport::TestCase
       policy.update!(delivery_time: "Three days")
     end
   end
+
+  test "variant changes queue a business knowledge refresh" do
+    product = @business.products.create!(name: "The Oud", price: 420, stock_quantity: 5)
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: SyncBusinessKnowledgeJob, args: [ @business.id ]) do
+      product.product_variants.create!(name: "30 ML", price: 850, stock_quantity: 2)
+    end
+  end
 end
