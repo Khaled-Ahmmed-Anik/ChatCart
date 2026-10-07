@@ -22,7 +22,7 @@ class BotReplyGenerator
     when :help
       help_reply
     when :wellbeing
-      "Alhamdulillah, I’m doing well#{address_suffix} 😊 How can I help with your order today?"
+      "Alhamdulillah, I’m doing well#{address_suffix} 😊 How can I help you today?"
     when :thanks
       "You’re very welcome#{address_suffix}! #{status_prompt}"
     when :goodbye
@@ -39,6 +39,8 @@ class BotReplyGenerator
       I18n.t("bot_replies.human_handover_started", locale: :bn)
     when :clarification_needed
       clarification_reply
+    when :previous_question_explained
+      previous_question_explanation
     when :price_inquiry
       product_information(:price)
     when :currency_clarification
@@ -148,6 +150,9 @@ class BotReplyGenerator
       "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
     when :confirmation_deferred
       "No problem—your order is saved, but it isn’t confirmed yet. Send “confirm” whenever you’re ready, or say “change the order” to update it."
+    when :order_paused
+      banglish? ? "Thik ache#{address_suffix}—eta ekhon pause rakhlam. Jokhon ichchhe notun kichu dekhte ba order korte bolben." :
+        "No problem#{address_suffix}—I’ve paused that for now. Tell me whenever you want to explore something else or continue."
     when :order_updated
       "Done—I’ve updated it. #{status_prompt}"
     when :confirmed_order_updated
@@ -423,10 +428,13 @@ class BotReplyGenerator
       "previous_recommendations" => guided_context["last_recommendations"].presence ||
         conversation_state.dig("shopping_preferences", "previous_recommendations")
     )
+    requested_count = preferences["recommendation_count"].to_i
+    recommendation_count = requested_count.positive? ? requested_count.clamp(1, 3) : 3
     result = ProductRecommendationService.new(
       business: pending_order.conversation.business,
       message: customer_message&.content,
-      preferences: preferences
+      preferences: preferences,
+      limit: recommendation_count
     ).call
     return result.clarification_question if result.clarification_question.present?
 
@@ -443,7 +451,7 @@ class BotReplyGenerator
     )
     remember_options!(:products, result.offers.map(&:product).uniq)
 
-    options = result.offers.first(3).map do |offer|
+    options = result.offers.first(recommendation_count).map do |offer|
       description = offer.product.short_description.presence || offer.product.description.to_s
       summary = description.squish.truncate(100)
       detail_lines = []
@@ -623,6 +631,24 @@ class BotReplyGenerator
     end
 
     "I’m not fully sure what you’d like to do. Are you choosing a product, changing an order, or asking about delivery/payment?"
+  end
+
+  def previous_question_explanation
+    previous = pending_order.conversation.messages.bot.order(id: :desc).first&.content.to_s
+    if previous.match?(/single.*combo|perfume.*combo|fragrance.*combo/i)
+      return "Ami jiggesh korechilam apni single perfume niben, naki koyekti fragrance-er combo niben. Chaile budget-o bolte paren." if banglish?
+
+      return "I was asking whether you want one perfume or a combo containing several fragrances. You can also share your budget."
+    end
+    if previous.match?(/scent|shondho|price|pochondo|like/i)
+      return "Ami jiggesh korechilam product-er scent, price, ba onno kono bishoy apnar pochondo hoyni kina. Na nite chaile kono problem nei." if banglish?
+
+      return "I was asking whether the scent, price, or something else did not suit you. It is completely fine if you do not want it."
+    end
+
+    return "Ager proshno-ta clear hoyni bujhte perechi. Kon part-ta bojha jayni bolle ami aro shohoj kore bolbo." if banglish?
+
+    "I understand that my previous question was unclear. Tell me which part was confusing and I’ll explain it more simply."
   end
 
   def recommendation_choice_reminder
