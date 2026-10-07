@@ -110,6 +110,10 @@ class CompactIntentClassifier
 
   def checkout_value?
     return true if pending_order&.collecting_phone? && normalized.match?(/\A\+?\d[\d ]{7,14}\z/)
+    if pending_order&.collecting_quantity?
+      quantity_words = Constants::Conversation::NUMBER_WORDS.keys.join("|")
+      return true if normalized.match?(/\A(?:\d+|#{quantity_words})(?:\s+(?:ta|pieces?|pcs?))?\z/)
+    end
     if pending_order&.status.in?(%w[collecting_variant collecting_quantity collecting_name collecting_phone collecting_address])
       return true if normalized.match?(/\b\d+\s*(?:ml|gm|kg|pieces?|pcs?)\b/)
       return true if normalized.match?(/\b(bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/)

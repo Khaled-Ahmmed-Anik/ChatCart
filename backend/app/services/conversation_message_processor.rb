@@ -328,7 +328,11 @@ class ConversationMessageProcessor
   end
 
   def handle_conversational_intent
-    @outcome = if repeat_order_request?
+    @outcome = if pause_active_order_request?
+      pause_active_order
+    elsif explanation_request?
+      :previous_question_explained
+    elsif repeat_order_request?
       repeat_previous_order ? :repeat_order_prepared : :restarted
     elsif restart_request?
       restart_order
@@ -386,6 +390,10 @@ class ConversationMessageProcessor
       :price_inquiry
     elsif stock_question?
       :stock_inquiry
+    elsif distinct_fragrances_recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
     elsif comparison_request?
       :product_comparison_requested
     elsif recommendation_refinement_request?
@@ -1036,10 +1044,17 @@ class ConversationMessageProcessor
     return true if budget_recommendation_request?
     return true if discovery_follow_up?
     return true if active_discovery_preference?
+    return true if distinct_fragrances_recommendation_request?
     return false if product_resolution.matched?
 
     content.downcase.match?(
       /\b(suggest|recommend|help me choose|(?:give|show)(?:\s+me)?(?:\s+some)?\s+options?|which (perfume|fragrance)|(?:want|need|looking for)(?:\s+\w+){0,3}\s+(?:perfume|fragrance)|combo|bundle|single(?: perfume)?|one perfume)\b|\b(fresh|sweet|fruity|floral|woody|oud|spicy|tobacco)\b.*\b(perfume|fragrance|scent|kichu)\b|\b(oudy|oudi|oody|oddy|ody)\b/
+    )
+  end
+
+  def distinct_fragrances_recommendation_request?
+    content.downcase.match?(
+      /\b(2|two|duita|duta)\b.{0,30}\b(different|alada|separate)\b.{0,20}\b(perfumes?|fragrances?|scents?)\b|দুইটা.{0,20}(আলাদা|ভিন্ন)/
     )
   end
 
@@ -1064,6 +1079,10 @@ class ConversationMessageProcessor
     flow = GuidedSalesConversation.new(pending_order.conversation)
     flow.suspend_order!(pending_order)
     flow.transition!("discover") unless flow.stage == "discover"
+    state = pending_order.conversation.conversation_state.to_h
+    if state["order_context_paused"] == true
+      pending_order.conversation.update!(conversation_state: state.merge("order_context_paused" => false))
+    end
     return unless pending_order.status.in?(%w[
       collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
     ])
@@ -1078,6 +1097,36 @@ class ConversationMessageProcessor
       existing: state["shopping_preferences"]
     )
     conversation.update!(conversation_state: state)
+  end
+
+  def pause_active_order_request?
+    normalized = content.downcase.squish
+    explicit_pause = normalized.match?(
+      /\b(pause|hold|nibo na|lagbe na|chai na|bad den|stop)\b|নিব না|লাগবে না|চাই না|বাদ দিন/
+    )
+    explicit_pause ||= !pending_order.awaiting_confirmation? && normalized.match?(/\A(ekhon na|এখন না)[?!. ]*\z/)
+    return true if explicit_pause && pending_order.product.present? && !pending_order.confirmed?
+    return false unless pending_order.conversation.conversation_state.to_h["order_context_paused"] == true
+
+    normalized.match?(/\A(no|na|nah|nope|না)[?!. ]*\z/)
+  end
+
+  def pause_active_order
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.suspend_order!(pending_order)
+    state = pending_order.conversation.conversation_state.to_h
+    pending_order.conversation.update!(conversation_state: state.merge(
+      "order_context_paused" => true,
+      "paused_product_id" => pending_order.product_id,
+      "paused_at" => Time.current.iso8601
+    ))
+    :order_paused
+  end
+
+  def explanation_request?
+    content.downcase.squish.match?(
+      /\A(?:mane ki|what do you mean|what does that mean|bujhlam na|bujte parini|clear na|কি মানে|মানে কি|বুঝিনি)[?!. ]*\z/
+    )
   end
 
   def resume_browsed_order_request?

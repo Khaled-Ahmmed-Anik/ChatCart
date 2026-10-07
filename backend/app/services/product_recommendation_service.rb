@@ -194,6 +194,9 @@ class ProductRecommendationService
     return if budget_detected
     return if preferences["price_direction"].present? || preferences["projection_preference"].present?
     dimensions = preference_dimensions
+    if preferences["recommendation_count"].to_i > 1 && preferences["format"] == "single" && dimensions.size == 1
+      return "What scent styles should the different fragrances cover—fresh, sweet, floral, woody/oud, or something else? You can also share your budget."
+    end
     return if dimensions.size >= 2
     return "Would you prefer one perfume or a combo with multiple fragrances?" if dimensions.empty?
 

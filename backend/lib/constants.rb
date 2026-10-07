@@ -1,6 +1,6 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.1"
+    ENGINE_VERSION = "2026.10.2"
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
@@ -48,7 +48,8 @@ module Constants
       product_recommendation_requested: "discover", alternative_product_requested: "discover",
       product_comparison_requested: "compare", recommendations_rejected: "discover",
       shortlist_updated: "compare", product_selected: "select", variant_selected: "configure",
-      quantity_collected: "checkout", address_collected: "confirm", confirmed: "complete"
+      quantity_collected: "checkout", address_collected: "confirm", confirmed: "complete",
+      order_paused: "discover"
     }.freeze
   end
 

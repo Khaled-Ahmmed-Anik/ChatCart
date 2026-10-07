@@ -59,6 +59,7 @@ class ConversationResponsePlanner
     return focused_clarification if outcome == :clarification_needed
 
     content = combined_reply
+    return content if order_context_paused?
     return content unless interruption?
     return content if pending_prompt.blank? || content.include?(pending_prompt)
 
@@ -106,6 +107,7 @@ class ConversationResponsePlanner
   end
 
   def pending_prompt
+    return if order_context_paused?
     return banglish_pending_prompt if preferred_language(conversation.conversation_state.to_h) == "banglish"
 
     case pending_order.status
@@ -127,6 +129,7 @@ class ConversationResponsePlanner
   end
 
   def continuation_prompt
+    return if order_context_paused?
     if conversation.conversation_state.to_h["context_switch_count"].to_i.positive? && selected_item.present?
       return "Apnar #{selected_item} selection-ta save ache. Eta niye continue korben, change korben, naki ekhon pause rakhben?" if
         preferred_language(conversation.conversation_state.to_h) == "banglish"
@@ -208,6 +211,7 @@ class ConversationResponsePlanner
   end
 
   def pending_question
+    return if order_context_paused?
     {
       "collecting_product" => "product",
       "collecting_quantity" => "quantity",
@@ -236,7 +240,7 @@ class ConversationResponsePlanner
   end
 
   def approved_facts
-    {
+    facts = {
       "business_name" => conversation.business.name,
       "product_id" => pending_order.product_id,
       "product_name" => pending_order.product&.name,
@@ -247,5 +251,12 @@ class ConversationResponsePlanner
       "total_price" => pending_order.product.present? && pending_order.quantity.present? ? pending_order.total_price.to_s : nil,
       "order_status" => pending_order.status
     }.compact
+    return facts.slice("business_name") if order_context_paused?
+
+    facts
+  end
+
+  def order_context_paused?
+    conversation.conversation_state.to_h["order_context_paused"] == true
   end
 end

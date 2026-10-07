@@ -12,6 +12,15 @@ intents:
     - "not sure what I need"
     - "কি বলতে হবে বুঝছি না"
     - "একটু বুঝিয়ে বলবেন"
+    - "mane ki"
+    - "bujhlam na"
+    - "what do you mean"
+  wellbeing:
+    - "ki khobor"
+    - "kemon asen"
+    - "shob bhalo"
+    - "কি খবর"
+    - "কেমন আছেন"
   product_search:
     - "search for a product"
     - "find me a blue shirt"
@@ -182,6 +191,10 @@ intents:
     - "পড়াশোনার জন্য ল্যাপটপ সাজেস্ট করুন"
     - "আমার জন্য ভালো খাবার সাজেস্ট করুন"
     - "কোন সার্ভিসটি আমার জন্য ভালো হবে"
+    - "2 ta suggest koren"
+    - "duita alada perfume suggest koren"
+    - "2 ta nite chai different fragrance"
+    - "দুইটা আলাদা সুগন্ধি সাজেস্ট করুন"
   product_variants:
     - "which colors are available"
     - "portion size ki ki"
