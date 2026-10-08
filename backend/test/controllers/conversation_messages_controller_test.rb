@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
+  setup { Business.default.update!(category: "perfume") }
   test "create records an incoming customer message for a new conversation" do
     assert_difference -> { Conversation.count }, 1 do
       assert_difference -> { Message.count }, 2 do

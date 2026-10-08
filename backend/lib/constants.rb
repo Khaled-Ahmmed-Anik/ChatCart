@@ -1,6 +1,6 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.3"
+    ENGINE_VERSION = "2026.10.4"
     BANGLISH_WORDS = {
       "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
       "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
@@ -37,6 +37,7 @@ module Constants
       "order_status" => :order_details_requested, "defer_confirmation" => :confirmation_deferred
     }.freeze
     FOCUSED_OUTCOMES = %i[
+      cart_needs_details cart_inventory_unavailable cart_locked
       product_recommendation_requested recommendation_choice_reminder product_variants_requested product_ambiguous
       variant_not_found clarification_needed product_weather_requested first_time_scent_guidance
     ].freeze
