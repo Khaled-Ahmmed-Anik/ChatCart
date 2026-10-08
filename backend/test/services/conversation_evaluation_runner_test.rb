@@ -4,7 +4,7 @@ class ConversationEvaluationRunnerTest < ActiveSupport::TestCase
   test "reports aggregate, locale, tag, and failure metrics" do
     report = ConversationEvaluationRunner.new.call
 
-    assert_equal 15, report[:total]
+    assert_equal ConversationEvaluationSuite.load.size, report[:total]
     assert report[:passing], report[:failures].inspect
     assert_operator report[:accuracy], :>=, ConversationEvaluationRunner::MINIMUM_ACCURACY
     assert_operator report[:coverage], :>=, ConversationEvaluationRunner::MINIMUM_COVERAGE

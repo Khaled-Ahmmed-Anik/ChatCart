@@ -5,6 +5,11 @@ description: >-
   electronics, appointments, and services without making any one sector a
   requirement.
 intents:
+  delivery_charge:
+    - "how much is delivery"
+    - "how much does shipping cost"
+    - "delivery er khoroch bolen age"
+    - "age delivery charge ta bolen"
   unclear:
     - "something"
     - "eta niye bolen"

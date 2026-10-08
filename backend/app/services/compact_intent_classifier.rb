@@ -130,7 +130,7 @@ class CompactIntentClassifier
     # not mistaken for a delivery-area or Dhaka delivery-charge question.
     !normalized.match?(/(?:\?|delivery|deliver|shipping|charge|koto|ki\b|how\b|can\b|হবে|কত|চার্জ)/i)
   end
-  def normalize(value) = value.to_s.downcase.unicode_normalize(:nfkc).gsub(/[^\p{L}\p{N}]+/u, " ").squish
+  def normalize(value) = ConversationTextNormalizer.call(value)
   def grams(value) = value.length < 3 ? [ value ] : value.chars.each_cons(3).map(&:join).uniq
 
   def similarity(left, right)
