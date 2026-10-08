@@ -5,7 +5,7 @@ class ConversationMessageProcessor
     @message = message
     @pending_order = pending_order
     @content = message.content.to_s.strip
-    @interpretation = interpretation
+    @interpretation = ConversationEntityValidator.call(interpretation, @content)
   end
 
   def process
@@ -56,7 +56,8 @@ class ConversationMessageProcessor
     plan = ConversationActionPlanner.new(
       message: message,
       business: pending_order.conversation.business,
-      current_product: pending_order.product
+      current_product: pending_order.product,
+      interpretation: interpretation
     ).call
     return false unless plan.actionable?
 
@@ -386,6 +387,9 @@ class ConversationMessageProcessor
       :product_recommendation_requested
     elsif currency_question?
       :currency_clarification
+    elsif content.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:delivery_charge_requested]) &&
+        !confident_ai_intent?(%w[select_product change_product])
+      :delivery_charge_requested
     elsif price_question?
       :price_inquiry
     elsif stock_question?
@@ -662,8 +666,8 @@ class ConversationMessageProcessor
   end
 
   def contextual_product_selection
-    normalized = content.downcase.squish
-    if normalized.match?(/\b(previous product|previous one|one before|ager product|agerta|আগের প্রোডাক্ট|আগেরটা)\b/)
+    normalized = ConversationTextNormalizer.call(content)
+    if normalized.match?(/\b(previous product|previous one|one before|ager product|ager ta)\b|আগের প্রোডাক্ট|আগেরটা/)
       history = Array(pending_order.conversation.conversation_state.to_h.dig("turn_manager", "reference_history"))
       current_id = pending_order.product_id || history.last&.dig("product_id")
       previous = history.reverse.find { |reference| reference["product_id"].to_i != current_id.to_i }
@@ -870,7 +874,7 @@ class ConversationMessageProcessor
 
   def parse_quantity(value)
     normalized = value.to_s.downcase
-      .gsub(/\b(first|second|third|last|prothom|ditiyo|tritiyo)\s+one\b/, "")
+      .gsub(/\b(first|second|third|last|previous|prothom|ditiyo|tritiyo)\s+one\b/, "")
       .gsub(/\b\d+(?:\.\d+)?\s*ml\b/, "")
 
     word_quantity = Constants::Conversation::NUMBER_WORDS.find do |word, _number|

@@ -1,5 +1,30 @@
 schema_version: 1
 cases:
+  - id: price_spelling_daam
+    message: "daam kotho"
+    expected_intent: product_price
+    locale: banglish
+    tags: [catalog, spelling]
+  - id: price_spelling_damm
+    message: "damm kotoo bhai"
+    expected_intent: product_price
+    locale: banglish
+    tags: [catalog, spelling]
+  - id: wellbeing_short_banglish
+    message: "ki khobor bhai"
+    expected_intent: wellbeing
+    locale: banglish
+    tags: [social, short_reply]
+  - id: clarify_short_banglish
+    message: "mane ki?"
+    expected_intent: unclear
+    locale: banglish
+    tags: [clarification, short_reply]
+  - id: delivery_english_question
+    message: "how much is delivery"
+    expected_intent: delivery_charge
+    locale: english
+    tags: [delivery, side_question]
   - id: greeting_en
     message: "hello, is anyone there?"
     expected_intent: greeting

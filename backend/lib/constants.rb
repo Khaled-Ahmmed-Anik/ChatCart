@@ -1,6 +1,12 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.2"
+    ENGINE_VERSION = "2026.10.3"
+    BANGLISH_WORDS = {
+      "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
+      "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
+      "kotho" => "koto", "daam" => "dam", "damm" => "dam",
+      "niboo" => "nibo", "nimu" => "nibo", "diben" => "den"
+    }.freeze
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,

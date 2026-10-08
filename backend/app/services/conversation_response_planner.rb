@@ -79,7 +79,7 @@ class ConversationResponsePlanner
   def combined_reply
     return base_reply if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
 
-    replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
+    replies = secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
         pending_order: pending_order,
         customer_message: customer_message,
@@ -87,7 +87,7 @@ class ConversationResponsePlanner
         interpretation: interpretation,
         address_preference: address_preference
       ).content
-    end
+    end + [ base_reply ]
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
   end
 
