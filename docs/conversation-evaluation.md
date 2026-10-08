@@ -29,7 +29,43 @@ Before committing it:
 Do not copy entire production conversations into the repository. A case should
 contain only the minimum anonymized message needed to reproduce the behavior.
 
-## Next evaluation layers
+## Multi-turn behavior checks
+
+`test/services/multilingual_conversation_flow_test.rb` exercises English and
+Banglish clothing and retail purchases, previous-product references, side
+questions, quantity corrections, ambiguous model decisions, and checkout
+grounding. These are authored regression scenarios, not copied production chats.
+The existing replay suite also covers perfume variants and completed-order repairs.
+
+Run both layers before changing conversation decisions:
+
+```bash
+mise exec -- bin/rails conversation:evaluate
+mise exec -- bin/rails test test/services/multilingual_conversation_flow_test.rb test/services/conversation_replay_test.rb test/services/conversation_entity_validator_test.rb
+```
+
+Spelling normalization applies to classification and action planning; the stored
+customer message remains intact. New spelling cases must be narrow enough not to
+rewrite customer names or catalogue names.
+
+## Decision validation
+
+Gemini receives the current business category, available product names/aliases,
+variant labels, recent messages, and remembered conversation state. It proposes
+registered intents and entities. Before checkout processing, an entity validator
+removes product, variant, size, customer, and address values unsupported by the
+current message, and rejects size/timing/price numbers as proposed quantities.
+References such as “the previous one” resolve through tenant-scoped conversation
+history rather than accepting a model-invented product name.
+
+The combined action planner requires an ordering cue, rejects uncertain,
+comparison, rejection, and deferred decisions, and checks stock before updating
+the order. Informational answers precede checkout prompts. The existing guarded
+naturalizer rewrites that approved reply when enabled; deterministic processing
+continues to work without a Gemini key. No new environment variables or migration
+are needed for these changes.
+
+## Further evaluation layers
 
 The dataset format is intentionally versioned so later PRs can add response
 grounding, order-state transitions, reference resolution, handover decisions,
