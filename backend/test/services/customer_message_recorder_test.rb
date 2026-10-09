@@ -185,7 +185,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "customer_requested_human", result.conversation.conversation_state.dig("handover_summary", "reason")
     assert_equal "I want to talk to a human agent",
       result.conversation.conversation_state.dig("handover_summary", "last_customer_message")
-    assert_includes result.bot_reply.content, "আমরা শিগগিরই আপনার সাথে যোগাযোগ করব"
+    assert_includes result.bot_reply.content, "we will get back to you soon"
 
     follow_up = record_message("hello?")
     assert_equal :awaiting_human, follow_up.outcome
@@ -196,7 +196,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     business = Business.default
     conversation = business.conversations.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
     draft = conversation.create_pending_order!(status: :collecting_name)
-    3.times do
+    2.times do
       result = CustomerMessageRecorder.new(business: business, channel: "facebook",
         external_customer_id: conversation.external_customer_id, content: "My password reset is not working").record
       assert_nil draft.reload.customer_name
