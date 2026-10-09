@@ -17,6 +17,9 @@ module Constants
       yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
       ha haa ji jii thik thikache accha acha
     ].freeze
+    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
+    EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|cancel (?:my |the |this )?order(?: please)?|please cancel (?:my |the )?order|order cancel(?: koro| korun)?|বাতিল করুন)[.! ]*\z/i
+    NON_NAME_SENTENCE = /(?:\b(?:password|forgot|cannot|can't|don't|do not|confirm|cancel|delivery|refund|payment)\b|পাসওয়ার্ড|বাতিল|পরে)/i
     AI_OUTCOMES = {
       "greeting" => :greeting, "thanks" => :thanks, "help" => :help, "wellbeing" => :wellbeing,
       "goodbye" => :goodbye, "bot_identity" => :bot_identity, "language_preference" => :language_preference,

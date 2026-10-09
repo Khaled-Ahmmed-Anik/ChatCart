@@ -273,6 +273,7 @@ class ConversationMessageProcessor
       address: clean_checkout_value(parts[(phone_index + 1)..]&.join(", "), :address)
     }
     details[:customer_name] = clean_checkout_value(parts.first, :customer_name) if phone_index.positive?
+    details.delete(:customer_name) if non_name_reply?(details[:customer_name])
     details.compact_blank
   end
 
@@ -623,6 +624,7 @@ class ConversationMessageProcessor
 
   def record_change(field, new_value)
     return false if new_value.blank?
+    return false if field == :customer_name && non_name_reply?(new_value)
 
     previous_value = pending_order.public_send(field)
     return true if previous_value.to_s == new_value.to_s
@@ -675,6 +677,7 @@ class ConversationMessageProcessor
   def collect_interpreted_value(field, next_status)
     value = interpretation.entities[field].to_s.strip
     return false if value.blank?
+    return false if field == :customer_name && non_name_reply?(value)
 
     pending_order.update!(field => value, status: next_status)
     true
@@ -951,11 +954,11 @@ class ConversationMessageProcessor
   end
 
   def confirmation?
-    normalized_content.in?(%w[confirm confirmed yes y]) || confident_ai_intent?(%w[confirm_order])
+    content.match?(Constants::Conversation::EXPLICIT_CONFIRMATION)
   end
 
   def cancellation?
-    normalized_content.in?(%w[cancel cancelled stop no n]) || confident_ai_intent?(%w[cancel_order])
+    content.match?(Constants::Conversation::EXPLICIT_CANCELLATION)
   end
 
   def normalized_content
@@ -1380,9 +1383,11 @@ class ConversationMessageProcessor
   end
 
   def non_name_reply?(value)
-    normalized = value.to_s.downcase.gsub(/[^a-z]/, "")
+    normalized = value.to_s.downcase.gsub(/[^\p{L}\p{M}]/, "")
     return true if normalized.blank? || greeting?
     return true if Constants::Conversation::NON_NAME_REPLIES.include?(normalized)
+    return true unless value.to_s.match?(/\A[\p{L}\p{M} .'-]{2,80}\z/u)
+    return true if value.to_s.match?(Constants::Conversation::NON_NAME_SENTENCE)
 
     value.to_s.downcase.match?(/\A(that|it|this)\s+(works|is fine|is good)(\s+for\s+me)?[?!. ]*\z/)
   end
