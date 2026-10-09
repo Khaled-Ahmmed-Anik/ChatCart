@@ -25,6 +25,8 @@ class BotReplyGenerator
 
   def outcome_reply
     case outcome
+    when :unsupported_support_requested
+      repair_translation(:support)
     when :greeting
       greeting_reply
     when :help
@@ -253,7 +255,7 @@ class BotReplyGenerator
       *product_catalog_lines(visible_products),
       more_products_line,
       "",
-      "Know what you want? Send the product name. Not sure? Tell me whether you want a single perfume or combo, the scent style or occasion, and your budget (for example, “fresh for office under ৳1500”)."
+      repair_translation(:discovery)
     ].compact.join("\n")
   end
 
@@ -272,9 +274,13 @@ class BotReplyGenerator
     pending_order.conversation.business.name
   end
 
+  def repair_translation(key)
+    I18n.t("conversation_repair.#{banglish? ? 'banglish' : 'en'}.#{key}")
+  end
+
   def quantity_prompt
     selection = [ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(" ")
-    unit = pending_order.product_variant.present? ? "each" : "per bottle"
+    unit = "each"
     "#{selection} is #{formatted_price(pending_order.unit_price)} #{unit}. How many would you like?"
   end
 

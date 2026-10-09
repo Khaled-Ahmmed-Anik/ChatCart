@@ -89,7 +89,7 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "collecting_quantity", response_body.dig("pending_order", "status")
     assert_equal product.id, response_body.dig("pending_order", "product_id")
     assert_equal "0", response_body.dig("pending_order", "total_price")
-    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", response_body.dig("bot_reply", "content")
+    assert_equal "Nice choice! Fresh Musk is ৳750 each. How many would you like?", response_body.dig("bot_reply", "content")
   end
 
   test "create processes quantity from incoming message" do

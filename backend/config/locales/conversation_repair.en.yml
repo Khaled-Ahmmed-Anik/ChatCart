@@ -1,0 +1,8 @@
+en:
+  conversation_repair:
+    en:
+      support: "Sorry you’re having trouble. I can help with products and orders here, but I can’t fix website or account-access problems. Please describe the issue so the seller can help. Your order hasn’t been changed."
+      discovery: "Know what you want? Send the product name. Not sure? Tell me what you’ll use it for, any preferences, and your budget."
+    banglish:
+      support: "Apnar oshubidhar jonno dukkhoito. Ekhane product ar order niye help korte pari, kintu website ba account-er problem fix korte pari na. Problem-ta ektu bolben, jate seller help korte paren? Apnar order change hoyni."
+      discovery: "Product pochondo kora thakle nam-ta bolun. Na hole ki kajer jonno lagbe, kono preference ache kina, ar budget-ta bolben?"
