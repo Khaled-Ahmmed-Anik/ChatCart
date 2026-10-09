@@ -3,7 +3,7 @@ class ConversationTurnManager
   MAX_REFERENCE_HISTORY = 5
   PROGRESS_OUTCOMES = %i[
     product_selected variant_selected variant_bundle_selected quantity_collected name_collected phone_collected
-    address_collected multiple_details_collected order_updated confirmed_order_updated restarted confirmed cancelled
+    address_collected multiple_details_collected order_updated confirmed_order_updated restarted confirmed cancelled cart_updated
   ].freeze
   UNRESOLVED_OUTCOMES = {
     clarification_needed: "intent",
@@ -15,7 +15,8 @@ class ConversationTurnManager
     quantity_unavailable: "quantity",
     invalid_phone: "phone",
     confirmation_unclear: "confirmation",
-    invalid_order_update: "order_update"
+    invalid_order_update: "order_update",
+    cart_needs_details: "cart_item", cart_inventory_unavailable: "cart_stock"
   }.freeze
 
   def initialize(conversation)

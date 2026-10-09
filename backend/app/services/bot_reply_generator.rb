@@ -8,6 +8,14 @@ class BotReplyGenerator
   end
 
   def content
+    return cart_translation(:stock) if outcome == :cart_inventory_unavailable
+    if outcome == :cart_needs_details
+      return pending_order.conversation.conversation_state.to_h["cart_question"]
+    end
+    return cart_translation(:locked) if outcome == :cart_locked
+    if outcome == :cart_updated
+      return "#{cart_translation(:updated)}\n#{cart_lines.join("\n")}\n\n#{status_prompt}"
+    end
     outcome_reply || status_prompt
   end
 
@@ -316,8 +324,7 @@ class BotReplyGenerator
   def confirmation_prompt
     [
       "Here’s your order summary:",
-      "• #{pending_order.quantity} × #{[ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(' ')}",
-      *combo_component_lines,
+      *cart_lines,
       "• Total: #{formatted_price(pending_order.total_price)}",
       "• Name: #{pending_order.customer_name}",
       "• Phone: #{pending_order.phone}",
@@ -325,6 +332,17 @@ class BotReplyGenerator
       "",
       "Does everything look right? Reply “confirm” to place it or “cancel” to stop."
     ].join("\n")
+  end
+
+  def cart_lines
+    pending_order.line_items.flat_map do |item|
+      [ "• #{item.quantity} × #{item.label} — #{formatted_price(item.total_price)}",
+        *item.product.component_snapshot.map { |component| "  ↳ Includes #{component['quantity']} × #{component['name']}" } ]
+    end
+  end
+
+  def cart_translation(key)
+    I18n.t("#{banglish? ? 'cart_banglish' : 'cart'}.#{key}", locale: :en)
   end
 
   def help_reply
@@ -546,6 +564,10 @@ class BotReplyGenerator
       offer.product.description, offer.product.suitable_for, offer.product.product_attributes.to_h.flatten.join(" ") ]
       .compact.join(" ").downcase
     reasons = []
+    preferences["attributes"].to_h.each do |key, values|
+      matches = Array(offer.product.product_attributes.to_h[key]) & Array(values)
+      reasons << "#{matches.join(', ')} #{key.humanize.downcase} matches your preference" if matches.any?
+    end
     Array(preferences["scent_families"]).each do |family|
       reasons << "matches your #{family} preference" if searchable.include?(family.to_s.downcase)
     end

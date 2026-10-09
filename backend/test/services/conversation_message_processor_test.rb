@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationMessageProcessorTest < ActiveSupport::TestCase
+  setup { Business.default.update!(category: "perfume") }
   test "collects product by matching active in-stock product name" do
     product = create_product(name: "Fresh Musk")
     pending_order = create_pending_order(status: :collecting_product)
