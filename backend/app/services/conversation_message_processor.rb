@@ -14,6 +14,10 @@ class ConversationMessageProcessor
       return pending_order
     end
 
+    if content.match?(Constants::Conversation::SUPPORT_ACCESS_REQUEST) || content.match?(Constants::Conversation::SUPPORT_TECHNICAL_REQUEST)
+      @outcome = :unsupported_support_requested
+      return pending_order
+    end
     return pending_order if handle_cart_request
     if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
       collect_variant
@@ -117,6 +121,8 @@ class ConversationMessageProcessor
 
   def handle_ai_intent
     return false if interpretation.blank?
+    return false if interpretation.intent == "greeting" && !greeting?
+    return false if interpretation.intent == "thanks" && !content.match?(Constants::Conversation::THANKS_ONLY)
 
     if interpretation.needs_clarification || interpretation.intent == "unclear"
       @outcome = :clarification_needed
@@ -1378,7 +1384,7 @@ class ConversationMessageProcessor
   end
 
   def extracted_customer_name
-    match = content.match(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s*[:=-]?\s*(.+?)[?!. ]*\z/i)
+    match = content.match(Constants::Conversation::CUSTOMER_NAME_PREFIX)
     match ? match[1].strip : content
   end
 
@@ -1388,6 +1394,8 @@ class ConversationMessageProcessor
     return true if Constants::Conversation::NON_NAME_REPLIES.include?(normalized)
     return true unless value.to_s.match?(/\A[\p{L}\p{M} .'-]{2,80}\z/u)
     return true if value.to_s.match?(Constants::Conversation::NON_NAME_SENTENCE)
+    return true if value.to_s.match?(Constants::Conversation::NON_NAME_CONVERSATION)
+    return true if value.to_s.split.size > 5
 
     value.to_s.downcase.match?(/\A(that|it|this)\s+(works|is fine|is good)(\s+for\s+me)?[?!. ]*\z/)
   end
