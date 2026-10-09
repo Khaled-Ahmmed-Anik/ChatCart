@@ -46,7 +46,7 @@ class BotReplyGenerator
     when :human_agent
       "I’ll mark this for seller assistance. Please leave a short description of what you need help with."
     when :human_handover_started
-      I18n.t("bot_replies.human_handover_started", locale: :bn)
+      repair_translation(:handover)
     when :clarification_needed
       clarification_reply
     when :previous_question_explained
@@ -135,7 +135,7 @@ class BotReplyGenerator
     when :product_unavailable
       "Sorry, that product isn’t available right now. #{product_selection_prompt}"
     when :product_not_found
-      "Are you asking about a product, recommendation, price, delivery, payment, or an existing order? You can send the product name, or tell me what you want and your budget."
+      contextual_repair_reply
     when :product_ambiguous
       product_ambiguity_reply
     when :invalid_quantity
@@ -275,7 +275,21 @@ class BotReplyGenerator
   end
 
   def repair_translation(key)
-    I18n.t("conversation_repair.#{banglish? ? 'banglish' : 'en'}.#{key}")
+    I18n.t("conversation_repair.#{repair_language}.#{key}")
+  end
+
+  def repair_language
+    language = interpretation&.language.presence || pending_order.conversation.conversation_state.to_h["preferred_language"]
+    return "bn" if language.in?(%w[bangla bengali bn]) || customer_message&.content.to_s.match?(/[\u0980-\u09FF]/)
+    return "banglish" if language == "banglish"
+
+    "en"
+  end
+
+  def contextual_repair_reply
+    context = ConversationRepairContext.new(conversation: pending_order.conversation, message: customer_message)
+    key = context.repeated? ? "retry_#{context.topic}" : "question_#{context.topic}"
+    repair_translation(key)
   end
 
   def quantity_prompt

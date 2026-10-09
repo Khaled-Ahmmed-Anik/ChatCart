@@ -56,11 +56,26 @@ this remains a conservative heuristic and is not identity verification.
 Discovery prompts use sector-neutral preferences, purpose and budget rather
 than assuming perfume. Selected-product quantity pricing uses "each".
 
-Three consecutive `product_not_found` or `unsupported_support_requested`
-outcomes trigger existing seller handover with reason
-`repeated_unresolved_request`. A successful intervening answer resets the
-sequence. The existing takeover UI/alerts handle this reason normally; no new
-notification channel is introduced.
+Three consecutive `product_not_found` outcomes trigger existing seller
+handover with reason `repeated_unresolved_request`. Two consecutive unsupported
+support outcomes use the separate `unsupported_support` reason. A successful
+intervening answer resets each sequence. The existing takeover UI/alerts handle
+these reasons normally; no new notification channel is introduced.
+
+## Contextual recovery (WC-051)
+
+Unmatched messages use a delivery, payment, order or product clarification
+rather than the generic topic menu. A second failure gets a more specific
+question. Recent customer messages provide topic context only when the current
+message contains a reference such as "that" or "it"; an explicit new topic
+takes priority. Repair prompts never change order facts.
+
+Recognizable failure follow-ups stay in website/account support context without
+mistaking a new product request for a support issue. Support does not count as
+an unclear shopping request. Handover and repair messages are localized in
+English, Banglish and Bengali using the interpretation, stored preference or
+Bengali script where available. These are bounded heuristics, not general
+conversation understanding. No dataset files are committed.
 
 Follow-up priorities remain side-question resumption, postfix quantities,
 product/reference resolution, and richer business-specific support knowledge.
