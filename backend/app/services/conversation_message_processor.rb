@@ -14,7 +14,8 @@ class ConversationMessageProcessor
       return pending_order
     end
 
-    if content.match?(Constants::Conversation::SUPPORT_ACCESS_REQUEST) || content.match?(Constants::Conversation::SUPPORT_TECHNICAL_REQUEST)
+    if content.match?(Constants::Conversation::SUPPORT_ACCESS_REQUEST) || content.match?(Constants::Conversation::SUPPORT_TECHNICAL_REQUEST) ||
+        ConversationRepairContext.new(conversation: pending_order.conversation, message: message).support_follow_up?
       @outcome = :unsupported_support_requested
       return pending_order
     end
