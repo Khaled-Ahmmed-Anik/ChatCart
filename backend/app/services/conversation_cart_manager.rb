@@ -4,23 +4,30 @@ class ConversationCartManager
   def initialize(message:, pending_order:)
     @message = message
     @order = pending_order
-    @text = ConversationTextNormalizer.call(message.content)
+    @text = ConversationTextNormalizer.call(message.content.to_s.gsub("+", " and "))
   end
 
   def call
     matches = product_mentions
-    command = text.match?(/\A(?:add|also add|include|remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
+    addition = text.match?(/\b(?:add|include|adding)\b|\b(?:aro|r o)\b.*\b(?:product|item)\b/) && !text.match?(/\b(?:not|don t|do not)\b/)
+    awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
+    command = addition || awaiting_addition || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
-    return unless command || ((matches.size > 1 || multiple_clause) && purchase)
+    explicit_list = matches.any? && message.content.match?(/\+|\b(?:and|ar|ebong)\b/i) && text.match?(/\d/)
+    return unless command || explicit_list || ((matches.size > 1 || multiple_clause) && purchase)
     return if text.match?(/\b(?:compare|difference|better|vs|nibo na|chai na|do not|don t)\b/)
     return if matches.any? do |match|
       text[match[:finish]..].to_s.match?(/\A\s+(?:na|not)\b/)
     end
-    return if command && matches.empty? && !text.match?(/\A(?:add|include|remove|delete|drop)\b/)
+    return if command && matches.empty? && !addition && !text.match?(/\A(?:remove|delete|drop)\b/)
     return if text.match?(/\A(?:change|update)\b/) && order.pending_order_items.none?
     return Result.new(outcome: :cart_locked, question: nil) if order.confirmed? || order.submitted_to_woocommerce?
-    return clarification("Which product would you like to add or change? Please send its name.") if matches.empty?
+    if matches.empty?
+      order.conversation.update!(conversation_state: order.conversation.conversation_state.to_h.merge("cart_awaiting_product" => addition))
+      key = text.match?(/\b(?:ager|aro|korte|korbo|cai|chai)\b/) ? "cart_banglish.choose_product" : "cart.choose_product"
+      return clarification(I18n.t(key))
+    end
     final_tail = text[matches.last[:finish]..].to_s
     if final_tail.match?(/\b(?:and|ar|ebong)\b\s+\S/) &&
         ConversationActionPlanner::INFORMATIONAL_PATTERNS.values.none? { |pattern| final_tail.match?(pattern) }
@@ -35,20 +42,23 @@ class ConversationCartManager
 
     plans = matches.each_with_index.map do |match, index|
       segment = text[match[:start]...matches[index + 1]&.fetch(:start)]
-      plan_for(match[:product], segment)
+      prefix = text[0...match[:start]][/(?:\A|\s)(\d+)\s*\z/, 1]
+      plan_for(match[:product], segment, prefix_quantity: prefix&.to_i)
     end
     if plans.any? { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
       return clarification("Please include the quantity and available option for each product you want to order.") if plans.size > 1
       return start_addition(plans.first)
     end
-    return Result.new(outcome: :cart_inventory_unavailable, question: nil) unless available_additions?(plans)
+    replace_cart = explicit_list && !command
+    return Result.new(outcome: :cart_inventory_unavailable, question: nil) unless available_additions?(plans, replace_cart: replace_cart)
 
     order.with_lock do
-      order.save_current_item!
+      replace_cart ? order.pending_order_items.destroy_all : order.save_current_item!
       plans[0...-1].each { |plan| add_saved_item(plan) }
       final = plans.last
       order.update!(product: final[:product], product_variant: final[:variant], quantity: final[:quantity], status: checkout_status)
     end
+    clear_addition_context!
     Result.new(outcome: :cart_updated, question: nil)
   end
 
@@ -58,7 +68,8 @@ class ConversationCartManager
 
   def product_mentions
     matches = order.conversation.business.products.available_for_sale.flat_map do |product|
-      product.searchable_names.filter_map do |name|
+      names = product.searchable_names.flat_map { |name| [ name, name.sub(/\Athe\s+/i, "") ] }.uniq
+      names.filter_map do |name|
         label = ConversationTextNormalizer.call(name)
         text.to_enum(:scan, /(?:\A|\s)(#{Regexp.escape(label)})(?=\z|\s)/).map do
           match = Regexp.last_match
@@ -66,22 +77,26 @@ class ConversationCartManager
         end
       end
     end.flatten.sort_by { |match| [ match[:start], -(match[:finish] - match[:start]) ] }
+    matches.reject! do |match|
+      same_span = matches.select { |other| other[:start] == match[:start] && other[:finish] == match[:finish] }
+      same_span.map { |other| other[:product].id }.uniq.size > 1
+    end
     matches.each_with_object([]) do |match, selected|
       selected << match unless selected.any? { |other| match[:start] < other[:finish] && match[:finish] > other[:start] }
     end
   end
 
-  def plan_for(product, segment)
+  def plan_for(product, segment, prefix_quantity: nil)
     plan = ConversationActionPlanner.new(message: Struct.new(:content).new(segment), business: order.conversation.business, current_product: product).call
-    quantity = plan.quantity
+    quantity = prefix_quantity || plan.quantity
     remainder = product.searchable_names.reduce(segment) { |value, name| value.gsub(ConversationTextNormalizer.call(name), "") }
     quantity ||= remainder.strip.to_i if remainder.strip.match?(/\A\d+\z/)
     quantity ||= remainder[/\bto\s+(\d+)\z/, 1]&.to_i
     { product: product, variant: plan.variant, quantity: quantity }
   end
 
-  def available_additions?(plans)
-    totals = order.line_items.to_h { |item| [ [ item.product_id, item.product_variant_id ], item.quantity ] }
+  def available_additions?(plans, replace_cart: false)
+    totals = replace_cart ? {} : order.line_items.to_h { |item| [ [ item.product_id, item.product_variant_id ], item.quantity ] }
     plans.all? do |plan|
       key = [ plan[:product].id, plan[:variant]&.id ]
       totals[key] = totals.fetch(key, 0) + plan[:quantity]
@@ -103,6 +118,7 @@ class ConversationCartManager
       status = plan[:product].available_variants.any? && plan[:variant].blank? ? :collecting_variant : :collecting_quantity
       order.update!(product: plan[:product], product_variant: plan[:variant], quantity: plan[:quantity], status: status)
     end
+    clear_addition_context!
     Result.new(outcome: :cart_updated, question: nil)
   end
 
@@ -151,4 +167,9 @@ class ConversationCartManager
   end
 
   def clarification(question) = Result.new(outcome: :cart_needs_details, question: question)
+
+  def clear_addition_context!
+    conversation = order.conversation
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product"))
+  end
 end

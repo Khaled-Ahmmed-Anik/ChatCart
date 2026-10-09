@@ -15,6 +15,10 @@ class ConversationMessageProcessor
     end
 
     return pending_order if handle_cart_request
+    if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
+      collect_variant
+      return pending_order
+    end
     return pending_order if accept_variant_bundle_offer
     return pending_order if apply_action_plan
     return pending_order if handle_order_update_request
@@ -442,6 +446,8 @@ class ConversationMessageProcessor
   end
 
   def restart_order
+    conversation = pending_order.conversation
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product"))
     pending_order.pending_order_items.destroy_all
     pending_order.update!(
       product: nil,
@@ -738,6 +744,11 @@ class ConversationMessageProcessor
   def matching_variant(product)
     return if product.blank? || product.product_variants.none?
 
+    if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/)
+      candidates = product.available_variants.select { |variant| variant.size.to_s[/\A\s*\d+(?:\.\d+)?/]&.strip == content.strip }
+      return candidates.first if candidates.one?
+    end
+
     requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
     exact = product.available_variants.find do |variant|
       candidates = [ variant.name, variant.size ].compact.map(&:downcase)
@@ -989,12 +1000,11 @@ class ConversationMessageProcessor
   end
 
   def restart_request?
-    intent_detector.new_order? || confident_ai_intent?(%w[new_order repeat_order])
+    intent_detector.new_order?
   end
 
   def repeat_order_request?
-    confident_ai_intent?(%w[repeat_order]) ||
-      content.downcase.match?(/\b(re-?order|order again|same order|ager order|আগের অর্ডার)\b/)
+    content.downcase.match?(/\b(re-?order|repeat (?:my )?order|order again|same order)\b|আগের অর্ডার.*আবার|\bager order\b.*\b(?:abar|again|repeat)\b/)
   end
 
   def order_details_request?
@@ -1330,10 +1340,10 @@ class ConversationMessageProcessor
     return false if pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
 
     normalized = normalize_catalog_name(content)
-    product = catalog.available_for_sale.find do |candidate|
-      candidate.searchable_names.any? { |name| normalize_catalog_name(name) == normalized }
+    products = catalog.available_for_sale.select do |candidate|
+      candidate.searchable_names.any? { |name| normalize_catalog_name(name).sub(/\Athe /, "") == normalized.sub(/\Athe /, "") }
     end
-    return false if product.blank?
+    return false unless products.one?
 
     collect_product
     true

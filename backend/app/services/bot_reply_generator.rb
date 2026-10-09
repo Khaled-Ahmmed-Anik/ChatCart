@@ -362,13 +362,12 @@ class BotReplyGenerator
   end
 
   def order_history_reply
-    orders = pending_order.conversation.pending_orders.order(created_at: :desc, id: :desc).limit(3)
+    orders = pending_order.conversation.pending_orders.where(status: [ :confirmed, :submitted_to_woocommerce ]).order(created_at: :desc, id: :desc).limit(3)
     return "You don’t have any previous orders yet." if orders.empty?
 
     lines = orders.map do |order|
-      product = order.product&.name || "Product not selected"
-      quantity = order.quantity || "—"
-      "• Order ##{order.id}: #{quantity} × #{product} — #{order.status.humanize}"
+      items = order.line_items.map { |item| "#{item.quantity} × #{item.label}" }.join(", ")
+      "• Order ##{order.id}: #{items} — #{order.status.humanize}"
     end
     ([ "Here are your latest orders:" ] + lines).join("\n")
   end
