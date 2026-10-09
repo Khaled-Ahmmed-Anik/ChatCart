@@ -1093,6 +1093,37 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_predicate pending_order.reload, :confirmed?
   end
 
+  test "classifier guesses cannot cancel or confirm an order" do
+    { "cancel_order" => "I cannot edit my order", "confirm_order" => "Is everything ready?" }.each do |intent, text|
+      order = create_ready_pending_order(status: :awaiting_confirmation)
+      message = order.conversation.messages.create!(sender_type: :customer, content: text)
+      ConversationMessageProcessor.new(message: message, pending_order: order,
+        interpretation: ai_interpretation(intent: intent)).process
+      assert_predicate order.reload, :awaiting_confirmation?
+    end
+  end
+
+  test "unrelated support and negated actions are not customer names" do
+    [ "I forgot my password", "do not confirm yet", "don't cancel", "12345678" ].each do |text|
+      order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+      process_message(order, text)
+      assert_nil order.reload.customer_name, text
+      assert_predicate order, :collecting_name?
+    end
+  end
+
+  test "Bengali customer names are accepted" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "রহিম আহমেদ")
+    assert_equal "রহিম আহমেদ", order.reload.customer_name
+  end
+
+  test "a support sentence in a checkout bundle is not saved as a name" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "I forgot my password, 01712345678, House 3 Dhaka")
+    assert_nil order.reload.customer_name
+  end
+
   private
 
   def process_message(pending_order, content)
