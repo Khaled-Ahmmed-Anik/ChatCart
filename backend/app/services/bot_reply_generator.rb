@@ -145,7 +145,7 @@ class BotReplyGenerator
     when :name_collected
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
     when :name_required
-      "What name should I put on the order? Please send the customer name only."
+      I18n.t("conversation_safety.#{banglish? ? 'banglish' : 'en'}.name_required")
     when :invalid_phone
       invalid_phone_reply
     when :phone_collected
