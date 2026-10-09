@@ -1,6 +1,6 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.4"
+    ENGINE_VERSION = "2026.10.5"
     BANGLISH_WORDS = {
       "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
       "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
