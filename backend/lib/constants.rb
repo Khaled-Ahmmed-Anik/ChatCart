@@ -1,6 +1,13 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.5"
+    ENGINE_VERSION = "2026.10.6"
+    GREETING_ONLY = /\A(?:hi|hello|hey|assalamu?\s*alaikum|assalamu?laikum|assalamulaikum|salam|হ্যালো|আসসালামু আলাইকুম)(?:\s+(?:there|bhai|apu|sir|madam))?[!. ]*\z/i
+    THANKS_ONLY = /\A(?:thanks(?: a lot)?|thank you(?: very much)?|dhonnobad|onek dhonnobad|ধন্যবাদ|অনেক ধন্যবাদ)[!. ]*\z/i
+    CUSTOMER_NAME_PREFIX = /\A(?:(?:hi|hello|hey|হ্যালো)(?:\s+there)?[,!. ]+)?(?:my name is|i am|i'm|amar naam|amar nam|name|naam|আমার নাম)\s*[:=-]?\s*(.+?)[.! ]*\z/i
+    NON_NAME_CONVERSATION = /\b(?:i|we|you|my|your|have|need|want|trying|loading|question|ordered|when|why|how|please|hello|hi)\b|আমার|আপনার|চাই|কেন|কিভাবে/i
+    SUPPORT_ACCESS_REQUEST = /\b(?:password|login|log in|sign in|account access|reset account|two.factor|2fa)\b|পাসওয়ার্ড|লগইন/i
+    SUPPORT_TECHNICAL_REQUEST = /\b(?:cart|checkout|check out|search|website|site)\b.*\b(?:not loading|not updating|won'?t|isn'?t|can't|cannot|not working|error|broken)\b|\b(?:can't|cannot)\b.*\b(?:checkout|check out|log in)\b/i
+    CONVERSATION_REPAIR_THRESHOLD = 3
     BANGLISH_WORDS = {
       "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
       "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
@@ -40,7 +47,7 @@ module Constants
       "order_status" => :order_details_requested, "defer_confirmation" => :confirmation_deferred
     }.freeze
     FOCUSED_OUTCOMES = %i[
-      cart_needs_details cart_inventory_unavailable cart_locked
+      cart_needs_details cart_inventory_unavailable cart_locked unsupported_support_requested
       product_recommendation_requested recommendation_choice_reminder product_variants_requested product_ambiguous
       variant_not_found clarification_needed product_weather_requested first_time_scent_guidance
     ].freeze

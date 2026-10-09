@@ -42,6 +42,26 @@ env -u DATABASE_URL RAILS_ENV=test mise exec -- bundle exec rails test
 mise exec -- bundle exec rubocop
 ```
 
-Follow-up priorities remain sector-neutral wording, side-question resumption,
-postfix quantities, and product/reference resolution. This change addresses
-the first safety unit rather than claiming all evaluation limitations solved.
+## Conversation repair (WC-050)
+
+Greeting and thanks classifications are accepted only for standalone social
+messages. A greeting attached to a delivery question must not replace the
+substantive request. Account-access and recognizable website/cart failures
+receive a localized support boundary response without changing the draft.
+
+Customer-name extraction supports greeting-prefixed introductions in English,
+Banglish and Bengali. Sentence cues and overly long candidates are rejected;
+this remains a conservative heuristic and is not identity verification.
+
+Discovery prompts use sector-neutral preferences, purpose and budget rather
+than assuming perfume. Selected-product quantity pricing uses "each".
+
+Three consecutive `product_not_found` or `unsupported_support_requested`
+outcomes trigger existing seller handover with reason
+`repeated_unresolved_request`. A successful intervening answer resets the
+sequence. The existing takeover UI/alerts handle this reason normally; no new
+notification channel is introduced.
+
+Follow-up priorities remain side-question resumption, postfix quantities,
+product/reference resolution, and richer business-specific support knowledge.
+Neither safety unit claims all evaluation limitations solved.

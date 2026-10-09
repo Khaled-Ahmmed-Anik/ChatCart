@@ -20,7 +20,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(product: product, status: :collecting_quantity)
 
     assert_equal(
-      "Fresh Musk is ৳750 per bottle. How many would you like?",
+      "Fresh Musk is ৳750 each. How many would you like?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -218,7 +218,8 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "Assalamu alaikum! 👋 Welcome to ChatCart."
     assert_includes reply, "Here are a few products you can order:"
     assert_includes reply, "• Fresh Musk — ৳750"
-    assert_includes reply, "single perfume or combo"
+    assert_includes reply, "any preferences, and your budget"
+    assert_not_includes reply, "single perfume"
   end
 
   test "limits the greeting catalog and explains how to see the rest" do

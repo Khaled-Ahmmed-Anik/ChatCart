@@ -1124,6 +1124,31 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_nil order.reload.customer_name
   end
 
+  test "extracts a name from a greeting and introduction" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "Hi there I am Sara Rahman.")
+    assert_equal "Sara Rahman", order.reload.customer_name
+  end
+
+  test "support issues preserve checkout and do not become names" do
+    [ "Hello my checkout is not working", "I forgot my password", "Hi I have a question about a product I ordered" ].each do |text|
+      order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+      process_message(order, text)
+      assert_nil order.reload.customer_name
+      assert_predicate order, :collecting_name?
+    end
+  end
+
+  test "a greeting classification cannot override a delivery question" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "Hello delivery charge koto?")
+    processor = ConversationMessageProcessor.new(message: message, pending_order: order,
+      interpretation: ai_interpretation(intent: "greeting"))
+    processor.process
+    assert_equal :delivery_charge_requested, processor.outcome
+    assert_nil order.reload.customer_name
+  end
+
   private
 
   def process_message(pending_order, content)

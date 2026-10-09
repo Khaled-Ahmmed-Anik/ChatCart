@@ -18,7 +18,7 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "product_selected", result.message.metadata.dig("conversation_intelligence", "outcome")
     assert_equal product, result.pending_order.product
     assert_predicate result.pending_order, :collecting_quantity?
-    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", result.bot_reply.content
+    assert_equal "Nice choice! Fresh Musk is ৳750 each. How many would you like?", result.bot_reply.content
     assert_equal :product_selected, result.outcome
   end
 
@@ -190,6 +190,20 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     follow_up = record_message("hello?")
     assert_equal :awaiting_human, follow_up.outcome
     assert_nil follow_up.bot_reply
+  end
+
+  test "repeated unresolved support preserves the draft and triggers handover" do
+    business = Business.default
+    conversation = business.conversations.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    draft = conversation.create_pending_order!(status: :collecting_name)
+    3.times do
+      result = CustomerMessageRecorder.new(business: business, channel: "facebook",
+        external_customer_id: conversation.external_customer_id, content: "My password reset is not working").record
+      assert_nil draft.reload.customer_name
+      assert_predicate draft, :collecting_name?
+      assert result.bot_reply.present?
+    end
+    assert_predicate conversation.reload, :handed_over?
   end
 
   private
