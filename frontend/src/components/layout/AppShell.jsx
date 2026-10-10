@@ -9,7 +9,7 @@ import { pollInterval } from "../../lib/polling";
 
 const businessNavigation = [
   ["/app", "Overview", true], ["/app/orders", "Orders"], ["/app/conversations", "Conversations"],
-  ["/app/products", "Products"], ["/app/settings", "Business setup"]
+  ["/app/products", "Products"], ["/app/knowledge", "Knowledge"], ["/app/settings", "Business setup"]
 ];
 
 function playHandoverSound() {

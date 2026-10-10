@@ -1,6 +1,8 @@
 class ProductVariant < ApplicationRecord
   belongs_to :product
 
+  after_commit :refresh_business_knowledge
+
   scope :active, -> { where(active: true) }
   scope :in_stock, -> { where("stock_quantity > 0") }
   scope :available, -> { active.in_stock }
@@ -16,5 +18,11 @@ class ProductVariant < ApplicationRecord
 
   def display_name
     size.presence || name
+  end
+
+  private
+
+  def refresh_business_knowledge
+    SyncBusinessKnowledgeJob.perform_later(product.business_id)
   end
 end

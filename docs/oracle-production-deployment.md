@@ -1,5 +1,7 @@
 # Oracle Always Free backend deployment
 
+> **Planned migration, not the current production environment.** ChatCart currently runs its Rails backend on Render. Use this guide when moving to an always-on Oracle VM; verify Oracle's current free-tier availability and account requirements before migration.
+
 This deployment runs the Rails API, Meta webhooks, and Solid Queue on one Oracle Cloud VM. Neon remains the PostgreSQL provider, and Cloudflare Pages hosts the React frontend.
 
 ## 1. Create the VM
@@ -54,9 +56,10 @@ docker compose version
 ## 5. Clone and configure ChatCart
 
 ```bash
-git clone https://github.com/Khaled-Ahmmed-Anik/wintobono-chat-helper-v1.git
-cd wintobono-chat-helper-v1
-git checkout WC-017-improve-conversation-recovery
+git clone https://github.com/Khaled-Ahmmed-Anik/ChatCart.git
+cd ChatCart
+git checkout main
+git pull --ff-only origin main
 cp deploy/oracle/.env.example deploy/oracle/.env
 nano deploy/oracle/.env
 ```
@@ -81,13 +84,13 @@ bin/rails db:encryption:init
 On the Oracle VM:
 
 ```bash
-cd ~/wintobono-chat-helper-v1/deploy/oracle
+cd ~/ChatCart/deploy/oracle
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail=100 backend
 ```
 
-The container automatically executes `db:prepare`. Seed initial accounts once:
+The container automatically executes `db:prepare`, primary migrations, and the critical schema contract check. A pending migration or missing required column stops startup and makes `/ready` return `503`. Seed initial accounts once:
 
 ```bash
 docker compose exec backend ./bin/rails db:seed
@@ -121,7 +124,7 @@ Meta's verify tokens must exactly match the values in `deploy/oracle/.env`.
 ## Release updates
 
 ```bash
-cd ~/wintobono-chat-helper-v1
+cd ~/ChatCart
 git pull --ff-only
 cd deploy/oracle
 docker compose up -d --build

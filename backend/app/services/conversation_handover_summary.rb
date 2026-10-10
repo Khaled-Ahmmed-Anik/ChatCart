@@ -37,6 +37,7 @@ class ConversationHandoverSummary
       "status" => order.status,
       "product" => order.product&.name,
       "quantity" => order.quantity,
+      "items" => order.item_snapshot,
       "customer_name" => order.customer_name
     }.compact
   end

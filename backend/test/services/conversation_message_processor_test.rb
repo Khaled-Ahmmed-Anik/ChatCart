@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationMessageProcessorTest < ActiveSupport::TestCase
+  setup { Business.default.update!(category: "perfume") }
   test "collects product by matching active in-stock product name" do
     product = create_product(name: "Fresh Musk")
     pending_order = create_pending_order(status: :collecting_product)
@@ -1010,6 +1011,142 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_equal current, pending_order.reload.product
     assert_nil pending_order.product_variant
     assert_nil pending_order.quantity
+  end
+
+  test "does not save an acceptance phrase as the customer name" do
+    pending_order = create_pending_order(product: create_product, quantity: 1, status: :collecting_name)
+
+    processor = process_message(pending_order, "that works for me")
+
+    assert_equal :name_required, processor.outcome
+    assert_nil pending_order.reload.customer_name
+    assert_predicate pending_order, :collecting_name?
+  end
+
+  test "selects an exact catalog product before a recommendation intent can override it" do
+    product = create_product(name: "The Office")
+    pending_order = create_pending_order(status: :collecting_product)
+    message = pending_order.conversation.messages.create!(sender_type: :customer, content: "The Office")
+    interpretation = ai_interpretation(intent: "product_recommendation")
+
+    processor = ConversationMessageProcessor.new(
+      message: message, pending_order: pending_order, interpretation: interpretation
+    )
+    processor.process
+
+    assert_equal :product_selected, processor.outcome
+    assert_equal product, pending_order.reload.product
+    assert_predicate pending_order, :collecting_quantity?
+  end
+
+  test "applies size quantity and name atomically while collecting checkout details" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 8)
+    selected = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 8)
+    pending_order = create_pending_order(product: product, quantity: 1, status: :collecting_name)
+    message = pending_order.conversation.messages.create!(
+      sender_type: :customer, content: "Salam, 30 ml 1 ta den bhai, 10 ml na"
+    )
+
+    processor = ConversationMessageProcessor.new(message: message, pending_order: pending_order)
+    processor.process
+
+    assert_equal :multiple_details_collected, processor.outcome
+    assert_equal selected, pending_order.reload.product_variant
+    assert_equal 1, pending_order.quantity
+    assert_equal "Salam", pending_order.customer_name
+    assert_predicate pending_order, :collecting_phone?
+  end
+
+  test "reuses a previous completed order phone number before AI can redirect the turn" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.create_pending_order!(
+      product: create_product, quantity: 1, customer_name: "Anik", phone: "01712345678",
+      address: "Dhaka", status: :confirmed
+    )
+    pending_order = conversation.create_pending_order!(
+      product: create_product(name: "The Oud"), quantity: 1, customer_name: "Anik", status: :collecting_phone
+    )
+
+    processor = process_message(pending_order, "ager number tai den bhai")
+
+    assert_equal :phone_collected, processor.outcome
+    assert_equal "01712345678", pending_order.reload.phone
+    assert_predicate pending_order, :collecting_address?
+  end
+
+  test "updates a customer name expressed naturally while reviewing the order" do
+    pending_order = create_ready_pending_order(customer_name: "that works for me", status: :awaiting_confirmation)
+
+    processor = process_message(pending_order, "my name is Salam update on the order")
+
+    assert_equal :order_updated, processor.outcome
+    assert_equal "Salam", pending_order.reload.customer_name
+  end
+
+  test "separates a return policy question from a return request" do
+    pending_order = create_ready_pending_order(status: :confirmed)
+
+    processor = process_message(pending_order, "return policy ase?")
+
+    assert_equal :return_policy_requested, processor.outcome
+    assert_predicate pending_order.reload, :confirmed?
+  end
+
+  test "classifier guesses cannot cancel or confirm an order" do
+    { "cancel_order" => "I cannot edit my order", "confirm_order" => "Is everything ready?" }.each do |intent, text|
+      order = create_ready_pending_order(status: :awaiting_confirmation)
+      message = order.conversation.messages.create!(sender_type: :customer, content: text)
+      ConversationMessageProcessor.new(message: message, pending_order: order,
+        interpretation: ai_interpretation(intent: intent)).process
+      assert_predicate order.reload, :awaiting_confirmation?
+    end
+  end
+
+  test "unrelated support and negated actions are not customer names" do
+    [ "I forgot my password", "do not confirm yet", "don't cancel", "12345678" ].each do |text|
+      order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+      process_message(order, text)
+      assert_nil order.reload.customer_name, text
+      assert_predicate order, :collecting_name?
+    end
+  end
+
+  test "Bengali customer names are accepted" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "রহিম আহমেদ")
+    assert_equal "রহিম আহমেদ", order.reload.customer_name
+  end
+
+  test "a support sentence in a checkout bundle is not saved as a name" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "I forgot my password, 01712345678, House 3 Dhaka")
+    assert_nil order.reload.customer_name
+  end
+
+  test "extracts a name from a greeting and introduction" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    process_message(order, "Hi there I am Sara Rahman.")
+    assert_equal "Sara Rahman", order.reload.customer_name
+  end
+
+  test "support issues preserve checkout and do not become names" do
+    [ "Hello my checkout is not working", "I forgot my password", "Hi I have a question about a product I ordered" ].each do |text|
+      order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+      process_message(order, text)
+      assert_nil order.reload.customer_name
+      assert_predicate order, :collecting_name?
+    end
+  end
+
+  test "a greeting classification cannot override a delivery question" do
+    order = create_ready_pending_order(status: :collecting_name, customer_name: nil)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "Hello delivery charge koto?")
+    processor = ConversationMessageProcessor.new(message: message, pending_order: order,
+      interpretation: ai_interpretation(intent: "greeting"))
+    processor.process
+    assert_equal :delivery_charge_requested, processor.outcome
+    assert_nil order.reload.customer_name
   end
 
   private

@@ -49,6 +49,17 @@ class SendWhatsappReplyJobTest < ActiveJob::TestCase
     assert_equal "retrying", delivery.reload.status
   end
 
+  test "skips delivery without an API call when the business is inactive" do
+    delivery = create_delivery
+    delivery.whatsapp_webhook_event.business.update!(status: "suspended")
+
+    with_sender_failure { SendWhatsappReplyJob.perform_now(delivery) }
+
+    assert_equal "skipped", delivery.reload.status
+    assert_equal "business_inactive", delivery.last_error
+    assert_equal 0, delivery.attempts
+  end
+
   private
 
   def create_delivery
@@ -75,6 +86,14 @@ class SendWhatsappReplyJobTest < ActiveJob::TestCase
   def with_sender_result(result)
     original_deliver = WhatsappReplySender.instance_method(:deliver)
     WhatsappReplySender.define_method(:deliver) { result }
+    yield
+  ensure
+    WhatsappReplySender.define_method(:deliver, original_deliver)
+  end
+
+  def with_sender_failure
+    original_deliver = WhatsappReplySender.instance_method(:deliver)
+    WhatsappReplySender.define_method(:deliver) { raise "WhatsApp API must not be called" }
     yield
   ensure
     WhatsappReplySender.define_method(:deliver, original_deliver)

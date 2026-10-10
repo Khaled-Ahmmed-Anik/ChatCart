@@ -20,7 +20,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     pending_order = create_pending_order(product: product, status: :collecting_quantity)
 
     assert_equal(
-      "Fresh Musk is ৳750 per bottle. How many would you like?",
+      "Fresh Musk is ৳750 each. How many would you like?",
       BotReplyGenerator.new(pending_order: pending_order).content
     )
   end
@@ -218,7 +218,8 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "Assalamu alaikum! 👋 Welcome to ChatCart."
     assert_includes reply, "Here are a few products you can order:"
     assert_includes reply, "• Fresh Musk — ৳750"
-    assert_includes reply, "single perfume or combo"
+    assert_includes reply, "any preferences, and your budget"
+    assert_not_includes reply, "single perfume"
   end
 
   test "limits the greeting catalog and explains how to see the rest" do
@@ -391,6 +392,20 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "8-10 hours"
     assert_not_includes reply, "Unrelated Product"
     assert office.persisted? && bleu.persisted?
+  end
+
+  test "answers a return policy question without starting a return request" do
+    pending_order = create_pending_order(status: :collecting_product)
+    pending_order.conversation.business.create_business_policy!(return_policy: "Replacement is available within 7 days.")
+
+    reply = BotReplyGenerator.new(
+      pending_order: pending_order,
+      outcome: :return_policy_requested
+    ).content
+
+    assert_includes reply, "Replacement is available within 7 days."
+    assert_not_includes reply, "what happened"
+    assert_not_includes reply, "order number"
   end
 
   private

@@ -2,6 +2,8 @@ require "digest"
 
 class AuthSession < ApplicationRecord
   DEFAULT_LIFETIME = 12.hours
+  ACCOUNT_DISABLED_REASON = "account_disabled"
+  BUSINESS_INACTIVE_REASON = "business_inactive"
 
   belongs_to :user, optional: true
   belongs_to :platform_administrator, optional: true
@@ -9,7 +11,7 @@ class AuthSession < ApplicationRecord
   validates :token_digest, :expires_at, presence: true
   validate :exactly_one_actor
 
-  scope :active, -> { where("expires_at > ?", Time.current) }
+  scope :active, -> { where(revoked_at: nil).where("auth_sessions.expires_at > ?", Time.current) }
 
   def self.issue!(actor:, ip_address: nil, user_agent: nil)
     token = SecureRandom.urlsafe_base64(48)
@@ -25,11 +27,26 @@ class AuthSession < ApplicationRecord
   def self.authenticate(token)
     return if token.blank?
 
-    active.find_by(token_digest: digest(token))&.tap { |session| session.touch(:last_used_at) }
+    session = active.includes(:user, :platform_administrator).find_by(token_digest: digest(token))
+    return unless session&.actor&.authentication_allowed?
+
+    session.tap { |authenticated| authenticated.touch(:last_used_at) }
   end
 
   def actor
     user || platform_administrator
+  end
+
+  def revoked?
+    revoked_at.present?
+  end
+
+  def revoke!(reason: nil)
+    update!(revoked_at: Time.current, revocation_reason: reason)
+  end
+
+  def self.revoke_all!(reason:)
+    update_all(revoked_at: Time.current, revocation_reason: reason, updated_at: Time.current)
   end
 
   def self.digest(token)

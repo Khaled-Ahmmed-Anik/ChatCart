@@ -1,9 +1,11 @@
 #!/bin/bash -e
 
 # If running the rails server then create or migrate existing database
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+if /rails/bin/running-rails-server-command "$@"; then
+  echo "Preparing primary database schema"
   ./bin/rails db:prepare
   ./bin/rails db:migrate:primary
+  ./bin/rails deployment:verify_schema
 
   ensure_schema() {
     model="$1"

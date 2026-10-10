@@ -1,6 +1,31 @@
-# ChatCart Messenger Order Assistant
+# ChatCart Conversational Commerce Platform
 
-ChatCart is a multi-business conversational-commerce platform. It receives Messenger webhooks, conducts English/Bengali/Banglish sales conversations, confirms durable orders, exposes an authenticated business dashboard, exports orders, and can submit confirmed orders to a delivery provider.
+ChatCart helps businesses sell through messaging with minimal human staffing. It receives Messenger and WhatsApp webhooks, conducts English/Bengali/Banglish sales conversations, recommends catalog products, confirms durable orders, exposes an authenticated business dashboard, exports orders, and can submit confirmed orders to a delivery provider.
+
+## Product demo
+
+Watch the 62-second walkthrough to see customer product discovery, conversational ordering, the business dashboard, conversations, human takeover, orders, catalog management, and business setup.
+
+[![Watch the ChatCart product demo](docs/assets/chatcart-demo-cover.png)](docs/assets/ChatCart_Demo.mp4)
+
+[Watch the demo](docs/assets/ChatCart_Demo.mp4) · [Download the MP4](docs/assets/ChatCart_Demo.mp4?raw=1) · [Open the live dashboard](https://chatcart-dashboard.pages.dev)
+
+## Production status
+
+The MVP is live on the following free-tier stack:
+
+| Component | Provider | Production URL |
+| --- | --- | --- |
+| Dashboard, legal pages, and API proxy | Cloudflare Pages | [chatcart-dashboard.pages.dev](https://chatcart-dashboard.pages.dev) |
+| Rails API, webhooks, and background jobs | Render | [chatcart-api-29oq.onrender.com](https://chatcart-api-29oq.onrender.com/ready) |
+| PostgreSQL | Neon | Private managed database |
+
+Public legal pages:
+
+- [Privacy Policy](https://chatcart-dashboard.pages.dev/privacy)
+- [Data Deletion](https://chatcart-dashboard.pages.dev/data-deletion)
+
+The current production baseline is [`v0.1.0`](https://github.com/Khaled-Ahmmed-Anik/ChatCart/tree/v0.1.0). Render and Cloudflare Pages deploy automatically from `main`; Render's free service can take about a minute to wake after inactivity.
 
 ## Current capabilities
 
@@ -26,9 +51,15 @@ Messenger and WhatsApp Cloud API are implemented customer channels. Instagram is
 
 Detailed implementation documentation:
 
+- [Authentication and access lifecycle](docs/authentication-and-access.md) — sessions, revocation, account controls, and business suspension/disable behavior.
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
+- [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
+- [Tenant-scoped knowledge retrieval](docs/knowledge-retrieval.md) — product/policy indexing, lexical retrieval, citations, and the hybrid RAG boundary.
+- [Conversation evaluation](docs/conversation-evaluation.md) — reviewed multilingual benchmark cases, quality thresholds, and the regression command.
+- [Conversation action and customer-name safety](docs/conversation-safety.md) — explicit confirmation/cancellation commands, name validation, and safe evaluation-data handling.
+- [Sector recommendations and multi-product orders](docs/multi-product-orders.md) — catalogue attributes, cart changes, shared checkout, stock checks, and rollout.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
-- [Free MVP deployment](docs/free-production-deployment.md) — Koyeb, Neon, Cloudflare Pages, production secrets, verification, and releases.
+- [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
 ## Requirements
 
@@ -90,13 +121,16 @@ npm run dev
 
 Open `http://localhost:4173`, select the account level, and sign in with email and password. Local seed accounts are configured through `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `CHATCART_OWNER_EMAIL`, and `CHATCART_OWNER_PASSWORD` in the ignored `backend/.env` file.
 
-Create a business and its first owner through the platform-admin API:
+Create a business and its first owner through the platform-admin API. Set
+`PLATFORM_ADMIN_SESSION` to the bearer token returned by `POST /auth/admin/login`.
+The example password below is a placeholder; replace it with a unique password
+of at least 12 characters and do not reuse it in production:
 
 ```bash
 curl -X POST http://localhost:3000/admin/businesses \
-  -H "Authorization: Bearer $PLATFORM_ADMIN_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_SESSION" \
   -H "Content-Type: application/json" \
-  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com"}}'
+  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com","password":"replace-with-a-unique-password"}}'
 ```
 
 The owner can immediately use the supplied email and password. Authentication returns an opaque 12-hour session token; passwords are stored only as salted PBKDF2 derivations.
@@ -105,6 +139,7 @@ Check the application:
 
 ```bash
 curl http://localhost:3000/up
+curl http://localhost:3000/ready
 curl http://localhost:3000/products
 ```
 
@@ -131,6 +166,7 @@ review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-p
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/up` | Rails health check |
+| `GET` | `/ready` | Database and Solid Queue readiness check |
 | `GET` | `/products` | List active, in-stock products |
 | `POST` | `/products` | Create a product |
 | `GET` | `/conversations/lookup` | Retrieve a conversation and order state |
@@ -147,9 +183,13 @@ review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-p
 | `POST` | `/api/conversations/:id/handover` | Pause automation for human takeover |
 | `GET/POST` | `/api/products` | Manage the current business's catalog |
 | `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
+| `GET/POST` | `/api/knowledge_documents` | Manage tenant-scoped manual FAQs and indexed sources |
+| `GET` | `/api/knowledge_documents/status` | Inspect knowledge and embedding readiness |
+| `GET` | `/api/knowledge_documents/preview` | Preview grounded retrieval for a customer question |
+| `POST` | `/api/knowledge_documents/sync` | Refresh indexed product and policy knowledge |
 | `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
-Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. The original API-token path remains temporarily available for backward compatibility.
+Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. Sessions expire after 12 hours; disabling a user or suspending/disabling its business revokes every affected session. Reactivation requires a fresh login. The original API-token path remains temporarily available for backward compatibility. See [Authentication and access lifecycle](docs/authentication-and-access.md) for the complete behavior.
 
 The React dashboard uses GraphQL for its business context, analytics, and product catalog. Authentication, Meta webhooks, health checks, and CSV downloads remain REST endpoints. After changing the GraphQL schema or dashboard operations, regenerate the checked-in client types:
 
@@ -186,19 +226,35 @@ frontend/  React/Vite multi-page seller and platform-admin dashboard
 The main application flow is implemented in:
 
 - `backend/app/controllers/webhooks/messenger_controller.rb`
+- `backend/app/controllers/webhooks/whatsapp_controller.rb`
 - `backend/app/services/customer_message_recorder.rb`
 - `backend/app/services/conversation_message_processor.rb`
 - `backend/app/services/bot_reply_generator.rb`
 - `backend/app/services/messenger_reply_sender.rb`
+- `backend/app/services/whatsapp_reply_sender.rb`
+
+## Contribution and release workflow
+
+`main` is the protected production branch. Do not develop directly on it.
+
+1. Update `main`, then create a `WC-###-description` feature branch.
+2. Commit the scoped change and open a pull request whose title matches the branch name.
+3. Wait for backend, frontend, lint, and security checks to pass.
+4. Other contributors require an approval from `@Khaled-Ahmmed-Anik`, the repository code owner. The repository owner may merge their own PR using the configured PR-only bypass.
+5. Merge the PR into `main`; direct pushes, force pushes, and deletion of `main` are blocked.
+6. Verify the automatic Render and Cloudflare deployments, then create the next semantic release from GitHub Actions.
+
+See [Free MVP deployment](docs/free-production-deployment.md#releasing-future-versions) for production verification, versioning, migrations, and rollback.
 
 ## Known next steps
 
 - Implement the Instagram messaging adapter
-- Add password/OAuth login and API-token rotation UX
+- Add password recovery, optional MFA, and legacy API-token rotation/removal UX
 - Add delivery-provider-specific adapters and WooCommerce synchronization
-- Deploy the backend and dashboard to permanent HTTPS hosting
+- Move the backend to always-on infrastructure before offering production uptime commitments
+- Add production monitoring, alerting, backups, and recovery drills
 
 ## Production deployment
 
-- [Oracle Always Free backend deployment](docs/oracle-production-deployment.md)
-- [Alternative free-platform deployment notes](docs/free-production-deployment.md)
+- [Current free MVP deployment: Render, Neon, and Cloudflare](docs/free-production-deployment.md)
+- [Planned always-on Oracle migration](docs/oracle-production-deployment.md)

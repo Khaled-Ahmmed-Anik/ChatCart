@@ -73,6 +73,8 @@ module Webhooks
       business = ChannelConnection.active.find_by(
         channel: "whatsapp", external_account_id: item.fetch(:phone_number_id)
       )&.business || Business.default
+      return { type: item.fetch(:event_type), status: "ignored" } unless business.active?
+
       result = WhatsappWebhookEventRecorder.new(**item, business: business).record
       if result.created && result.event.event_type == "customer_text"
         ProcessWhatsappEventJob.set(wait: message_debounce).perform_later(result.event)

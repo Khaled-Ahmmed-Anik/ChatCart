@@ -1,5 +1,25 @@
 class ConversationResponsePlanner
-  Plan = Data.define(:content, :language, :tone, :address_preference, :pending_question, :interrupted)
+  Plan = Data.define(
+    :content, :language, :tone, :address_preference, :pending_question, :interrupted,
+    :goal, :actions, :facts, :confidence, :needs_clarification, :handover_required
+  ) do
+    def to_h
+      {
+        content: content,
+        language: language,
+        tone: tone,
+        address_preference: address_preference,
+        pending_question: pending_question,
+        interrupted: interrupted,
+        goal: goal,
+        actions: actions,
+        facts: facts,
+        confidence: confidence,
+        needs_clarification: needs_clarification,
+        handover_required: handover_required
+      }.compact
+    end
+  end
 
   def initialize(conversation:, pending_order:, customer_message:, outcome:, interpretation: nil, secondary_outcomes: [])
     @conversation = conversation
@@ -21,7 +41,13 @@ class ConversationResponsePlanner
       tone: state.fetch("preferred_tone", "friendly"),
       address_preference: state["address_preference"],
       pending_question: state["pending_question"],
-      interrupted: interruption?
+      interrupted: interruption?,
+      goal: response_goal,
+      actions: planned_actions,
+      facts: approved_facts,
+      confidence: interpretation&.confidence || 1.0,
+      needs_clarification: outcome == :clarification_needed || interpretation&.needs_clarification == true,
+      handover_required: outcome == :human_handover_started
     )
   end
 
@@ -33,6 +59,7 @@ class ConversationResponsePlanner
     return focused_clarification if outcome == :clarification_needed
 
     content = combined_reply
+    return content if order_context_paused?
     return content unless interruption?
     return content if pending_prompt.blank? || content.include?(pending_prompt)
 
@@ -52,7 +79,7 @@ class ConversationResponsePlanner
   def combined_reply
     return base_reply if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
 
-    replies = [ base_reply ] + secondary_outcomes.map do |secondary_outcome|
+    replies = secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
         pending_order: pending_order,
         customer_message: customer_message,
@@ -60,7 +87,7 @@ class ConversationResponsePlanner
         interpretation: interpretation,
         address_preference: address_preference
       ).content
-    end
+    end + [ base_reply ]
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
   end
 
@@ -80,6 +107,7 @@ class ConversationResponsePlanner
   end
 
   def pending_prompt
+    return if order_context_paused?
     return banglish_pending_prompt if preferred_language(conversation.conversation_state.to_h) == "banglish"
 
     case pending_order.status
@@ -101,6 +129,7 @@ class ConversationResponsePlanner
   end
 
   def continuation_prompt
+    return if order_context_paused?
     if conversation.conversation_state.to_h["context_switch_count"].to_i.positive? && selected_item.present?
       return "Apnar #{selected_item} selection-ta save ache. Eta niye continue korben, change korben, naki ekhon pause rakhben?" if
         preferred_language(conversation.conversation_state.to_h) == "banglish"
@@ -182,6 +211,7 @@ class ConversationResponsePlanner
   end
 
   def pending_question
+    return if order_context_paused?
     {
       "collecting_product" => "product",
       "collecting_quantity" => "quantity",
@@ -190,5 +220,43 @@ class ConversationResponsePlanner
       "collecting_address" => "address",
       "awaiting_confirmation" => "confirmation"
     }[pending_order.status]
+  end
+
+  def response_goal
+    return "handover_to_seller" if outcome == :human_handover_started
+    return "clarify_customer_request" if outcome == :clarification_needed
+    return "complete_order" if outcome == :confirmed
+    return "answer_and_resume_order" if interruption?
+    return "collect_#{pending_question}" if pending_question.present?
+
+    "answer_customer"
+  end
+
+  def planned_actions
+    actions = [ { "type" => outcome.to_s } ]
+    secondary_outcomes.each { |secondary| actions << { "type" => secondary.to_s } }
+    actions << { "type" => "ask", "field" => pending_question } if pending_question.present?
+    actions.uniq
+  end
+
+  def approved_facts
+    facts = {
+      "business_name" => conversation.business.name,
+      "product_id" => pending_order.product_id,
+      "product_name" => pending_order.product&.name,
+      "variant_id" => pending_order.product_variant_id,
+      "variant_name" => pending_order.product_variant&.display_name,
+      "quantity" => pending_order.quantity,
+      "unit_price" => pending_order.product.present? ? pending_order.unit_price.to_s : nil,
+      "total_price" => pending_order.product.present? && pending_order.quantity.present? ? pending_order.total_price.to_s : nil,
+      "order_status" => pending_order.status
+    }.compact.merge("items" => pending_order.item_snapshot)
+    return facts.slice("business_name") if order_context_paused?
+
+    facts
+  end
+
+  def order_context_paused?
+    conversation.conversation_state.to_h["order_context_paused"] == true
   end
 end

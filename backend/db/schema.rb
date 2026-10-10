@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -20,12 +20,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
     t.string "ip_address"
     t.datetime "last_used_at"
     t.bigint "platform_administrator_id"
+    t.string "revocation_reason"
+    t.datetime "revoked_at"
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.string "user_agent"
     t.bigint "user_id"
     t.index ["expires_at"], name: "index_auth_sessions_on_expires_at"
     t.index ["platform_administrator_id"], name: "index_auth_sessions_on_platform_administrator_id"
+    t.index ["revoked_at"], name: "index_auth_sessions_on_revoked_at"
     t.index ["token_digest"], name: "index_auth_sessions_on_token_digest", unique: true
     t.index ["user_id"], name: "index_auth_sessions_on_user_id"
     t.check_constraint "user_id IS NOT NULL AND platform_administrator_id IS NULL OR user_id IS NULL AND platform_administrator_id IS NOT NULL", name: "auth_sessions_exactly_one_actor"
@@ -135,6 +138,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
     t.index ["order_id"], name: "index_delivery_submissions_on_order_id"
   end
 
+  create_table "knowledge_documents", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.bigint "business_id", null: false
+    t.string "checksum", null: false
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.datetime "embedded_at"
+    t.jsonb "embedding", default: [], null: false
+    t.string "embedding_model"
+    t.jsonb "metadata", default: {}, null: false
+    t.bigint "source_id"
+    t.string "source_type", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index "to_tsvector('simple'::regconfig, (((COALESCE(title, ''::character varying))::text || ' '::text) || COALESCE(content, ''::text)))", name: "index_knowledge_documents_on_search_text", using: :gin
+    t.index ["active"], name: "index_knowledge_documents_on_active"
+    t.index ["business_id", "source_type", "source_id"], name: "index_knowledge_documents_on_tenant_source", unique: true
+    t.index ["business_id"], name: "index_knowledge_documents_on_business_id"
+  end
+
   create_table "messages", force: :cascade do |t|
     t.text "content", null: false
     t.bigint "conversation_id", null: false
@@ -219,6 +242,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
     t.index ["business_id"], name: "index_orders_on_business_id"
     t.index ["conversation_id"], name: "index_orders_on_conversation_id"
     t.index ["pending_order_id"], name: "index_orders_on_pending_order_id", unique: true
+  end
+
+  create_table "pending_order_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "pending_order_id", null: false
+    t.bigint "product_id", null: false
+    t.bigint "product_variant_id"
+    t.integer "quantity", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pending_order_id"], name: "index_pending_order_items_on_pending_order_id"
+    t.index ["product_id"], name: "index_pending_order_items_on_product_id"
+    t.index ["product_variant_id"], name: "index_pending_order_items_on_product_variant_id"
   end
 
   create_table "pending_orders", force: :cascade do |t|
@@ -374,6 +409,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
   add_foreign_key "delivery_integrations", "businesses"
   add_foreign_key "delivery_submissions", "delivery_integrations"
   add_foreign_key "delivery_submissions", "orders"
+  add_foreign_key "knowledge_documents", "businesses"
   add_foreign_key "messages", "conversations"
   add_foreign_key "messenger_deliveries", "messages"
   add_foreign_key "messenger_deliveries", "messenger_webhook_events"
@@ -384,6 +420,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_000100) do
   add_foreign_key "orders", "businesses"
   add_foreign_key "orders", "conversations"
   add_foreign_key "orders", "pending_orders"
+  add_foreign_key "pending_order_items", "pending_orders"
+  add_foreign_key "pending_order_items", "product_variants"
+  add_foreign_key "pending_order_items", "products"
   add_foreign_key "pending_orders", "conversations"
   add_foreign_key "pending_orders", "product_variants"
   add_foreign_key "pending_orders", "products"

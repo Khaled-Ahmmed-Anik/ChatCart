@@ -45,6 +45,7 @@ class CustomerMessageRecorder
       end
       current_order = conversation.pending_order
       interpretation = classify_intent(message, current_order, conversation)
+      record_classification_feedback(message, interpretation)
       record_intelligence(message, interpretation)
       pending_order = pending_order_for(conversation, interpretation)
       processor = ConversationMessageProcessor.new(
@@ -55,6 +56,7 @@ class CustomerMessageRecorder
       processor.process
       outcome = processor.outcome
       record_outcome(message, outcome)
+      ConversationClassificationFeedback.new(message: message).record_outcome!(outcome)
       GuidedSalesConversation.new(conversation).sync!(outcome: outcome, pending_order: pending_order)
       escalation = ConversationEscalationPolicy.new(
         conversation: conversation,
@@ -99,7 +101,7 @@ class CustomerMessageRecorder
       bot_reply = conversation.messages.create!(
         sender_type: :bot,
         content: final_reply_content(message, pending_order, outcome, interpretation, response_plan),
-        metadata: { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+        metadata: bot_reply_metadata
       )
     end
 
@@ -135,16 +137,29 @@ class CustomerMessageRecorder
 
   def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
     return response_plan.content if interpretation.blank?
-    return response_plan.content if message.metadata["intent_classifier"] == "local"
+    if message.metadata["intent_classifier"] == "local" &&
+        !ConversationAiRollout.enabled?(:naturalizer_all_turns, conversation: pending_order.conversation)
+      return response_plan.content
+    end
 
-    AiConversationAssistant.new(
+    assistant = AiConversationAssistant.new(
       customer_message: message,
       pending_order: pending_order,
       outcome: outcome,
       language: response_plan.language,
       tone: response_plan.tone,
-      address_preference: response_plan.address_preference
-    ).rewrite(fallback: response_plan.content)
+      address_preference: response_plan.address_preference,
+      response_plan: response_plan
+    )
+    content = assistant.rewrite(fallback: response_plan.content)
+    @ai_reply_metadata = assistant.telemetry.compact
+    content
+  end
+
+  def bot_reply_metadata
+    metadata = { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+    metadata["ai_assistant"] = @ai_reply_metadata if @ai_reply_metadata.present?
+    metadata
   end
 
   def find_or_create_conversation
@@ -175,16 +190,28 @@ class CustomerMessageRecorder
 
   def classify_intent(message, pending_order, conversation)
     local = CompactIntentClassifier.new(message: message, pending_order: pending_order).classify
+    @local_classification_result = local
     if local.interpretation.present?
       message.update!(metadata: message.metadata.merge("intent_classifier" => "local"))
       return local.interpretation
     end
 
-    AiIntentClassifier.new(
+    interpretation = AiIntentClassifier.new(
       message: message,
       pending_order: pending_order,
       recent_messages: conversation.messages.order(created_at: :desc, id: :desc).limit(10).reverse
     ).classify
+    message.update!(metadata: message.metadata.merge("intent_classifier" => "gemini")) if interpretation.present?
+    interpretation
+  end
+
+  def record_classification_feedback(message, interpretation)
+    classifier = message.metadata["intent_classifier"].presence || "fallback"
+    ConversationClassificationFeedback.new(message: message).record_prediction!(
+      classifier: classifier,
+      interpretation: interpretation,
+      local_result: @local_classification_result
+    )
   end
 
   def enqueue_delivery(order)
