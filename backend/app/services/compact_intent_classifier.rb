@@ -3,6 +3,7 @@ class CompactIntentClassifier
   # probabilities. Held-out multilingual phrases generally match at 0.45–0.75.
   MINIMUM_CONFIDENCE = 0.44
   MAXIMUM_EXAMPLES_PER_INTENT = 40
+  DATASET_PATH = Rails.root.join("config/intent_examples.yml")
   PREFIXES = [ "please ", "bhai ", "apni ", "ektu " ].freeze
   SUFFIXES = [ "?", " please", " bhai" ].freeze
   SEEDS = {
@@ -45,10 +46,23 @@ class CompactIntentClassifier
     "refund_request" => [ "need refund", "money back", "taka ferot chai", "refund chai", "টাকা ফেরত চাই", "রিফান্ড চাই" ]
   }.freeze
 
-  Result = Data.define(:interpretation, :score, :runner_up_score, :source)
+  def self.dataset_seeds
+    @dataset_seeds ||= begin
+      data = YAML.safe_load_file(DATASET_PATH, aliases: false)
+      data.fetch("intents").transform_values { |examples| Array(examples).map(&:to_s) }
+    end
+  end
+
+  def self.seeds
+    SEEDS.merge(dataset_seeds) do |_intent, built_in, configured|
+      (built_in + configured).uniq
+    end
+  end
+
+  Result = Data.define(:interpretation, :score, :runner_up_score, :source, :candidate_intent, :runner_up_intent)
 
   def self.examples
-    @examples ||= SEEDS.transform_values do |seeds|
+    @examples ||= seeds.transform_values do |seeds|
       variants = seeds.dup
       PREFIXES.each { |prefix| seeds.each { |seed| variants << "#{prefix}#{seed}" } }
       SUFFIXES.each { |suffix| seeds.each { |seed| variants << "#{seed}#{suffix}" } }
@@ -65,31 +79,43 @@ class CompactIntentClassifier
     return empty_result if checkout_value?
 
     ranked = self.class.examples.map do |intent, examples|
+      next if intent == "greeting" && !message.content.to_s.strip.match?(Constants::Conversation::GREETING_ONLY)
+      next if intent == "thanks" && !message.content.to_s.strip.match?(Constants::Conversation::THANKS_ONLY)
       [ intent, examples.map { |example| similarity(normalized, normalize(example)) }.max ]
-    end.sort_by { |_intent, score| -score }
+    end.compact.sort_by { |_intent, score| -score }
     intent, score = ranked.first
-    runner_up = ranked.second&.last.to_f
+    runner_up_intent, runner_up = ranked.second
+    runner_up = runner_up.to_f
     adjusted = [ score + context_bonus(intent), 1.0 ].min
-    return empty_result(score: adjusted, runner_up_score: runner_up) if yield_to_checkout?(intent)
-    return empty_result(score: adjusted, runner_up_score: runner_up) if
-      adjusted < MINIMUM_CONFIDENCE || adjusted - runner_up < 0.04
+    return empty_result(score: adjusted, runner_up_score: runner_up,
+      candidate_intent: intent, runner_up_intent: runner_up_intent) if yield_to_checkout?(intent)
+    if adjusted < MINIMUM_CONFIDENCE || adjusted - runner_up < 0.04
+      return empty_result(score: adjusted, runner_up_score: runner_up,
+        candidate_intent: intent, runner_up_intent: runner_up_intent)
+    end
 
     Result.new(interpretation: AiIntentClassifier::Result.new(
       intent: intent, secondary_intents: [], confidence: adjusted, entities: {}.with_indifferent_access,
       language: detected_language, sentiment: "neutral", needs_clarification: false, possible_intents: []
-    ), score: adjusted, runner_up_score: runner_up, source: "local")
+    ), score: adjusted, runner_up_score: runner_up, source: "local",
+      candidate_intent: intent, runner_up_intent: runner_up_intent)
   end
 
   private
 
   attr_reader :message, :pending_order
   def normalized = @normalized ||= normalize(message.content)
-  def empty_result(score: 0.0, runner_up_score: 0.0) = Result.new(
-    interpretation: nil, score: score, runner_up_score: runner_up_score, source: "local"
+  def empty_result(score: 0.0, runner_up_score: 0.0, candidate_intent: nil, runner_up_intent: nil) = Result.new(
+    interpretation: nil, score: score, runner_up_score: runner_up_score, source: "local",
+    candidate_intent: candidate_intent, runner_up_intent: runner_up_intent
   )
 
   def checkout_value?
     return true if pending_order&.collecting_phone? && normalized.match?(/\A\+?\d[\d ]{7,14}\z/)
+    if pending_order&.collecting_quantity?
+      quantity_words = Constants::Conversation::NUMBER_WORDS.keys.join("|")
+      return true if normalized.match?(/\A(?:\d+|#{quantity_words})(?:\s+(?:ta|pieces?|pcs?))?\z/)
+    end
     if pending_order&.status.in?(%w[collecting_variant collecting_quantity collecting_name collecting_phone collecting_address])
       return true if normalized.match?(/\b\d+\s*(?:ml|gm|kg|pieces?|pcs?)\b/)
       return true if normalized.match?(/\b(bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/)
@@ -106,7 +132,7 @@ class CompactIntentClassifier
     # not mistaken for a delivery-area or Dhaka delivery-charge question.
     !normalized.match?(/(?:\?|delivery|deliver|shipping|charge|koto|ki\b|how\b|can\b|হবে|কত|চার্জ)/i)
   end
-  def normalize(value) = value.to_s.downcase.unicode_normalize(:nfkc).gsub(/[^\p{L}\p{N}]+/u, " ").squish
+  def normalize(value) = ConversationTextNormalizer.call(value)
   def grams(value) = value.length < 3 ? [ value ] : value.chars.each_cons(3).map(&:join).uniq
 
   def similarity(left, right)

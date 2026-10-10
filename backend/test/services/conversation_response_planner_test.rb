@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationResponsePlannerTest < ActiveSupport::TestCase
+  setup { Business.default.update!(category: "perfume") }
   test "answers an interruption and returns to the pending order question" do
     order = create_pending_order(status: :collecting_phone, customer_name: "Anik")
     message = order.conversation.messages.create!(sender_type: :customer, content: "delivery charge koto?")

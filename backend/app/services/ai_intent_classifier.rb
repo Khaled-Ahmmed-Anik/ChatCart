@@ -103,6 +103,12 @@ class AiIntentClassifier
       Choose one primary registered intent and zero or more secondary intents when the message genuinely contains
       multiple requests. Put the order-changing intent first. Never return more than one order-changing intent.
       Extract only values explicitly stated by the customer.
+      Resolve short answers against the last question and offered options, not merely the order status.
+      Banglish spelling is flexible: oita/oitai means that one, ager ta/agerta means the previous one,
+      duita den means give two, and dam bolen age means answer the price before continuing checkout.
+      A side question does not confirm, cancel, or replace the saved order. A correction replaces the old
+      value only when the customer clearly requests it. Budget, size, model numbers, and delivery days
+      are not quantities. Questions about an item are not instructions to buy it.
       Never invent products, quantities, personal details, prices, policies, or order facts.
       Set needs_clarification true when the request is ambiguous. When it is true, provide the two or three
       most likely registered intents in possible_intents; otherwise return an empty possible_intents array.
@@ -115,7 +121,8 @@ class AiIntentClassifier
       Registered intents: #{ConversationIntentRegistry.intents.join(", ")}
       Current order status: #{pending_order&.status || "none"}
       Remembered conversation state: #{conversation_memory.to_json}
-      Available products: #{catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }.map(&:name).join(", ")}
+      Business category: #{message.conversation.business.category}
+      Available catalogue: #{catalog_context.to_json}
       Recent conversation:
       #{sanitized_history}
       Current customer message: #{sanitize(message.content)}
@@ -134,6 +141,16 @@ class AiIntentClassifier
 
   def catalog
     message.conversation.business.products
+  end
+
+  def catalog_context
+    catalog.available_for_sale.includes(:product_variants).order(:name).first(30).map do |product|
+      {
+        name: product.name,
+        aliases: product.searchable_names,
+        variants: product.available_variants.map { |variant| { name: variant.name, size: variant.size } }
+      }
+    end
   end
 
   def sanitize(value)

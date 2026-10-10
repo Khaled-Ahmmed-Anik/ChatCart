@@ -6,6 +6,9 @@ class ReadinessControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal true, response.parsed_body["ready"]
-    assert_equal({ "database" => true, "queue" => true }, response.parsed_body["checks"])
+    assert_equal(
+      { "database" => true, "migrations" => true, "schema_contract" => true, "queue" => true },
+      response.parsed_body["checks"]
+    )
   end
 end

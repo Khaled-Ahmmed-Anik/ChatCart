@@ -45,6 +45,7 @@ class CustomerMessageRecorder
       end
       current_order = conversation.pending_order
       interpretation = classify_intent(message, current_order, conversation)
+      record_classification_feedback(message, interpretation)
       record_intelligence(message, interpretation)
       pending_order = pending_order_for(conversation, interpretation)
       processor = ConversationMessageProcessor.new(
@@ -55,6 +56,7 @@ class CustomerMessageRecorder
       processor.process
       outcome = processor.outcome
       record_outcome(message, outcome)
+      ConversationClassificationFeedback.new(message: message).record_outcome!(outcome)
       GuidedSalesConversation.new(conversation).sync!(outcome: outcome, pending_order: pending_order)
       escalation = ConversationEscalationPolicy.new(
         conversation: conversation,
@@ -188,16 +190,28 @@ class CustomerMessageRecorder
 
   def classify_intent(message, pending_order, conversation)
     local = CompactIntentClassifier.new(message: message, pending_order: pending_order).classify
+    @local_classification_result = local
     if local.interpretation.present?
       message.update!(metadata: message.metadata.merge("intent_classifier" => "local"))
       return local.interpretation
     end
 
-    AiIntentClassifier.new(
+    interpretation = AiIntentClassifier.new(
       message: message,
       pending_order: pending_order,
       recent_messages: conversation.messages.order(created_at: :desc, id: :desc).limit(10).reverse
     ).classify
+    message.update!(metadata: message.metadata.merge("intent_classifier" => "gemini")) if interpretation.present?
+    interpretation
+  end
+
+  def record_classification_feedback(message, interpretation)
+    classifier = message.metadata["intent_classifier"].presence || "fallback"
+    ConversationClassificationFeedback.new(message: message).record_prediction!(
+      classifier: classifier,
+      interpretation: interpretation,
+      local_result: @local_classification_result
+    )
   end
 
   def enqueue_delivery(order)

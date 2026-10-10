@@ -194,12 +194,24 @@ These are public URLs, not secrets.
 
 The backend container runs `db:prepare` before starting. Production migrations must therefore be backward-compatible with the previous release:
 
+The entrypoint detects `bin/rails server` even when the hosting platform appends
+bind or port arguments. A successful startup prints `Preparing primary database
+schema` before Puma boots. If `/ready` rejects a release, search the logs for
+`deployment_readiness_failed`; it lists only the failed check names and missing
+schema objects, never connection credentials.
+
 1. Add new columns/tables as nullable or with safe defaults.
 2. Deploy code that can handle old and new data.
 3. Backfill data separately when needed.
 4. Remove old columns only in a later release.
 
 Never rely on an automatic destructive rollback for customer orders or conversations.
+
+After primary migrations run, the container executes `deployment:verify_schema`. The command fails startup when Rails still reports a pending primary migration or when a runtime-critical table or column is missing. The `/ready` endpoint performs the same checks and returns `503` for schema drift instead of reporting a false healthy deployment.
+
+When a migration introduces a column or table required by authentication, tenancy, ordering, or webhook processing, add it to `DatabaseSchemaHealth::REQUIRED_SCHEMA` in the same pull request. This contract also detects cases where `schema_migrations` says a migration ran but the corresponding Neon object is absent.
+
+Do not repair normal deployments with ad-hoc SQL in Neon. First inspect the Render startup output for `db:migrate:primary` and `deployment:verify_schema`. If an emergency SQL repair is unavoidable, apply the equivalent Rails migration state deliberately and follow it with a forward-fix pull request; otherwise the next automated migration may fail because the schema and `schema_migrations` disagree.
 
 ### Rollback
 

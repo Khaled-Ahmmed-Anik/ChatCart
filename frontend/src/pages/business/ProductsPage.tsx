@@ -7,6 +7,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { ApproveDashboardProductImportDocument, ArchiveDashboardProductDocument, DashboardProductsDocument, PreviewDashboardProductImportDocument, SaveDashboardProductDocument, type DashboardProductsQuery, type ProductInput } from "../../graphql/generated/graphql";
 import { graphqlRequest } from "../../lib/graphqlClient";
+import { parseProductAttributes, formatProductAttributes } from "../../lib/productAttributes";
 
 type Product = DashboardProductsQuery["products"][number];
 type Variant = Product["variants"][number];
@@ -56,7 +57,7 @@ export function ProductsPage() {
     event.preventDefault();
     const form = event.currentTarget;
     const values = Object.fromEntries(new FormData(form));
-    const productAttributes = Object.fromEntries(String(values.product_attributes || "").split("\n").map(line => line.split("=").map(part => part.trim())).filter(parts => parts.length === 2 && parts[0]));
+    const productAttributes = parseProductAttributes(String(values.product_attributes || ""));
     save.mutate({ id: editing?.id, input: {
       name: String(values.name), price: String(values.price), stockQuantity: Number(values.stock_quantity),
       description: String(values.description || ""), shortDescription: String(values.short_description || ""),
@@ -84,7 +85,7 @@ export function ProductsPage() {
         <label>Long description<textarea name="description" defaultValue={editing?.description || ""} /></label>
         <div className="form-grid"><label>Benefits<textarea name="benefits" defaultValue={editing?.benefits || ""} /></label><label>Suitable for<textarea name="suitable_for" defaultValue={editing?.suitableFor || ""} /></label></div>
         <label>Usage instructions<textarea name="usage_instructions" defaultValue={editing?.usageInstructions || ""} /></label>
-        <label>Additional facts <small>One key=value pair per line</small><textarea name="product_attributes" defaultValue={Object.entries((editing?.productAttributes as Record<string,string>) || {}).map(([key,value]) => `${key}=${value}`).join("\n")} placeholder={"longevity=8–10 hours\nfragrance_family=Woody"} /></label>
+        <label>Product attributes <small>One key=value per line. Separate multiple values with |. Used to match customer preferences.</small><textarea name="product_attributes" defaultValue={formatProductAttributes((editing?.productAttributes as Record<string,unknown>) || {})} placeholder={"material=cotton\ncolor=blue | white\npurpose=office"} /></label>
         <div className="variant-heading"><div><strong>Sizes and variants</strong><small>Variant price and stock override the base values.</small></div><button type="button" className="button secondary small" onClick={() => setVariants(current => [...current, blankVariant()])}>Add variant</button></div>
         <div className="variant-list">{variants.map((variant,index) => <div className="variant-row" key={variant.id || index}><input aria-label="Variant name" placeholder="Name" value={variant.name} onChange={event => updateVariant(index,{name:event.target.value})}/><input aria-label="Variant size" placeholder="Size (6 ml)" value={variant.size || ""} onChange={event => updateVariant(index,{size:event.target.value})}/><input aria-label="Variant price" placeholder="Price" type="number" min="0" value={variant.price} onChange={event => updateVariant(index,{price:event.target.value})}/><input aria-label="Variant stock" placeholder="Stock" type="number" min="0" value={variant.stockQuantity} onChange={event => updateVariant(index,{stockQuantity:Number(event.target.value)})}/><button type="button" className="button secondary small" onClick={() => setVariants(current => current.filter((_,i) => i !== index))}>Remove</button></div>)}</div>
         <div className="variant-heading"><div><strong>Combo components</strong><small>Add the products included in a fixed or configurable combo.</small></div><button type="button" className="button secondary small" onClick={()=>setComboItems(current=>[...current,{componentProductId:"",quantity:1,required:true,position:current.length}])}>Add component</button></div>

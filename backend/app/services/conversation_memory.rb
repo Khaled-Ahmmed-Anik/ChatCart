@@ -77,6 +77,7 @@ class ConversationMemory
     {
       product: order.product&.name,
       quantity: order.quantity,
+      items: order.item_snapshot,
       status: order.status
     }.compact
   end

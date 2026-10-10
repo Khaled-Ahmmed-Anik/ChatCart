@@ -32,11 +32,18 @@ This makes the decision behind a response testable without depending on its exac
 
 ## Conversation tools
 
+Descriptive product questions and business FAQs can use the tenant-scoped
+`search_business_knowledge` tool. Exact prices, stock, variants, delivery
+charges, and order state continue to use their structured tools. Knowledge
+results include internal citations, which are recorded in assistant telemetry
+for diagnostics but are not shown to customers.
+
 `ConversationToolGateway` exposes a deliberately small, read-only allowlist:
 
 | Tool | Purpose |
 | --- | --- |
 | `search_products` | Return up to three active, in-stock offers for customer preferences or budget |
+| `search_business_knowledge` | Retrieve tenant-scoped approved descriptions, FAQs, and policy explanations with internal citations |
 | `get_product_details` | Read grounded product descriptions and attributes |
 | `get_variant_availability` | Read active, in-stock variants, prices, and quantities |
 | `get_business_policy` | Read an approved payment, delivery, sales, or after-sales policy |
@@ -75,7 +82,7 @@ The naturalizer receives the safe structured context, required next question, ap
 
 ## Feature controls
 
-| Variable | Default | Purpose |
+| Variable | Supplied environment configuration | Purpose |
 | --- | --- | --- |
 | `CONVERSATION_PLANNER_ENABLED` | `false` | Enables Gemini tool selection during response generation |
 | `CONVERSATION_PLANNER_ROLLOUT_PERCENT` | `0` | Stable percentage of conversations eligible for tool planning |
@@ -85,6 +92,12 @@ The naturalizer receives the safe structured context, required next question, ap
 | `CONVERSATION_NATURALIZER_ALL_TURNS_ROLLOUT_PERCENT` | `0` | Stable percentage eligible for all-turn rewriting |
 
 Rollout assignment uses the conversation ID, so one customer conversation remains consistently inside or outside a percentage rollout.
+
+These values describe the checked-in `.env.example` and Render Blueprint, not
+the live provider settings. If a percentage variable is absent,
+`ConversationAiRollout` defaults that percentage to 100; the corresponding
+enable flag still gates the feature. Set flags and percentages explicitly when
+rolling out, and inspect provider settings to determine what production uses.
 
 Recommended production rollout:
 
@@ -107,7 +120,7 @@ Bot message metadata stores only safe operational information:
 - fallback reason; and
 - AI latency in milliseconds.
 
-`ConversationQualityEvaluator` aggregates AI-assisted turns, planner turns, tool-call count, fallbacks, guardrail rejections, and average AI latency alongside clarification, repetition, frustration, handover, and conversion metrics. Tool results, API keys, access tokens, and raw credentials are not stored in this telemetry.
+`ConversationQualityEvaluator` aggregates AI-assisted turns, planner turns, tool-call count, fallbacks, guardrail rejections, and average AI latency alongside clarification, correction, repair, repetition, frustration, handover, conversion, and abandoned-checkout-stage metrics. Tool results, API keys, access tokens, raw credentials, and additional copies of customer messages are not stored in this telemetry.
 
 ## Quality benchmark
 
