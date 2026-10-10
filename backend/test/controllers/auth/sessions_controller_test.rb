@@ -60,6 +60,65 @@ class Auth::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  test "inactive business users cannot create or continue sessions" do
+    business = Business.create!(name: "Alpha", slug: "alpha")
+    user = create_user(business, email: "owner@example.com")
+    token, = AuthSession.issue!(actor: user)
+    user.update!(active: false)
+
+    post auth_login_path, params: { email: user.email, password: PASSWORD }, as: :json
+    assert_response :unauthorized
+
+    get api_business_path, headers: { "Authorization" => "Bearer #{token}" }
+    assert_response :unauthorized
+  end
+
+  test "inactive platform administrators cannot create or continue sessions" do
+    administrator = PlatformAdministrator.create!(
+      name: "Platform Admin", email: "inactive-admin@chatcart.test", password: PASSWORD
+    )
+    token, = AuthSession.issue!(actor: administrator)
+    administrator.update!(active: false)
+
+    post auth_admin_login_path, params: { email: administrator.email, password: PASSWORD }, as: :json
+    assert_response :unauthorized
+
+    get admin_businesses_path, headers: { "Authorization" => "Bearer #{token}" }
+    assert_response :unauthorized
+  end
+
+  test "users of suspended businesses cannot create or continue sessions" do
+    business = Business.create!(name: "Alpha", slug: "alpha")
+    user = create_user(business, email: "owner@example.com")
+    token, = AuthSession.issue!(actor: user)
+    business.update!(status: "suspended")
+
+    post auth_login_path, params: { email: user.email, password: PASSWORD }, as: :json
+    assert_response :unauthorized
+
+    get api_business_path, headers: { "Authorization" => "Bearer #{token}" }
+    assert_response :unauthorized
+  end
+
+  test "users of disabled businesses cannot use sessions or legacy API tokens" do
+    business = Business.create!(name: "Alpha", slug: "alpha")
+    legacy_token, digest = User.issue_token
+    user = business.users.create!(
+      name: "Owner", email: "owner@example.com", role: "owner", api_token_digest: digest, password: PASSWORD
+    )
+    session_token, = AuthSession.issue!(actor: user)
+    business.update!(status: "disabled")
+
+    post auth_login_path, params: { email: user.email, password: PASSWORD }, as: :json
+    assert_response :unauthorized
+
+    get api_business_path, headers: { "Authorization" => "Bearer #{session_token}" }
+    assert_response :unauthorized
+
+    get api_business_path, headers: { "Authorization" => "Bearer #{legacy_token}" }
+    assert_response :unauthorized
+  end
+
   private
 
   def create_user(business, email:)

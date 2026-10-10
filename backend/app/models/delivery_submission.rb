@@ -1,5 +1,5 @@
 class DeliverySubmission < ApplicationRecord
-  STATUSES = %w[pending submitting submitted retrying failed].freeze
+  STATUSES = %w[pending submitting submitted retrying failed skipped].freeze
 
   belongs_to :order
   belongs_to :delivery_integration

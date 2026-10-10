@@ -19,6 +19,9 @@ class ProductResolutionService
     return Result.new(status: :not_found, product: nil, confidence: 0.0, candidates: []) if ranked.empty?
 
     best = ranked.first
+    threshold = meaningful_tokens.length <= 1 ? 0.82 : 0.68
+    return Result.new(status: :not_found, product: nil, confidence: best.score, candidates: ranked.first(3)) if best.score < threshold
+
     shared = shared_single_token_candidates(ranked)
     if best.score < 1.0 && shared.map(&:product).uniq.size > 1
       return Result.new(status: :ambiguous, product: nil, confidence: best.score, candidates: shared.first(4))
@@ -27,9 +30,6 @@ class ProductResolutionService
     if close.map(&:product).uniq.size > 1
       return Result.new(status: :ambiguous, product: nil, confidence: best.score, candidates: close)
     end
-
-    threshold = meaningful_tokens.length <= 1 ? 0.82 : 0.68
-    return Result.new(status: :not_found, product: nil, confidence: best.score, candidates: ranked.first(3)) if best.score < threshold
 
     Result.new(status: :matched, product: best.product, confidence: best.score, candidates: [ best ])
   end

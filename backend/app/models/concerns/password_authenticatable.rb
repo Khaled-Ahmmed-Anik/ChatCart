@@ -12,6 +12,10 @@ module PasswordAuthenticatable
   end
 
   def authenticate(password_attempt)
-    self if active? && PasswordHasher.matches?(password_digest, password_attempt)
+    self if authentication_allowed? && PasswordHasher.matches?(password_digest, password_attempt)
+  end
+
+  def authentication_allowed?
+    active?
   end
 end

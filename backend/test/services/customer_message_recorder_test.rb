@@ -14,10 +14,11 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "facebook", result.conversation.channel
     assert_equal "fb-user-123", result.conversation.external_customer_id
     assert_equal "I want Fresh Musk", result.message.content
-    assert_equal({ "source" => "messenger" }, result.message.metadata)
+    assert_equal "messenger", result.message.metadata["source"]
+    assert_equal "product_selected", result.message.metadata.dig("conversation_intelligence", "outcome")
     assert_equal product, result.pending_order.product
     assert_predicate result.pending_order, :collecting_quantity?
-    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", result.bot_reply.content
+    assert_equal "Nice choice! Fresh Musk is ৳750 each. How many would you like?", result.bot_reply.content
     assert_equal :product_selected, result.outcome
   end
 
@@ -184,11 +185,25 @@ class CustomerMessageRecorderTest < ActiveSupport::TestCase
     assert_equal "customer_requested_human", result.conversation.conversation_state.dig("handover_summary", "reason")
     assert_equal "I want to talk to a human agent",
       result.conversation.conversation_state.dig("handover_summary", "last_customer_message")
-    assert_includes result.bot_reply.content, "passed this conversation to the seller"
+    assert_includes result.bot_reply.content, "we will get back to you soon"
 
     follow_up = record_message("hello?")
     assert_equal :awaiting_human, follow_up.outcome
     assert_nil follow_up.bot_reply
+  end
+
+  test "repeated unresolved support preserves the draft and triggers handover" do
+    business = Business.default
+    conversation = business.conversations.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    draft = conversation.create_pending_order!(status: :collecting_name)
+    2.times do
+      result = CustomerMessageRecorder.new(business: business, channel: "facebook",
+        external_customer_id: conversation.external_customer_id, content: "My password reset is not working").record
+      assert_nil draft.reload.customer_name
+      assert_predicate draft, :collecting_name?
+      assert result.bot_reply.present?
+    end
+    assert_predicate conversation.reload, :handed_over?
   end
 
   private

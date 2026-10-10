@@ -59,6 +59,7 @@ class ConversationsController < ApplicationController
       status: pending_order.status,
       product: serialize_product(pending_order.product),
       quantity: pending_order.quantity,
+      items: pending_order.item_snapshot,
       customer_name: pending_order.customer_name,
       phone: pending_order.phone,
       address: pending_order.address,

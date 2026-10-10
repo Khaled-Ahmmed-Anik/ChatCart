@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationResponsePlannerTest < ActiveSupport::TestCase
+  setup { Business.default.update!(category: "perfume") }
   test "answers an interruption and returns to the pending order question" do
     order = create_pending_order(status: :collecting_phone, customer_name: "Anik")
     message = order.conversation.messages.create!(sender_type: :customer, content: "delivery charge koto?")
@@ -13,9 +14,48 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     ).plan
 
     assert plan.interrupted
-    assert_includes plan.content, "To continue your order: What phone number"
+    assert_equal "answer_and_resume_order", plan.goal
+    assert_equal "phone", plan.pending_question
+    assert_includes plan.actions, { "type" => "ask", "field" => "phone" }
+    assert_includes plan.content, "To continue your order: Delivery-r jonno phone number-ta diben?"
     assert_equal "banglish", plan.language
     assert_equal "phone", order.conversation.reload.conversation_state["pending_question"]
+  end
+
+  test "answers a side question while choosing a variant and resumes with a concise Banglish prompt" do
+    product = Product.create!(name: "The Club", price: 390, stock_quantity: 0)
+    product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    order = create_pending_order(product: product, status: :collecting_variant)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "delivery charge koto?")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :delivery_charge_requested,
+      interpretation: interpretation(intent: "delivery_charge", language: "banglish")
+    ).plan
+
+    assert plan.interrupted
+    assert_includes plan.content, "To continue your order: The Club-er kon size ta niben?"
+    assert_not_includes plan.content, "good for trying it first"
+  end
+
+  test "offers a clear resume change or pause choice after repeated context switches" do
+    product = Product.create!(name: "The Club", price: 390, stock_quantity: 0)
+    variant = product.product_variants.create!(name: "10 ML", size: "10 ML", price: 390, stock_quantity: 10)
+    order = create_pending_order(product: product, product_variant: variant, status: :collecting_quantity)
+    order.conversation.update!(conversation_state: { "context_switch_count" => 1 })
+    message = order.conversation.messages.create!(sender_type: :customer, content: "delivery time koto?")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :delivery_time_requested,
+      interpretation: interpretation(intent: "delivery_time", language: "banglish")
+    ).plan
+
+    assert_includes plan.content, "Apnar The Club 10 ML selection-ta save ache"
+    assert_equal 2, order.conversation.reload.conversation_state["context_switch_count"]
   end
 
   test "asks a focused question when new and changed orders are both possible" do
@@ -49,6 +89,51 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
 
     assert_equal "calm_and_helpful", plan.tone
     assert_equal "calm_and_helpful", order.conversation.reload.conversation_state["preferred_tone"]
+  end
+
+  test "returns an auditable structured plan with approved order facts" do
+    product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
+    order = create_pending_order(product: product, quantity: 2, status: :collecting_name)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "two bottles")
+
+    plan = build_planner(
+      order: order,
+      message: message,
+      outcome: :quantity_collected,
+      interpretation: interpretation(intent: "select_quantity", confidence: 0.91)
+    ).plan
+
+    assert_equal "collect_customer_name", plan.goal
+    assert_equal 0.91, plan.confidence
+    assert_equal "Fresh Musk", plan.facts.fetch("product_name")
+    assert_equal 2, plan.facts.fetch("quantity")
+    assert_equal "1500.0", plan.facts.fetch("total_price")
+    assert_equal false, plan.needs_clarification
+    assert_equal false, plan.handover_required
+    assert_equal plan.content, plan.to_h.fetch(:content)
+  end
+
+  test "marks clarification and handover plans explicitly" do
+    order = create_pending_order
+    message = order.conversation.messages.create!(sender_type: :customer, content: "something else")
+
+    clarification = build_planner(
+      order: order,
+      message: message,
+      outcome: :clarification_needed,
+      interpretation: interpretation(intent: "unclear", needs_clarification: true)
+    ).plan
+    handover = build_planner(
+      order: order,
+      message: message,
+      outcome: :human_handover_started,
+      interpretation: interpretation(intent: "human_agent")
+    ).plan
+
+    assert clarification.needs_clarification
+    assert_equal "clarify_customer_request", clarification.goal
+    assert handover.handover_required
+    assert_equal "handover_to_seller", handover.goal
   end
 
   test "keeps the remembered language when detection confidence is weak" do
@@ -110,6 +195,24 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
     assert_not_includes plan.content, "size"
   end
 
+  test "keeps a size question focused instead of appending generic help" do
+    order = create_pending_order(status: :collecting_product)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "size options?")
+
+    plan = ConversationResponsePlanner.new(
+      conversation: order.conversation,
+      pending_order: order,
+      customer_message: message,
+      outcome: :product_variants_requested,
+      secondary_outcomes: [ :help ],
+      interpretation: interpretation(intent: "product_variants")
+    ).plan
+
+    assert_includes plan.content, "which product"
+    assert_not_includes plan.content, "place an order"
+    assert_not_includes plan.content, "available products"
+  end
+
   test "remembers and naturally mirrors the customer's form of address" do
     order = create_pending_order
     message = order.conversation.messages.create!(sender_type: :customer, content: "Bhai, hello")
@@ -133,6 +236,17 @@ class ConversationResponsePlannerTest < ActiveSupport::TestCase
       interpretation: interpretation(intent: "thanks", language: "banglish")
     ).plan
     assert_includes next_plan.content, "welcome, bhai"
+  end
+
+  test "does not switch away from remembered Banglish for a one-word product reply" do
+    order = create_pending_order
+    order.conversation.update!(conversation_state: { "preferred_language" => "banglish" })
+    message = order.conversation.messages.create!(sender_type: :customer, content: "oud")
+
+    plan = build_planner(order: order, message: message, outcome: :product_recommendation_requested,
+      interpretation: interpretation(intent: "product_recommendation", language: "english")).plan
+
+    assert_equal "banglish", plan.language
   end
 
   private

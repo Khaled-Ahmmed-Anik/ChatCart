@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
+  setup { Business.default.update!(category: "perfume") }
   test "create records an incoming customer message for a new conversation" do
     assert_difference -> { Conversation.count }, 1 do
       assert_difference -> { Message.count }, 2 do
@@ -88,7 +89,7 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "collecting_quantity", response_body.dig("pending_order", "status")
     assert_equal product.id, response_body.dig("pending_order", "product_id")
     assert_equal "0", response_body.dig("pending_order", "total_price")
-    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", response_body.dig("bot_reply", "content")
+    assert_equal "Nice choice! Fresh Musk is ৳750 each. How many would you like?", response_body.dig("bot_reply", "content")
   end
 
   test "create processes quantity from incoming message" do
@@ -166,7 +167,8 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
 
     response_body = JSON.parse(response.body)
     assert_equal "confirmed", response_body.dig("pending_order", "status")
-    assert_equal "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly.", response_body.dig("bot_reply", "content")
+    assert_equal "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly. Was this chat helpful? Reply “helpful” or “not helpful”.",
+      response_body.dig("bot_reply", "content")
   end
 
   test "create cancels an order awaiting confirmation" do
