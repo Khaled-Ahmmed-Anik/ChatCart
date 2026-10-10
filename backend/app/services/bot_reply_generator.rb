@@ -148,6 +148,9 @@ class BotReplyGenerator
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
     when :name_required
       I18n.t("conversation_safety.#{banglish? ? 'banglish' : 'en'}.name_required")
+    when :checkout_edit_requested
+      field = pending_order.conversation.conversation_state.to_h.dig("checkout_edit", "field")
+      I18n.t("checkout_edit.#{banglish? ? 'banglish' : 'en'}.#{field}")
     when :invalid_phone
       invalid_phone_reply
     when :phone_collected
