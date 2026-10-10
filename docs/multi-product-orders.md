@@ -10,6 +10,16 @@ This is catalogue matching, not universal semantic understanding: missing attrib
 
 ## One order, several items
 
+### Clarification and totals (WC-056)
+
+Incomplete multi-item requests now store their intended known items in `conversation_state.cart_repair`, scoped to the pending order. The existing cart remains unchanged until all intended options and quantities are supplied and stock is rechecked. A follow-up such as `Oud 30 ml` completes the missing Oud option while preserving the other intended additions. Unknown items are not silently dropped: customers must explicitly discard the unknown item and identify which known items to keep. A new order clears pending repairs.
+
+`The Oud ekta koren` changes the named cart line's quantity without changing the other products. Ambiguous variants still require clarification. Confirmed/submitted carts remain locked. An unresolved repair prevents checkout confirmation, even if the previous cart already had customer details.
+
+`total koto?` answers the sum of all current cart lines as an **items subtotal**, explicitly excluding delivery. This does not calculate a delivery-inclusive total from free-form policy text. Incomplete summaries omit blank customer fields and ask for the next missing detail instead of inviting confirmation.
+
+Regression tests: `cart_repair_and_totals_test.rb`, alongside the existing cart-routing and checkout tests. New prompts use i18n; pattern constants remain in `constants.rb`. No migration or new environment variables are needed.
+
 Customers can request multiple named products with quantities and options, add an item to an unfinished order, change a named item's quantity, or remove a named product. For example:
 
 - `I want Cotton Shirt Medium 2 pieces and Canvas Bag 1 piece`
