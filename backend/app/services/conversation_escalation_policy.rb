@@ -16,6 +16,8 @@ class ConversationEscalationPolicy
     return urgent_support_reason if urgent_support_case?
     return "repeated_complaint" if consecutive_problem_count("complaint") >= REPEATED_PROBLEM_THRESHOLD
     return "repeated_confusion" if consecutive_clarification_count >= REPEATED_PROBLEM_THRESHOLD
+    return "unsupported_support" if consecutive_support_count >= Constants::Conversation::SUPPORT_REPAIR_THRESHOLD
+    return "repeated_unresolved_request" if consecutive_unresolved_count >= Constants::Conversation::CONVERSATION_REPAIR_THRESHOLD
 
     nil
   end
@@ -30,7 +32,9 @@ class ConversationEscalationPolicy
 
   def repeated_problem?
     consecutive_problem_count("complaint") >= REPEATED_PROBLEM_THRESHOLD ||
-      consecutive_clarification_count >= REPEATED_PROBLEM_THRESHOLD
+      consecutive_clarification_count >= REPEATED_PROBLEM_THRESHOLD ||
+      consecutive_support_count >= Constants::Conversation::SUPPORT_REPAIR_THRESHOLD ||
+      consecutive_unresolved_count >= Constants::Conversation::CONVERSATION_REPAIR_THRESHOLD
   end
 
   def intelligence
@@ -47,6 +51,16 @@ class ConversationEscalationPolicy
     intelligence.take_while do |item|
       item["needs_clarification"] || item["outcome"] == "clarification_needed"
     end.size
+  end
+
+  def consecutive_unresolved_count
+    intelligence.take_while do |item|
+      item["outcome"] == "product_not_found"
+    end.size
+  end
+
+  def consecutive_support_count
+    intelligence.take_while { |item| item["outcome"] == "unsupported_support_requested" }.size
   end
 
   def urgent_support_case?

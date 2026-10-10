@@ -22,6 +22,18 @@ class ConversationToolGateway
       }
     },
     {
+      name: "search_business_knowledge",
+      description: "Search approved descriptive product guidance, FAQs, and policies for the current business.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          query: { type: "STRING", description: "The customer's descriptive question or preference." },
+          limit: { type: "INTEGER", minimum: 1, maximum: MAX_RESULTS }
+        },
+        required: [ "query" ]
+      }
+    },
+    {
       name: "get_product_details",
       description: "Get grounded details for one product in the current business.",
       parameters: {
@@ -70,6 +82,7 @@ class ConversationToolGateway
     arguments = arguments.to_h.with_indifferent_access
     result = case name.to_s
     when "search_products" then search_products(arguments)
+    when "search_business_knowledge" then search_business_knowledge(arguments)
     when "get_product_details" then get_product_details(arguments)
     when "get_variant_availability" then get_variant_availability(arguments)
     when "get_business_policy" then get_business_policy(arguments)
@@ -119,6 +132,23 @@ class ConversationToolGateway
     }.compact
   end
 
+  def search_business_knowledge(arguments)
+    limit = arguments[:limit].to_i.clamp(1, MAX_RESULTS)
+    results = HybridBusinessKnowledgeRetriever.new(
+      business: business, query: arguments.fetch(:query), limit: limit
+    ).call
+    {
+      "matches" => results.map do |result|
+        {
+          "title" => result.document.title,
+          "content" => result.document.content.truncate(800),
+          "citation" => result.citation,
+          "retrieval_score" => result.score
+        }
+      end
+    }
+  end
+
   def get_variant_availability(arguments)
     product = business.products.available_for_sale.find_by(id: arguments[:product_id])
     return { "found" => false, "variants" => [] } if product.blank?
@@ -153,6 +183,7 @@ class ConversationToolGateway
       "variant_id" => pending_order.product_variant_id,
       "variant_name" => pending_order.product_variant&.display_name,
       "quantity" => pending_order.quantity,
+      "items" => pending_order.item_snapshot,
       "unit_price" => pending_order.product.present? ? decimal(pending_order.unit_price) : nil,
       "total_price" => pending_order.product.present? && pending_order.quantity.present? ? decimal(pending_order.total_price) : nil,
       "has_customer_name" => pending_order.customer_name.present?,

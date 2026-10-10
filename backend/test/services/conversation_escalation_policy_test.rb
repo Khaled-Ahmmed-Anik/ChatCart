@@ -1,6 +1,22 @@
 require "test_helper"
 
 class ConversationEscalationPolicyTest < ActiveSupport::TestCase
+  test "hands over consecutive unresolved requests but resets on a successful answer" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    3.times do
+      conversation.messages.create!(sender_type: :customer, content: "unresolved question", metadata: {
+        "conversation_intelligence" => { "outcome" => "product_not_found" }
+      })
+    end
+    policy = ConversationEscalationPolicy.new(conversation: conversation, interpretation: nil, outcome: :product_not_found)
+    assert policy.handover?
+    assert_equal "repeated_unresolved_request", policy.reason
+    conversation.messages.create!(sender_type: :customer, content: "price?", metadata: {
+      "conversation_intelligence" => { "outcome" => "price_inquiry" }
+    })
+    assert_not policy.handover?
+  end
+
   test "escalates after repeated low-confidence misunderstandings" do
     conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
     3.times do

@@ -40,6 +40,14 @@ Rails.application.routes.draw do
     end
     resource :analytics, only: :show
     resource :delivery_integration, only: %i[show update]
+    resources :knowledge_documents, only: %i[index create update destroy] do
+      collection do
+        get :status
+        get :preview
+        post :sync
+      end
+      member { post :reindex }
+    end
   end
 
   namespace :admin do

@@ -90,7 +90,7 @@ docker compose ps
 docker compose logs --tail=100 backend
 ```
 
-The container automatically executes `db:prepare`. Seed initial accounts once:
+The container automatically executes `db:prepare`, primary migrations, and the critical schema contract check. A pending migration or missing required column stops startup and makes `/ready` return `503`. Seed initial accounts once:
 
 ```bash
 docker compose exec backend ./bin/rails db:seed

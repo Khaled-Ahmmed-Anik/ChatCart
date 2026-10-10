@@ -45,7 +45,7 @@ class DeliverySubmissionSender
       customer: { name: order.customer_name, phone: order.phone, address: order.address },
       amount: order.total.to_s,
       currency: order.currency,
-      items: order.order_items.map { |item| { name: item.product_name, quantity: item.quantity } }
+      items: order.order_items.map { |item| { name: item.product_name, variant: item.variant_name, quantity: item.quantity } }
     }
   end
 

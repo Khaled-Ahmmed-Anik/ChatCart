@@ -3,6 +3,7 @@ class PendingOrder < ApplicationRecord
   belongs_to :product, optional: true
   belongs_to :product_variant, optional: true
   has_one :order, dependent: :restrict_with_error
+  has_many :pending_order_items, dependent: :destroy
 
   enum :status, {
     collecting_product: 0,
@@ -28,9 +29,35 @@ class PendingOrder < ApplicationRecord
   end
 
   def total_price
-    return 0 if product.blank? || quantity.blank?
+    line_items.sum(&:total_price)
+  end
 
-    unit_price * quantity
+  def line_items
+    items = pending_order_items.includes(:product, :product_variant).to_a
+    if product.present? && quantity.present? && variant_selected_if_required?
+      current = PendingOrderItem.new(pending_order: self, product: product, product_variant: product_variant, quantity: quantity)
+      existing = items.find { |item| item.product_id == current.product_id && item.product_variant_id == current.product_variant_id }
+      existing ? existing.quantity += quantity : items << current
+    end
+    items
+  end
+
+  def inventory_available? = line_items.present? && line_items.all?(&:available?)
+
+  def item_snapshot
+    line_items.map do |item|
+      { "product_id" => item.product_id, "product_name" => item.product.name,
+        "variant_id" => item.product_variant_id, "variant_name" => item.product_variant&.display_name,
+        "quantity" => item.quantity, "unit_price" => item.unit_price.to_s, "total_price" => item.total_price.to_s }.compact
+    end
+  end
+
+  def save_current_item!
+    return unless product.present? && quantity.present? && variant_selected_if_required?
+
+    item = pending_order_items.find_or_initialize_by(product: product, product_variant: product_variant)
+    item.quantity = item.quantity.to_i + quantity
+    item.save!
   end
 
   def unit_price

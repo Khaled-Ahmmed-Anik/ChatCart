@@ -1,4 +1,15 @@
 namespace :deployment do
+  desc "Fail deployment when primary migrations or critical schema objects are missing"
+  task verify_schema: :environment do
+    result = DatabaseSchemaHealth.new.call
+    next puts("Production database schema is current.") if result[:current]
+
+    warn "Production database schema verification failed."
+    warn "- Pending primary migrations exist." unless result[:migrations_current]
+    result[:missing].each { |item| warn "- Missing #{item}" }
+    abort
+  end
+
   desc "Validate production environment settings without printing secrets"
   task preflight: :environment do
     required = %w[
