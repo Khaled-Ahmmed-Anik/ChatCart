@@ -1,6 +1,12 @@
 module Constants
   module Conversation
     ENGINE_VERSION = "2026.10.7"
+    CHECKOUT_EDIT_FIELDS = {
+      "phone" => /\A(?:change|update|edit)\s+(?:my\s+)?phone(?:\s+number)?[?.! ]*\z|\Aphone(?:\s+number)?\s+change\s+korbo[?.! ]*\z/i,
+      "address" => /\A(?:change|update|edit)\s+(?:my\s+|the\s+)?address[?.! ]*\z|\Aaddress\s+change\s+korbo[?.! ]*\z/i,
+      "customer_name" => /\A(?:change|update|edit)\s+(?:my\s+)?name[?.! ]*\z|\A(?:name|naam)\s+change\s+korbo[?.! ]*\z/i
+    }.freeze
+    QUANTITY_CORRECTION = /\A(?:actually[\s,]*)?(?:\d+|one|two|three|ekta|duita|একটা|দুইটা)\s+(?:ta\s+)?(?:koren|korun|করেন|করুন|hobe|হবে)[?.! ]*\z/i
     GREETING_ONLY = /\A(?:hi|hello|hey|assalamu?\s*alaikum|assalamu?laikum|assalamulaikum|salam|হ্যালো|আসসালামু আলাইকুম)(?:\s+(?:there|bhai|apu|sir|madam))?[!. ]*\z/i
     THANKS_ONLY = /\A(?:thanks(?: a lot)?|thank you(?: very much)?|dhonnobad|onek dhonnobad|ধন্যবাদ|অনেক ধন্যবাদ)[!. ]*\z/i
     CUSTOMER_NAME_PREFIX = /\A(?:(?:hi|hello|hey|হ্যালো)(?:\s+there)?[,!. ]+)?(?:my name is|i am|i'm|amar naam|amar nam|name|naam|আমার নাম)\s*[:=-]?\s*(.+?)[.! ]*\z/i
