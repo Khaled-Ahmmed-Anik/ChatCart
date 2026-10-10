@@ -79,8 +79,8 @@ GEM
     base64 (0.3.0)
     bcrypt_pbkdf (1.1.2)
     bigdecimal (4.1.3)
-    bootsnap (1.24.4)
-      msgpack (~> 1.2)
+    bootsnap (1.26.0)
+      msgpack (~> 1.5)
     brakeman (8.1.0)
       racc
     builder (3.3.0)
@@ -114,7 +114,7 @@ GEM
       raabro (~> 1.4)
     globalid (1.4.0)
       activesupport (>= 6.1)
-    graphql (2.6.10)
+    graphql (2.6.11)
       base64
       fiber-storage
       logger
@@ -353,7 +353,7 @@ DEPENDENCIES
   brakeman
   bundler-audit
   debug
-  graphql (~> 2.5)
+  graphql (~> 2.6)
   image_processing (~> 1.2)
   json (~> 2.19.9)
   kamal
