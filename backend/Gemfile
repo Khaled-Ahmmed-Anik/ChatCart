@@ -35,7 +35,7 @@ gem "thruster", require: false
 gem "image_processing", "~> 1.2"
 
 # Typed dashboard API consumed by the React application.
-gem "graphql", "~> 2.5"
+gem "graphql", "~> 2.6"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
