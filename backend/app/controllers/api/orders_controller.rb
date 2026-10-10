@@ -54,7 +54,7 @@ module Api
     def serialize(order, include_conversation: false)
       data = order.as_json(except: %i[created_at updated_at]).merge(
         channel: order.conversation.channel,
-        items: order.order_items.as_json(only: %i[product_id product_name quantity unit_price total])
+        items: order.order_items.as_json(only: %i[product_id product_name product_variant_id variant_name quantity unit_price total])
       )
       if include_conversation
         data[:conversation] = {
@@ -72,7 +72,7 @@ module Api
     def csv_for(orders)
       rows = [ %w[number status confirmed_at customer_name phone address channel products subtotal delivery_charge total currency] ]
       orders.each do |order|
-        products = order.order_items.map { |item| "#{item.quantity} x #{item.product_name}" }.join("; ")
+        products = order.order_items.map { |item| "#{item.quantity} x #{[ item.product_name, item.variant_name ].compact.join(' ')}" }.join("; ")
         rows << [ order.number, order.status, order.confirmed_at.iso8601, order.customer_name, order.phone,
           order.address, order.conversation.channel, products, order.subtotal, order.delivery_charge,
           order.total, order.currency ]

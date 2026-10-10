@@ -1,0 +1,6 @@
+en:
+  conversation_safety:
+    en:
+      name_required: "What name should I put on the order? Please send the customer name only."
+    banglish:
+      name_required: "Order-e kar nam dibo? Customer-er nam-ta bolben?"

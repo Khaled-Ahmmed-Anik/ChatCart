@@ -22,6 +22,7 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
 
     assert_includes captured_request.body, "Customer's preferred form of address: bhai"
     assert_includes captured_request.body, "Never infer gender"
+    assert_includes captured_request.body, "Use search_business_knowledge"
   end
 
   test "uses the deterministic reply when no API key is configured" do
@@ -82,6 +83,46 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
     end
   end
 
+  test "uses an allowlisted tool and records safe telemetry when planner rollout is enabled" do
+    product = create_product(name: "Fresh Musk", price: 750)
+    order = create_pending_order(product: product, status: :collecting_quantity)
+    assistant = build_assistant(api_key: "gemini-key", pending_order: order)
+    responses = [
+      fake_response(code: 200, body: {
+        candidates: [ { content: { role: "model", parts: [ {
+          functionCall: { name: "get_product_details", args: { product_id: product.id } }
+        } ] } } ]
+      }.to_json),
+      fake_response(code: 200, body: gemini_response(reply: "Fresh Musk is ৳750. How many bottles would you like?"))
+    ]
+    requests = []
+
+    with_environment("CONVERSATION_PLANNER_ENABLED" => "true") do
+      with_http_stub(->(request) { requests << JSON.parse(request.body); responses.shift }) do
+        reply = assistant.rewrite(fallback: "Fresh Musk is ৳750. How many bottles would you like?")
+
+        assert_equal "Fresh Musk is ৳750. How many bottles would you like?", reply
+      end
+    end
+
+    assert_equal 2, requests.size
+    tool_names = requests.first.fetch("tools").first.fetch("functionDeclarations").pluck("name")
+    assert_includes tool_names, "search_business_knowledge"
+    assert_equal "get_product_details", requests.second.dig("contents", 2, "parts", 0, "functionResponse", "name")
+    assert_equal true, assistant.telemetry.fetch("planner_used")
+    assert_equal [ "get_product_details" ], assistant.telemetry.fetch("tool_names")
+    assert_empty assistant.telemetry.fetch("knowledge_citations")
+    assert_nil assistant.telemetry.fetch("fallback_reason")
+  end
+
+  test "records why deterministic fallback was used" do
+    assistant = build_assistant(api_key: nil)
+
+    assistant.rewrite(fallback: "Approved reply")
+
+    assert_equal "api_key_missing", assistant.telemetry.fetch("fallback_reason")
+  end
+
   private
 
   def build_assistant(
@@ -139,5 +180,15 @@ class AiConversationAssistantTest < ActiveSupport::TestCase
     yield
   ensure
     Net::HTTP.define_singleton_method(:new, original_new)
+  end
+
+
+  def with_environment(values)
+    previous = values.to_h.transform_values { |_value| nil }
+    values.each_key { |key| previous[key] = ENV[key] }
+    values.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
   end
 end

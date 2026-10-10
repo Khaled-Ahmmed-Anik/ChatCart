@@ -1,0 +1,134 @@
+require "test_helper"
+
+class ConversationQualityEvaluatorTest < ActiveSupport::TestCase
+  test "flags repeated replies clarification loops frustration and unresolved handover" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid, status: :handed_over)
+    2.times do
+      conversation.messages.create!(
+        sender_type: :customer,
+        content: "This is frustrating",
+        metadata: { "conversation_intelligence" => {
+          "needs_clarification" => true, "outcome" => "clarification_needed", "sentiment" => "negative"
+        } }
+      )
+      conversation.messages.create!(sender_type: :bot, content: "Which product do you mean?")
+    end
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+
+    assert_operator result[:score], :<, 60
+    assert_equal "poor", result[:grade]
+    assert_includes result[:flags], "repeated_bot_reply"
+    assert_includes result[:flags], "clarification_loop"
+    assert_includes result[:flags], "customer_frustration"
+    assert_includes result[:flags], "waiting_for_seller"
+  end
+
+  test "reports stored review feedback and engine versions" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.update!(conversation_state: {
+      "quality_review" => { "label" => "successful" },
+      "customer_feedback" => { "rating" => "helpful" }
+    })
+    conversation.messages.create!(
+      sender_type: :bot, content: "Hello", metadata: { "conversation_engine_version" => "2026.09.1" }
+    )
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+
+    assert_equal "successful", result.dig(:review, "label")
+    assert_equal "helpful", result.dig(:customer_feedback, "rating")
+    assert_equal [ "2026.09.1" ], result[:engine_versions]
+  end
+
+  test "supports legacy single handover summaries" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.update!(conversation_state: {
+      "handover_summary" => { "reason" => "seller_takeover", "created_at" => Time.current.iso8601 }
+    })
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+
+    assert_equal 1, result.dig(:metrics, :handovers)
+  end
+
+  test "reports planner tool fallback guardrail and latency metrics" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.messages.create!(sender_type: :bot, content: "First", metadata: {
+      "ai_assistant" => {
+        "planner_used" => true, "tool_names" => %w[search_products get_business_policy],
+        "fallback_reason" => nil, "latency_ms" => 100
+      }
+    })
+    conversation.messages.create!(sender_type: :bot, content: "Second", metadata: {
+      "ai_assistant" => {
+        "planner_used" => true, "tool_names" => [],
+        "fallback_reason" => "guardrail_rejected", "latency_ms" => 200
+      }
+    })
+
+    metrics = ConversationQualityEvaluator.new(conversation: conversation).call.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:ai_assisted_turns)
+    assert_equal 2, metrics.fetch(:planner_turns)
+    assert_equal 2, metrics.fetch(:tool_calls)
+    assert_equal 1, metrics.fetch(:ai_fallbacks)
+    assert_equal 1, metrics.fetch(:guardrail_rejections)
+    assert_equal 150, metrics.fetch(:average_ai_latency_ms)
+  end
+
+  test "reports correction repair and abandoned checkout metrics" do
+    conversation = Conversation.create!(
+      channel: "facebook", external_customer_id: SecureRandom.uuid, status: :closed
+    )
+    conversation.create_pending_order!(status: :collecting_phone)
+    %w[order_updated confirmed_order_updated invalid_phone name_required clarification_needed].each do |outcome|
+      conversation.messages.create!(
+        sender_type: :customer,
+        content: outcome,
+        metadata: { "conversation_intelligence" => {
+          "outcome" => outcome, "needs_clarification" => outcome == "clarification_needed"
+        } }
+      )
+    end
+
+    result = ConversationQualityEvaluator.new(conversation: conversation).call
+    metrics = result.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:correction_turns)
+    assert_equal 40.0, metrics.fetch(:correction_rate)
+    assert_equal 3, metrics.fetch(:repair_turns)
+    assert_equal 60.0, metrics.fetch(:repair_rate)
+    assert_equal 20.0, metrics.fetch(:clarification_rate)
+    assert_equal "collecting_phone", metrics.fetch(:abandoned_checkout_stage)
+    assert_includes result.fetch(:flags), "conversation_repair_loop"
+    assert_includes result.fetch(:flags), "repeated_order_correction"
+  end
+
+  test "reports classification feedback metrics" do
+    conversation = Conversation.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+    conversation.messages.create!(sender_type: :customer, content: "show products", metadata: {
+      "classification_feedback" => {
+        "classifier" => "local", "predicted_intent" => "list_products", "repeated_intent" => false
+      }
+    })
+    conversation.messages.create!(sender_type: :customer, content: "find a shirt", metadata: {
+      "classification_feedback" => {
+        "classifier" => "gemini", "predicted_intent" => "list_products",
+        "classifier_disagreement" => true, "corrected_intent" => "product_search", "was_correct" => false,
+        "repeated_intent" => true, "follows_repair" => true
+      }
+    })
+
+    metrics = ConversationQualityEvaluator.new(conversation: conversation).call.fetch(:metrics)
+
+    assert_equal 2, metrics.fetch(:classified_turns)
+    assert_equal 1, metrics.fetch(:local_classifications)
+    assert_equal 1, metrics.fetch(:gemini_classifications)
+    assert_equal 1, metrics.fetch(:classifier_disagreements)
+    assert_equal 1, metrics.fetch(:reviewed_classifications)
+    assert_equal 1, metrics.fetch(:incorrect_classifications)
+    assert_equal 1, metrics.fetch(:repeated_intents)
+    assert_equal 1, metrics.fetch(:followups_after_repair)
+  end
+end

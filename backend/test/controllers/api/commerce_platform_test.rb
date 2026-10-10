@@ -77,6 +77,47 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal "A seller is here to help.", conversation.messages.seller.sole.content
   end
 
+  test "seller can review a conversation and record feedback" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "review-buyer")
+    message = conversation.messages.create!(sender_type: :customer, content: "show me something", metadata: {
+      "classification_feedback" => { "predicted_intent" => "list_products" }
+    })
+
+    post review_api_conversation_path(conversation), params: {
+      label: "confusing", notes: "Repeated question", message_id: message.id, corrected_intent: "product_search"
+    },
+      headers: authorization(@token), as: :json
+    assert_response :success
+    assert_equal "confusing", JSON.parse(response.body).dig("quality", "review", "label")
+    assert_equal "product_search", message.reload.metadata.dig("classification_feedback", "corrected_intent")
+
+    post feedback_api_conversation_path(conversation), params: { rating: "unhelpful" },
+      headers: authorization(@token), as: :json
+    assert_response :success
+    assert_equal "unhelpful", JSON.parse(response.body).dig("quality", "customer_feedback", "rating")
+  end
+
+  test "seller cannot attach an invalid intent correction" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "invalid-review")
+    message = conversation.messages.create!(sender_type: :customer, content: "show me something")
+
+    post review_api_conversation_path(conversation), params: {
+      label: "incorrect_reply", message_id: message.id, corrected_intent: "invented_intent"
+    }, headers: authorization(@token), as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "Invalid corrected intent", JSON.parse(response.body).fetch("error")
+  end
+
+  test "conversation quality endpoints are tenant isolated" do
+    conversation = @other_business.conversations.create!(channel: "facebook", external_customer_id: "other-buyer")
+
+    post review_api_conversation_path(conversation), params: { label: "successful" },
+      headers: authorization(@token), as: :json
+
+    assert_response :not_found
+  end
+
   test "manual delivery integration submits an order without an external charge" do
     order = create_order(@business, number: "ORD-DELIVERY")
     integration = @business.create_delivery_integration!(provider: "manual", active: true)
@@ -108,6 +149,41 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal 50.0, body["conversation_to_order_rate"]
     assert_equal 100.0, body["repeat_customer_rate"]
     assert second_conversation.persisted?
+  end
+
+  test "analytics accepts legacy single handover summaries" do
+    conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "legacy-handover")
+    conversation.update!(conversation_state: {
+      "handover_summary" => { "reason" => "seller_takeover", "created_at" => 2.minutes.ago.iso8601 }
+    })
+
+    get api_analytics_path, headers: authorization(@token)
+
+    assert_response :success
+    assert_equal 1, JSON.parse(response.body).dig("handovers", "total")
+  end
+
+  test "analytics aggregates conversation repair and abandonment telemetry" do
+    conversation = @business.conversations.create!(
+      channel: "facebook", external_customer_id: "abandoned-buyer", status: :closed
+    )
+    conversation.create_pending_order!(status: :collecting_address)
+    %w[invalid_phone order_updated clarification_needed].each do |outcome|
+      conversation.messages.create!(sender_type: :customer, content: outcome, metadata: {
+        "conversation_intelligence" => {
+          "outcome" => outcome, "needs_clarification" => outcome == "clarification_needed"
+        }
+      })
+    end
+
+    get api_analytics_path, headers: authorization(@token)
+
+    assert_response :success
+    quality = JSON.parse(response.body).fetch("conversation_quality")
+    assert_equal 33.33, quality.fetch("clarification_rate")
+    assert_equal 33.33, quality.fetch("correction_rate")
+    assert_equal 66.67, quality.fetch("repair_rate")
+    assert_equal({ "collecting_address" => 1 }, quality.fetch("abandoned_checkout_stages"))
   end
 
   private

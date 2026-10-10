@@ -24,7 +24,10 @@ module Webhooks
 
     def record_messaging_event(entry_id, event)
       event_type = MessengerEventClassifier.new(event).type
-      business = ChannelConnection.find_by(channel: "facebook", external_account_id: entry_id)&.business || Business.default
+      business = ChannelConnection.active.find_by(channel: "facebook", external_account_id: entry_id)&.business ||
+        Business.default
+      return { type: event_type, status: "ignored" } unless business.active?
+
       result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
 
       if result.created && event_type == :customer_text
@@ -47,14 +50,11 @@ module Webhooks
     end
 
     def verify_webhook_signature
-      app_secret = ENV["MESSENGER_APP_SECRET"]
-      signature = request.headers["X-Hub-Signature-256"]
-      signature_match = signature&.match(/\Asha256=([0-9a-f]{64})\z/i)
-
-      return head :forbidden if app_secret.blank? || signature_match.nil?
-
-      expected_signature = OpenSSL::HMAC.hexdigest("SHA256", app_secret, request.raw_post)
-      return if ActiveSupport::SecurityUtils.secure_compare(expected_signature, signature_match[1].downcase)
+      return if MetaWebhookSignatureVerifier.valid?(
+        payload: request.raw_post,
+        signature: request.headers["X-Hub-Signature-256"],
+        app_secret: ENV["MESSENGER_APP_SECRET"]
+      )
 
       head :forbidden
     end
