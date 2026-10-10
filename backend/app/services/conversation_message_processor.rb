@@ -5,7 +5,7 @@ class ConversationMessageProcessor
     @message = message
     @pending_order = pending_order
     @content = message.content.to_s.strip
-    @interpretation = interpretation
+    @interpretation = ConversationEntityValidator.call(interpretation, @content)
   end
 
   def process
@@ -14,6 +14,16 @@ class ConversationMessageProcessor
       return pending_order
     end
 
+    if content.match?(Constants::Conversation::SUPPORT_ACCESS_REQUEST) || content.match?(Constants::Conversation::SUPPORT_TECHNICAL_REQUEST) ||
+        ConversationRepairContext.new(conversation: pending_order.conversation, message: message).support_follow_up?
+      @outcome = :unsupported_support_requested
+      return pending_order
+    end
+    return pending_order if handle_cart_request
+    if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
+      collect_variant
+      return pending_order
+    end
     return pending_order if accept_variant_bundle_offer
     return pending_order if apply_action_plan
     return pending_order if handle_order_update_request
@@ -52,11 +62,29 @@ class ConversationMessageProcessor
 
   attr_reader :message, :pending_order, :content, :interpretation
 
+  def handle_cart_request
+    result = ConversationCartManager.new(message: message, pending_order: pending_order).call
+    return false unless result
+
+    @outcome = result.outcome
+    if outcome == :cart_updated
+      @planned_secondary_outcomes = ConversationActionPlanner::INFORMATIONAL_PATTERNS.filter_map do |key, pattern|
+        key if content.match?(pattern)
+      end
+    end
+    if result.question
+      conversation = pending_order.conversation
+      conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("cart_question" => result.question))
+    end
+    true
+  end
+
   def apply_action_plan
     plan = ConversationActionPlanner.new(
       message: message,
       business: pending_order.conversation.business,
-      current_product: pending_order.product
+      current_product: pending_order.product,
+      interpretation: interpretation
     ).call
     return false unless plan.actionable?
 
@@ -94,6 +122,8 @@ class ConversationMessageProcessor
 
   def handle_ai_intent
     return false if interpretation.blank?
+    return false if interpretation.intent == "greeting" && !greeting?
+    return false if interpretation.intent == "thanks" && !content.match?(Constants::Conversation::THANKS_ONLY)
 
     if interpretation.needs_clarification || interpretation.intent == "unclear"
       @outcome = :clarification_needed
@@ -250,6 +280,7 @@ class ConversationMessageProcessor
       address: clean_checkout_value(parts[(phone_index + 1)..]&.join(", "), :address)
     }
     details[:customer_name] = clean_checkout_value(parts.first, :customer_name) if phone_index.positive?
+    details.delete(:customer_name) if non_name_reply?(details[:customer_name])
     details.compact_blank
   end
 
@@ -271,6 +302,10 @@ class ConversationMessageProcessor
   end
 
   def collect_confirmation
+    if confirmation? && !pending_order.inventory_available?
+      @outcome = :cart_inventory_unavailable
+      return
+    end
     if confirmation?
       pending_order.confirmed!
       @outcome = :confirmed
@@ -328,7 +363,11 @@ class ConversationMessageProcessor
   end
 
   def handle_conversational_intent
-    @outcome = if repeat_order_request?
+    @outcome = if pause_active_order_request?
+      pause_active_order
+    elsif explanation_request?
+      :previous_question_explained
+    elsif repeat_order_request?
       repeat_previous_order ? :repeat_order_prepared : :restarted
     elsif restart_request?
       restart_order
@@ -382,10 +421,17 @@ class ConversationMessageProcessor
       :product_recommendation_requested
     elsif currency_question?
       :currency_clarification
+    elsif content.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:delivery_charge_requested]) &&
+        !confident_ai_intent?(%w[select_product change_product])
+      :delivery_charge_requested
     elsif price_question?
       :price_inquiry
     elsif stock_question?
       :stock_inquiry
+    elsif distinct_fragrances_recommendation_request?
+      enter_product_discovery!
+      remember_recommendation_preferences!
+      :product_recommendation_requested
     elsif comparison_request?
       :product_comparison_requested
     elsif recommendation_refinement_request?
@@ -408,6 +454,9 @@ class ConversationMessageProcessor
   end
 
   def restart_order
+    conversation = pending_order.conversation
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product"))
+    pending_order.pending_order_items.destroy_all
     pending_order.update!(
       product: nil,
       product_variant: nil,
@@ -423,7 +472,7 @@ class ConversationMessageProcessor
   def repeat_previous_order
     previous = previous_completed_order
     inventory = previous&.product_variant || previous&.product
-    unless inventory&.available_for_quantity?(previous.quantity)
+    unless inventory&.available_for_quantity?(previous.quantity) && previous.inventory_available?
       restart_order
       return false
     end
@@ -437,6 +486,9 @@ class ConversationMessageProcessor
       address: previous.address,
       status: :awaiting_confirmation
     )
+    previous.pending_order_items.each do |item|
+      pending_order.pending_order_items.create!(product: item.product, product_variant: item.product_variant, quantity: item.quantity)
+    end
     true
   end
 
@@ -579,6 +631,7 @@ class ConversationMessageProcessor
 
   def record_change(field, new_value)
     return false if new_value.blank?
+    return false if field == :customer_name && non_name_reply?(new_value)
 
     previous_value = pending_order.public_send(field)
     return true if previous_value.to_s == new_value.to_s
@@ -631,6 +684,7 @@ class ConversationMessageProcessor
   def collect_interpreted_value(field, next_status)
     value = interpretation.entities[field].to_s.strip
     return false if value.blank?
+    return false if field == :customer_name && non_name_reply?(value)
 
     pending_order.update!(field => value, status: next_status)
     true
@@ -654,8 +708,8 @@ class ConversationMessageProcessor
   end
 
   def contextual_product_selection
-    normalized = content.downcase.squish
-    if normalized.match?(/\b(previous product|previous one|one before|ager product|agerta|আগের প্রোডাক্ট|আগেরটা)\b/)
+    normalized = ConversationTextNormalizer.call(content)
+    if normalized.match?(/\b(previous product|previous one|one before|ager product|ager ta)\b|আগের প্রোডাক্ট|আগেরটা/)
       history = Array(pending_order.conversation.conversation_state.to_h.dig("turn_manager", "reference_history"))
       current_id = pending_order.product_id || history.last&.dig("product_id")
       previous = history.reverse.find { |reference| reference["product_id"].to_i != current_id.to_i }
@@ -699,6 +753,11 @@ class ConversationMessageProcessor
 
   def matching_variant(product)
     return if product.blank? || product.product_variants.none?
+
+    if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/)
+      candidates = product.available_variants.select { |variant| variant.size.to_s[/\A\s*\d+(?:\.\d+)?/]&.strip == content.strip }
+      return candidates.first if candidates.one?
+    end
 
     requested = interpretation&.entities&.values_at(:variant_name, :size)&.find(&:present?)
     exact = product.available_variants.find do |variant|
@@ -862,7 +921,7 @@ class ConversationMessageProcessor
 
   def parse_quantity(value)
     normalized = value.to_s.downcase
-      .gsub(/\b(first|second|third|last|prothom|ditiyo|tritiyo)\s+one\b/, "")
+      .gsub(/\b(first|second|third|last|previous|prothom|ditiyo|tritiyo)\s+one\b/, "")
       .gsub(/\b\d+(?:\.\d+)?\s*ml\b/, "")
 
     word_quantity = Constants::Conversation::NUMBER_WORDS.find do |word, _number|
@@ -902,11 +961,11 @@ class ConversationMessageProcessor
   end
 
   def confirmation?
-    normalized_content.in?(%w[confirm confirmed yes y]) || confident_ai_intent?(%w[confirm_order])
+    content.match?(Constants::Conversation::EXPLICIT_CONFIRMATION)
   end
 
   def cancellation?
-    normalized_content.in?(%w[cancel cancelled stop no n]) || confident_ai_intent?(%w[cancel_order])
+    content.match?(Constants::Conversation::EXPLICIT_CANCELLATION)
   end
 
   def normalized_content
@@ -951,12 +1010,11 @@ class ConversationMessageProcessor
   end
 
   def restart_request?
-    intent_detector.new_order? || confident_ai_intent?(%w[new_order repeat_order])
+    intent_detector.new_order?
   end
 
   def repeat_order_request?
-    confident_ai_intent?(%w[repeat_order]) ||
-      content.downcase.match?(/\b(re-?order|order again|same order|ager order|আগের অর্ডার)\b/)
+    content.downcase.match?(/\b(re-?order|repeat (?:my )?order|order again|same order)\b|আগের অর্ডার.*আবার|\bager order\b.*\b(?:abar|again|repeat)\b/)
   end
 
   def order_details_request?
@@ -995,6 +1053,7 @@ class ConversationMessageProcessor
   end
 
   def first_time_scent_statement?
+    return false unless catalogue_preferences.fragrance?
     normalized = content.downcase
     normalized.match?(/\b(never|haven'?t|have not|try kori nai|use kori nai|kokhono.*nai)\b/) &&
       Constants::Fragrance::SCENT_FAMILIES.values.flatten.any? { |term| normalized.match?(/\b#{Regexp.escape(term)}\b/) }
@@ -1036,6 +1095,7 @@ class ConversationMessageProcessor
     return true if budget_recommendation_request?
     return true if discovery_follow_up?
     return true if active_discovery_preference?
+    return true if distinct_fragrances_recommendation_request?
     return false if product_resolution.matched?
 
     content.downcase.match?(
@@ -1043,11 +1103,17 @@ class ConversationMessageProcessor
     )
   end
 
+  def distinct_fragrances_recommendation_request?
+    content.downcase.match?(
+      /\b(2|two|duita|duta)\b.{0,30}\b(different|alada|separate)\b.{0,20}\b(perfumes?|fragrances?|scents?)\b|দুইটা.{0,20}(আলাদা|ভিন্ন)/
+    )
+  end
+
   def active_discovery_preference?
     return false unless GuidedSalesConversation.new(pending_order.conversation).stage == "discover"
 
-    extracted = FragrancePreferenceExtractor.new(content).call
-    extracted.values_at("format", "audience", "performance", "scent_families", "occasions").any?(&:present?)
+    extracted = catalogue_preferences.call
+    extracted.values_at("format", "audience", "performance", "scent_families", "occasions", "attributes").any?(&:present?)
   end
 
   def discovery_follow_up?
@@ -1064,6 +1130,10 @@ class ConversationMessageProcessor
     flow = GuidedSalesConversation.new(pending_order.conversation)
     flow.suspend_order!(pending_order)
     flow.transition!("discover") unless flow.stage == "discover"
+    state = pending_order.conversation.conversation_state.to_h
+    if state["order_context_paused"] == true
+      pending_order.conversation.update!(conversation_state: state.merge("order_context_paused" => false))
+    end
     return unless pending_order.status.in?(%w[
       collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation
     ])
@@ -1074,10 +1144,40 @@ class ConversationMessageProcessor
   def remember_recommendation_preferences!
     conversation = pending_order.conversation
     state = conversation.conversation_state.to_h
-    state["shopping_preferences"] = FragrancePreferenceExtractor.new(content).call(
+    state["shopping_preferences"] = catalogue_preferences.call(
       existing: state["shopping_preferences"]
     )
     conversation.update!(conversation_state: state)
+  end
+
+  def pause_active_order_request?
+    normalized = content.downcase.squish
+    explicit_pause = normalized.match?(
+      /\b(pause|hold|nibo na|lagbe na|chai na|bad den|stop)\b|নিব না|লাগবে না|চাই না|বাদ দিন/
+    )
+    explicit_pause ||= !pending_order.awaiting_confirmation? && normalized.match?(/\A(ekhon na|এখন না)[?!. ]*\z/)
+    return true if explicit_pause && pending_order.product.present? && !pending_order.confirmed?
+    return false unless pending_order.conversation.conversation_state.to_h["order_context_paused"] == true
+
+    normalized.match?(/\A(no|na|nah|nope|না)[?!. ]*\z/)
+  end
+
+  def pause_active_order
+    flow = GuidedSalesConversation.new(pending_order.conversation)
+    flow.suspend_order!(pending_order)
+    state = pending_order.conversation.conversation_state.to_h
+    pending_order.conversation.update!(conversation_state: state.merge(
+      "order_context_paused" => true,
+      "paused_product_id" => pending_order.product_id,
+      "paused_at" => Time.current.iso8601
+    ))
+    :order_paused
+  end
+
+  def explanation_request?
+    content.downcase.squish.match?(
+      /\A(?:mane ki|what do you mean|what does that mean|bujhlam na|bujte parini|clear na|কি মানে|মানে কি|বুঝিনি)[?!. ]*\z/
+    )
   end
 
   def resume_browsed_order_request?
@@ -1107,7 +1207,7 @@ class ConversationMessageProcessor
     flow = GuidedSalesConversation.new(pending_order.conversation)
     rejected_ids = flow.reject_last_recommendations!
     state = pending_order.conversation.conversation_state.to_h
-    extractor = FragrancePreferenceExtractor.new(content)
+    extractor = catalogue_preferences
     preferences = extractor.call(existing: state.fetch("shopping_preferences", {}))
       .merge("rejected_product_ids" => rejected_ids)
     pending_order.conversation.update!(conversation_state: state.merge("shopping_preferences" => preferences))
@@ -1156,7 +1256,7 @@ class ConversationMessageProcessor
   end
 
   def recommendation_refinement_request?
-    extractor = FragrancePreferenceExtractor.new(content)
+    extractor = catalogue_preferences
     confident_ai_intent?(%w[refine_recommendation closest_alternative]) || extractor.refinement?
   end
 
@@ -1250,10 +1350,10 @@ class ConversationMessageProcessor
     return false if pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
 
     normalized = normalize_catalog_name(content)
-    product = catalog.available_for_sale.find do |candidate|
-      candidate.searchable_names.any? { |name| normalize_catalog_name(name) == normalized }
+    products = catalog.available_for_sale.select do |candidate|
+      candidate.searchable_names.any? { |name| normalize_catalog_name(name).sub(/\Athe /, "") == normalized.sub(/\Athe /, "") }
     end
-    return false if product.blank?
+    return false unless products.one?
 
     collect_product
     true
@@ -1285,14 +1385,18 @@ class ConversationMessageProcessor
   end
 
   def extracted_customer_name
-    match = content.match(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s*[:=-]?\s*(.+?)[?!. ]*\z/i)
+    match = content.match(Constants::Conversation::CUSTOMER_NAME_PREFIX)
     match ? match[1].strip : content
   end
 
   def non_name_reply?(value)
-    normalized = value.to_s.downcase.gsub(/[^a-z]/, "")
+    normalized = value.to_s.downcase.gsub(/[^\p{L}\p{M}]/, "")
     return true if normalized.blank? || greeting?
     return true if Constants::Conversation::NON_NAME_REPLIES.include?(normalized)
+    return true unless value.to_s.match?(/\A[\p{L}\p{M} .'-]{2,80}\z/u)
+    return true if value.to_s.match?(Constants::Conversation::NON_NAME_SENTENCE)
+    return true if value.to_s.match?(Constants::Conversation::NON_NAME_CONVERSATION)
+    return true if value.to_s.split.size > 5
 
     value.to_s.downcase.match?(/\A(that|it|this)\s+(works|is fine|is good)(\s+for\s+me)?[?!. ]*\z/)
   end
@@ -1320,5 +1424,9 @@ class ConversationMessageProcessor
     return unless confident_ai_intent?([ for_intent ])
 
     interpretation.entities[key].presence
+  end
+
+  def catalogue_preferences
+    CataloguePreferenceExtractor.new(content, business: pending_order.conversation.business)
   end
 end

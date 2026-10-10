@@ -6,9 +6,18 @@ import { DashboardAnalyticsDocument } from "../../graphql/generated/graphql";
 import { graphqlRequest } from "../../lib/graphqlClient";
 
 type BreakdownData = Record<string, string | number>;
+type JsonObject = Record<string, unknown>;
+
+function asObject(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
+}
 
 function asBreakdown(value: unknown): BreakdownData {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as BreakdownData : {};
+  return Object.fromEntries(
+    Object.entries(asObject(value)).filter((entry): entry is [string, string | number] =>
+      typeof entry[1] === "string" || typeof entry[1] === "number"
+    )
+  );
 }
 
 function Breakdown({ title, data }: { title: string; data: BreakdownData }) {
@@ -27,16 +36,13 @@ export function AnalyticsPage() {
   if (query.isError) return <ErrorState error={query.error} />;
 
   const data = query.data!.analytics;
-  const handovers = asBreakdown(data.handovers);
-  const quality = asBreakdown(data.conversationQuality);
-  const reviewLabels = asBreakdown(quality.review_labels);
-  const qualitySummary = Object.fromEntries(
-    Object.entries(quality).filter(([key]) => key !== "review_labels")
-  );
-  const handoverReasons = asBreakdown(handovers.reasons);
-  const handoverPerformance = Object.fromEntries(
-    Object.entries(handovers).filter(([key]) => key !== "reasons")
-  );
+  const handoverData = asObject(data.handovers);
+  const qualityData = asObject(data.conversationQuality);
+  const handoverPerformance = asBreakdown(handoverData);
+  const handoverReasons = asBreakdown(handoverData.reasons);
+  const qualitySummary = asBreakdown(qualityData);
+  const reviewLabels = asBreakdown(qualityData.review_labels);
+  const abandonedCheckoutStages = asBreakdown(qualityData.abandoned_checkout_stages);
   const metrics: Array<[string, string | number]> = [
     ["Conversations", data.conversations],
     ["Confirmed orders", data.confirmedOrders],
@@ -46,10 +52,10 @@ export function AnalyticsPage() {
     ["Repeat customers", data.repeatCustomers],
     ["Repeat rate", `${data.repeatCustomerRate}%`],
     ["Average order", `${data.averageOrderValue} BDT`],
-    ["Takeovers", handovers.total ?? 0],
-    ["Waiting for seller", handovers.waiting_now ?? 0],
-    ["Chat quality", quality.average_score ?? "—"],
-    ["Needs review", quality.needs_review ?? 0]
+    ["Takeovers", handoverPerformance.total ?? 0],
+    ["Waiting for seller", handoverPerformance.waiting_now ?? 0],
+    ["Chat quality", qualitySummary.average_score ?? "—"],
+    ["Needs review", qualitySummary.needs_review ?? 0]
   ];
 
   return <>
@@ -63,6 +69,7 @@ export function AnalyticsPage() {
       <Breakdown title="Takeover reasons" data={handoverReasons} />
       <Breakdown title="Conversation quality" data={qualitySummary} />
       <Breakdown title="Review labels" data={reviewLabels} />
+      <Breakdown title="Abandoned checkout stages" data={abandonedCheckoutStages} />
     </div>
   </>;
 }

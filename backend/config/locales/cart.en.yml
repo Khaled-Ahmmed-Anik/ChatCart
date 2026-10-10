@@ -1,0 +1,11 @@
+en:
+  cart:
+    choose_product: "Sure—which product would you like to add to this order? Send its name, option, and quantity. Your existing items will stay in the order."
+    updated: "Your order now has:"
+    locked: "Please start a new order to add items, or ask the seller to update your confirmed order."
+    stock: "One or more items are no longer available in the requested quantity. Please change or remove those items before confirming."
+  cart_banglish:
+    choose_product: "Obosshoi—ei order-e kon product-ta add korben? Product-er nam, option ar quantity bolun. Ager item-gulo order-e thakbe."
+    updated: "Apnar order-e ekhon ache:"
+    locked: "Notun item-er jonno notun order shuru korun, ba confirmed order change korte seller-er help nin."
+    stock: "Order-er ek ba ekadhik item-er oi quantity ekhon available nei. Confirm korar age quantity change korun ba item-ta bad din."

@@ -66,6 +66,8 @@ class ProcessMessengerEventJob < ApplicationJob
       events.each { |event| event.update!(status: "processed", processed_at: Time.current, last_error: nil) }
     end
 
+    remember_customer_name(result.conversation, webhook_event.business)
+
     { result: result, delivery: delivery, webhook_event: processed_event }
   end
 
@@ -87,6 +89,22 @@ class ProcessMessengerEventJob < ApplicationJob
       "batched_message_ids" => events.filter_map(&:external_event_id),
       "batched_message_count" => events.size
     )
+  end
+
+  def remember_customer_name(conversation, business)
+    state = conversation.conversation_state.to_h
+    return if state.dig("customer_profile", "name").present?
+
+    name = MessengerCustomerProfile.new(
+      sender_id: conversation.external_customer_id,
+      page_access_token: business.channel_connections.active.find_by(channel: "facebook")&.access_token ||
+        ENV["MESSENGER_PAGE_ACCESS_TOKEN"]
+    ).name
+    return if name.blank?
+
+    conversation.update!(conversation_state: state.merge(
+      "customer_profile" => state["customer_profile"].to_h.merge("name" => name, "source" => "messenger")
+    ))
   end
 
   def log_processed(webhook_event, processing)

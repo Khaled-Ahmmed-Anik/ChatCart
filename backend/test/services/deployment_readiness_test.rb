@@ -19,10 +19,17 @@ class DeploymentReadinessTest < ActiveSupport::TestCase
     }
     schema_health.define_singleton_method(:call) { schema_result }
 
+    log_output = StringIO.new
+    previous_logger = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log_output)
     result = DeploymentReadiness.new(schema_health: schema_health).call
 
     assert_equal false, result[:ready]
     assert_equal false, result.dig(:checks, :schema_contract)
     assert_equal [ "column:auth_sessions.revoked_at" ], result[:missing_schema_items]
+    assert_includes log_output.string, "deployment_readiness_failed checks=schema_contract"
+    assert_includes log_output.string, "missing_schema_items=column:auth_sessions.revoked_at"
+  ensure
+    Rails.logger = previous_logger
   end
 end

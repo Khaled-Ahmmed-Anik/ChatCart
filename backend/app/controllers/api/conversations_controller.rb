@@ -118,6 +118,7 @@ module Api
       {
         id: conversation.id,
         channel: conversation.channel,
+        customer_name: customer_name(conversation),
         external_customer_id: conversation.external_customer_id,
         status: conversation.status,
         last_message_at: conversation.last_message_at,
@@ -128,6 +129,11 @@ module Api
         handover_summary: handover,
         quality: quality
       }
+    end
+
+    def customer_name(conversation)
+      conversation.conversation_state.to_h.dig("customer_profile", "name").presence ||
+        conversation.pending_order&.customer_name.presence
     end
 
     def update_conversation_state!(key, value)

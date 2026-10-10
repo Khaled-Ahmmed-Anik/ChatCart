@@ -109,7 +109,7 @@ If Gemini is unavailable, times out, or fails, deterministic processing and fall
 
 `CompactIntentClassifier` is the fast first layer. It contains 20–40 balanced English, Banglish, and Bengali examples for every registered intent and uses character n-gram plus token-overlap scoring. The versioned source examples live in `backend/config/intent_examples.yml`; they are sector-neutral and include retail, food, fashion, electronics, appointments, and services. New business sectors can add phrases there without changing classifier code. It handles common social, catalogue, product-information, recommendation, ordering, delivery, payment, handover, and after-sales questions without a network call. Ambiguous and low-confidence matches are rejected rather than guessed. Values expected by the active checkout step, such as a phone number or `10 ML`, bypass this classifier and continue through deterministic state collection.
 
-The local classifier is evaluated with separate multilingual phrases. The automated quality gate currently requires at least 80% classification coverage and 72% correct intent accuracy. Adding training examples without passing this held-out check is not considered an improvement.
+The local classifier is evaluated with separate multilingual phrases. The automated quality gate currently requires at least 80% classification coverage and 70% correct intent accuracy, as defined in `ConversationEvaluationRunner`. Adding training examples without passing this held-out check is not considered an improvement.
 
 ### Classification feedback loop
 
@@ -147,7 +147,7 @@ Supported intent groups are defined in `Constants::Intents`:
 
 Phone-like strings are replaced with `[PHONE]` before being sent to Gemini. The original message is validated locally, so real phone numbers are not required in the AI prompt.
 
-Locally classified turns use deterministic wording and do not call Gemini again for a rewrite. This keeps common replies fast and available during Gemini failures.
+Locally classified turns use deterministic wording by default. Optional all-turn naturalization can rewrite them when `CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED` and its percentage rollout allow it, normal naturalization is enabled, and a Gemini key is available. Failed or rejected rewrites retain the deterministic response. See [Structured conversation planner](structured-conversation-planner.md#feature-controls) for the controls.
 
 ## 6. Deterministic processing order
 
@@ -278,7 +278,7 @@ change name to Anik
 change address to Badda, Dhaka
 ```
 
-Explicit confirmation is required at the confirmation step. A casual acknowledgement such as `okay` does not confirm an order from an unrelated state.
+Explicit confirmation is required at the confirmation step. A casual acknowledgement such as `okay` does not confirm an order from an unrelated state. Confirmation and cancellation require supported customer wording; model intent labels alone cannot authorize these actions. A bare `no` does not cancel a draft. See [Conversation action and customer-name safety](conversation-safety.md) for the validation boundary.
 
 ### Context switches
 
@@ -330,7 +330,7 @@ Its context can contain:
 
 Shopping preferences can include:
 
-- single perfume or combo;
+- single product or combo, including perfume-specific preferences for perfume catalogues;
 - recipient or audience;
 - scent families;
 - scent families to avoid;
@@ -343,7 +343,7 @@ Shopping preferences can include:
 
 The recommendation service changes its behavior based on available information:
 
-- no useful preference: ask whether the customer wants a single perfume or combo;
+- no useful preference: ask a catalogue-dependent discovery question; perfume catalogues may ask about a single perfume or combo;
 - one useful preference: ask one narrowing question, such as occasion or budget;
 - two or more useful dimensions: recommend immediately;
 - explicit budget or comparative direction: recommend immediately.
@@ -508,7 +508,10 @@ Important environment variables include:
 | `CONVERSATION_PLANNER_ENABLED` | Enables allowlisted Gemini tool planning |
 | `CONVERSATION_PLANNER_ROLLOUT_PERCENT` | Percentage of conversations eligible for tool planning |
 | `CONVERSATION_NATURALIZER_ENABLED` | Enables natural rewrites for eligible turns |
+| `CONVERSATION_NATURALIZER_ROLLOUT_PERCENT` | Percentage eligible for normal rewriting |
 | `CONVERSATION_NATURALIZER_ALL_TURNS_ENABLED` | Extends rewriting to local-classifier turns |
+| `CONVERSATION_NATURALIZER_ALL_TURNS_ROLLOUT_PERCENT` | Percentage eligible for all-turn rewriting |
+| `KNOWLEDGE_EMBEDDINGS_ENABLED` | Enables optional semantic knowledge indexing |
 
 Per-business channel tokens should normally be stored in `ChannelConnection`, rather than relying on global fallback environment variables.
 
@@ -581,4 +584,4 @@ Every conversation is scored from deterministic evidence rather than an LLM self
 
 Quality telemetry also records clarification, order-correction, and conversation-repair counts and rates. A repair is a turn where the assistant must recover from an invalid or ambiguous answer, such as an invalid phone number, missing customer name, unknown product, or unclear confirmation. Closed conversations without an order retain the checkout stage where they were abandoned. Business analytics aggregate these signals without storing additional message content.
 
-Every bot message stores `conversation_engine_version`, currently `2026.10.1`, so production outcomes can be compared between releases. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.
+Every bot message stores `conversation_engine_version` from `Constants::Conversation::ENGINE_VERSION`, so production outcomes can be compared between releases. Read that constant in the deployed revision rather than relying on a hard-coded version in this guide. After confirmation, customers can reply `helpful` or `not helpful`; this feedback is stored in conversation state and included in analytics.

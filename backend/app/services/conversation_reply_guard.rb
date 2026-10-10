@@ -50,7 +50,8 @@ class ConversationReplyGuard
       [ product.name, formatted_price(product.price), *variant_facts ]
     end
 
-    (order_facts + catalog_facts).uniq.select { |fact| fallback.include?(fact) }
+    cart_facts = pending_order.line_items.size > 1 ? pending_order.line_items.flat_map { |item| [ "#{item.quantity} × #{item.label}", formatted_price(item.total_price) ] } : []
+    (order_facts + catalog_facts + cart_facts).uniq.select { |fact| fallback.include?(fact) }
   end
 
   def uses_only_approved_prices?

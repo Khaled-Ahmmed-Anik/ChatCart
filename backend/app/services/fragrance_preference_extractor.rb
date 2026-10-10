@@ -22,6 +22,7 @@ class FragrancePreferenceExtractor
     preferences["maximum_projection"] = "moderate" if message.match?(/not (too )?strong|don'?t want strong|halka|soft projection|overpowering (chai na|no)|(?:too )?strong (na|chai na|jeno na)/)
     preferences["price_direction"] = detected_price_direction || preferences["price_direction"]
     preferences["projection_preference"] = detected_projection_preference || preferences["projection_preference"]
+    preferences["recommendation_count"] = detected_recommendation_count || preferences["recommendation_count"]
     preferences.merge!(detected_budget)
     preferences.compact
   end
@@ -45,7 +46,21 @@ class FragrancePreferenceExtractor
 
   def detected_format
     return "combo" if message.match?(/\b(combo|bundle|set|collection|multiple|variety)\b/)
+    return "single" if distinct_fragrances_request?
     "single" if message.match?(/\b(single|one perfume|one fragrance|specific one|ekta)\b|একটা/)
+  end
+
+  def detected_recommendation_count
+    return 2 if message.match?(/\b(2|two|duita|duta)\b|দুইটা|দুটি/)
+    3 if message.match?(/\b(3|three|tinta)\b|তিনটা|তিনটি/)
+  end
+
+  def distinct_fragrances_request?
+    message.match?(
+      /\b(2|two|duita|duta)\b.{0,30}\b(different|alada|separate)\b.{0,20}\b(perfumes?|fragrances?|scents?)\b|দুইটা.{0,20}(আলাদা|ভিন্ন)/
+    ) || message.match?(
+      /\b(different|alada|separate)\b.{0,20}\b(2|two|duita|duta)\b.{0,20}\b(perfumes?|fragrances?|scents?)\b/
+    )
   end
 
   def detected_audience

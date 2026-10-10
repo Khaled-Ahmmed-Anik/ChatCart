@@ -1,6 +1,27 @@
 module Constants
   module Conversation
-    ENGINE_VERSION = "2026.10.1"
+    ENGINE_VERSION = "2026.10.7"
+    GREETING_ONLY = /\A(?:hi|hello|hey|assalamu?\s*alaikum|assalamu?laikum|assalamulaikum|salam|হ্যালো|আসসালামু আলাইকুম)(?:\s+(?:there|bhai|apu|sir|madam))?[!. ]*\z/i
+    THANKS_ONLY = /\A(?:thanks(?: a lot)?|thank you(?: very much)?|dhonnobad|onek dhonnobad|ধন্যবাদ|অনেক ধন্যবাদ)[!. ]*\z/i
+    CUSTOMER_NAME_PREFIX = /\A(?:(?:hi|hello|hey|হ্যালো)(?:\s+there)?[,!. ]+)?(?:my name is|i am|i'm|amar naam|amar nam|name|naam|আমার নাম)\s*[:=-]?\s*(.+?)[.! ]*\z/i
+    NON_NAME_CONVERSATION = /\b(?:i|we|you|my|your|have|need|want|trying|loading|question|ordered|when|why|how|please|hello|hi)\b|আমার|আপনার|চাই|কেন|কিভাবে/i
+    SUPPORT_ACCESS_REQUEST = /\b(?:password|login|log in|sign in|account access|reset account|two.factor|2fa)\b|পাসওয়ার্ড|লগইন/i
+    SUPPORT_TECHNICAL_REQUEST = /\b(?:cart|checkout|check out|search|website|site)\b.*\b(?:not loading|not updating|won'?t|isn'?t|can't|cannot|not working|error|broken)\b|\b(?:can't|cannot)\b.*\b(?:checkout|check out|log in)\b/i
+    CONVERSATION_REPAIR_THRESHOLD = 3
+    SUPPORT_REPAIR_THRESHOLD = 2
+    SUPPORT_FAILURE_FOLLOW_UP = /\b(?:still not working|not working|did not work|didn't work|same problem)\b|কাজ করছে না|ekhono kaj|kaj korche na/i
+    REPAIR_REFERENCE = /\b(?:that|it|same|again|meant)\b|ওটা|সেটা|oita|sheta/i
+    REPAIR_TOPICS = {
+      delivery: /\b(?:delivery|shipping|parcel|courier)\b|ডেলিভারি|deli?very/i,
+      payment: /\b(?:payment|pay|cod|card)\b|পেমেন্ট/i,
+      order: /\b(?:order|refund|return)\b|অর্ডার|ফেরত/i
+    }.freeze
+    BANGLISH_WORDS = {
+      "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
+      "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
+      "kotho" => "koto", "daam" => "dam", "damm" => "dam",
+      "niboo" => "nibo", "nimu" => "nibo", "diben" => "den"
+    }.freeze
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
@@ -11,6 +32,9 @@ module Constants
       yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
       ha haa ji jii thik thikache accha acha
     ].freeze
+    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
+    EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|cancel (?:my |the |this )?order(?: please)?|please cancel (?:my |the )?order|order cancel(?: koro| korun)?|বাতিল করুন)[.! ]*\z/i
+    NON_NAME_SENTENCE = /(?:\b(?:password|forgot|cannot|can't|don't|do not|confirm|cancel|delivery|refund|payment)\b|পাসওয়ার্ড|বাতিল|পরে)/i
     AI_OUTCOMES = {
       "greeting" => :greeting, "thanks" => :thanks, "help" => :help, "wellbeing" => :wellbeing,
       "goodbye" => :goodbye, "bot_identity" => :bot_identity, "language_preference" => :language_preference,
@@ -31,6 +55,7 @@ module Constants
       "order_status" => :order_details_requested, "defer_confirmation" => :confirmation_deferred
     }.freeze
     FOCUSED_OUTCOMES = %i[
+      cart_needs_details cart_inventory_unavailable cart_locked unsupported_support_requested
       product_recommendation_requested recommendation_choice_reminder product_variants_requested product_ambiguous
       variant_not_found clarification_needed product_weather_requested first_time_scent_guidance
     ].freeze
@@ -48,7 +73,8 @@ module Constants
       product_recommendation_requested: "discover", alternative_product_requested: "discover",
       product_comparison_requested: "compare", recommendations_rejected: "discover",
       shortlist_updated: "compare", product_selected: "select", variant_selected: "configure",
-      quantity_collected: "checkout", address_collected: "confirm", confirmed: "complete"
+      quantity_collected: "checkout", address_collected: "confirm", confirmed: "complete",
+      order_paused: "discover"
     }.freeze
   end
 

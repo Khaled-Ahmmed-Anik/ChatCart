@@ -79,8 +79,10 @@ class CompactIntentClassifier
     return empty_result if checkout_value?
 
     ranked = self.class.examples.map do |intent, examples|
+      next if intent == "greeting" && !message.content.to_s.strip.match?(Constants::Conversation::GREETING_ONLY)
+      next if intent == "thanks" && !message.content.to_s.strip.match?(Constants::Conversation::THANKS_ONLY)
       [ intent, examples.map { |example| similarity(normalized, normalize(example)) }.max ]
-    end.sort_by { |_intent, score| -score }
+    end.compact.sort_by { |_intent, score| -score }
     intent, score = ranked.first
     runner_up_intent, runner_up = ranked.second
     runner_up = runner_up.to_f
@@ -110,6 +112,10 @@ class CompactIntentClassifier
 
   def checkout_value?
     return true if pending_order&.collecting_phone? && normalized.match?(/\A\+?\d[\d ]{7,14}\z/)
+    if pending_order&.collecting_quantity?
+      quantity_words = Constants::Conversation::NUMBER_WORDS.keys.join("|")
+      return true if normalized.match?(/\A(?:\d+|#{quantity_words})(?:\s+(?:ta|pieces?|pcs?))?\z/)
+    end
     if pending_order&.status.in?(%w[collecting_variant collecting_quantity collecting_name collecting_phone collecting_address])
       return true if normalized.match?(/\b\d+\s*(?:ml|gm|kg|pieces?|pcs?)\b/)
       return true if normalized.match?(/\b(bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/)
@@ -126,7 +132,7 @@ class CompactIntentClassifier
     # not mistaken for a delivery-area or Dhaka delivery-charge question.
     !normalized.match?(/(?:\?|delivery|deliver|shipping|charge|koto|ki\b|how\b|can\b|হবে|কত|চার্জ)/i)
   end
-  def normalize(value) = value.to_s.downcase.unicode_normalize(:nfkc).gsub(/[^\p{L}\p{N}]+/u, " ").squish
+  def normalize(value) = ConversationTextNormalizer.call(value)
   def grams(value) = value.length < 3 ? [ value ] : value.chars.each_cons(3).map(&:join).uniq
 
   def similarity(left, right)

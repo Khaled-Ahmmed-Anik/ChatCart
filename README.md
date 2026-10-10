@@ -55,6 +55,10 @@ Detailed implementation documentation:
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
 - [Interactive architecture diagrams](docs/architecture-diagrams.md) — production topology, conversation/order lifecycle, and intent/context resolution.
+- [Tenant-scoped knowledge retrieval](docs/knowledge-retrieval.md) — product/policy indexing, lexical retrieval, citations, and the hybrid RAG boundary.
+- [Conversation evaluation](docs/conversation-evaluation.md) — reviewed multilingual benchmark cases, quality thresholds, and the regression command.
+- [Conversation action and customer-name safety](docs/conversation-safety.md) — explicit confirmation/cancellation commands, name validation, and safe evaluation-data handling.
+- [Sector recommendations and multi-product orders](docs/multi-product-orders.md) — catalogue attributes, cart changes, shared checkout, stock checks, and rollout.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
@@ -118,13 +122,16 @@ npm run dev
 
 Open `http://localhost:4173`, select the account level, and sign in with email and password. Local seed accounts are configured through `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `CHATCART_OWNER_EMAIL`, and `CHATCART_OWNER_PASSWORD` in the ignored `backend/.env` file.
 
-Create a business and its first owner through the platform-admin API:
+Create a business and its first owner through the platform-admin API. Set
+`PLATFORM_ADMIN_SESSION` to the bearer token returned by `POST /auth/admin/login`.
+The example password below is a placeholder; replace it with a unique password
+of at least 12 characters and do not reuse it in production:
 
 ```bash
 curl -X POST http://localhost:3000/admin/businesses \
-  -H "Authorization: Bearer $PLATFORM_ADMIN_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_SESSION" \
   -H "Content-Type: application/json" \
-  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com"}}'
+  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com","password":"replace-with-a-unique-password"}}'
 ```
 
 The owner can immediately use the supplied email and password. Authentication returns an opaque 12-hour session token; passwords are stored only as salted PBKDF2 derivations.
@@ -177,6 +184,10 @@ review steps are documented in [`docs/meta-production-checklist.md`](docs/meta-p
 | `POST` | `/api/conversations/:id/handover` | Pause automation for human takeover |
 | `GET/POST` | `/api/products` | Manage the current business's catalog |
 | `GET/PATCH` | `/api/business_policy` | Manage sales and delivery knowledge |
+| `GET/POST` | `/api/knowledge_documents` | Manage tenant-scoped manual FAQs and indexed sources |
+| `GET` | `/api/knowledge_documents/status` | Inspect knowledge and embedding readiness |
+| `GET` | `/api/knowledge_documents/preview` | Preview grounded retrieval for a customer question |
+| `POST` | `/api/knowledge_documents/sync` | Refresh indexed product and policy knowledge |
 | `GET/PATCH` | `/api/delivery_integration` | Configure order delivery submission |
 
 Use `POST /auth/login` for business users and `POST /auth/admin/login` for platform administrators. All `/api` and `/admin` endpoints require the returned bearer session. Sessions expire after 12 hours; disabling a user or suspending/disabling its business revokes every affected session. Reactivation requires a fresh login. The original API-token path remains temporarily available for backward compatibility. See [Authentication and access lifecycle](docs/authentication-and-access.md) for the complete behavior.

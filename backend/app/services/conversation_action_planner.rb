@@ -7,7 +7,7 @@ class ConversationActionPlanner
   end
 
   INFORMATIONAL_PATTERNS = {
-    delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
+    delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho)|how much.*(?:delivery|shipping)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
     delivery_time_requested: /\b(delivery|shipping)\s*(time|when|kobe)|koto din|কত\s*দিন|কবে\s*(পাব|আসবে)/i,
     cash_on_delivery_requested: /\b(cod|cash on delivery|cash e|cash-e)\b|ক্যাশ\s*(অন\s*ডেলিভারি)?/i,
     payment_methods_requested: /\b(payment|pay)\s*(method|option|kivabe|how)|bkash|nagad|card/i,
@@ -17,10 +17,11 @@ class ConversationActionPlanner
 
   ORDERING_CUE = /\b(want|need|take|give|send|order|buy|nibo|chai|den|dao|din|bottle|bottles|piece|pieces|ta|টা|নিব|চাই|দেন)\b/i
 
-  def initialize(message:, business:, current_product: nil)
-    @content = message.content.to_s
+  def initialize(message:, business:, current_product: nil, interpretation: nil)
+    @content = ConversationTextNormalizer.call(message.content)
     @business = business
     @current_product = current_product
+    @interpretation = interpretation
   end
 
   def call
@@ -37,12 +38,14 @@ class ConversationActionPlanner
 
   private
 
-  attr_reader :content, :business, :current_product
+  attr_reader :content, :business, :current_product, :interpretation
 
   def selected_product
     normalized = content.downcase
     matches = business.products.available_for_sale.select do |product|
-      product.searchable_names.any? { |name| normalized.include?(name.downcase) }
+      product.searchable_names.any? do |name|
+        normalized.match?(/(?:\A|\s)#{Regexp.escape(ConversationTextNormalizer.call(name))}(?:\z|\s)/)
+      end
     end
     matches.reject! do |product|
       product.searchable_names.any? do |name|
@@ -57,7 +60,8 @@ class ConversationActionPlanner
 
     product.available_variants.find do |variant|
       !variant_explicitly_rejected?(variant) && [ variant.name, variant.size ].compact.any? do |label|
-        content.downcase.delete(" ").include?(label.downcase.delete(" "))
+        pattern = Regexp.escape(ConversationTextNormalizer.call(label)).gsub("\\ ", "\\s*")
+        content.match?(/(?:\A|\s)#{pattern}(?:\z|\s)/)
       end
     end
   end
@@ -74,18 +78,28 @@ class ConversationActionPlanner
       .gsub(/\b\d+(?:\.\d+)?\s*(?:ml|মিলি)\b/i, " ")
       .gsub(/\b01[3-9]\d{8}\b/, " ")
     word = Constants::Conversation::NUMBER_WORDS.find do |candidate, _number|
-      normalized.match?(/\b#{Regexp.escape(candidate)}\b/)
+      normalized.match?(/\b#{Regexp.escape(candidate)}\b(?!\s*(?:days?|din|hours?|ghonta|taka|tk|ml|kg|gm)\b)/)
     end
     return word.last if word.present?
 
-    normalized[/\b\d+\b/]&.to_i&.then { |value| value if value.positive? }
+    normalized[/\b(\d+)\s*(?:ta|ti|pieces?|pcs?|bottles?|units?)\b/, 1]&.to_i&.then { |value| value if value.positive? }
   end
 
   def informational_outcomes
-    INFORMATIONAL_PATTERNS.filter_map { |outcome, pattern| outcome if content.match?(pattern) }.uniq
+    detected = INFORMATIONAL_PATTERNS.filter_map { |outcome, pattern| outcome if content.match?(pattern) }
+    if interpretation.present? && !interpretation.needs_clarification
+      detected.concat(interpretation.intents.filter_map do |intent|
+        Constants::Conversation::AI_OUTCOMES[intent] if intent.in?(ConversationIntentRegistry.informational_intents)
+      end)
+    end
+    detected.uniq
   end
 
   def ordering_cue?
-    content.match?(ORDERING_CUE) || selected_quantity.present?
+    return false if content.match?(/\b(?:don t|do not|not ready|later|pore|nibo na|chai na)\b/i)
+    return false if interpretation&.needs_clarification
+    return false if interpretation.present? && interpretation.intents.intersect?(%w[compare_products reject_recommendations defer_confirmation])
+
+    content.match?(ORDERING_CUE)
   end
 end
