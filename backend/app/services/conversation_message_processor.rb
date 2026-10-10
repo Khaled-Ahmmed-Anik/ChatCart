@@ -22,6 +22,7 @@ class ConversationMessageProcessor
     return pending_order if begin_checkout_edit
     return pending_order if content.match?(Constants::Conversation::QUANTITY_CORRECTION) && handle_order_update_request
     return pending_order if complete_checkout_edit
+    return pending_order if handle_inquiry_follow_up
     return pending_order if handle_cart_request
     if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
       collect_variant
@@ -58,12 +59,34 @@ class ConversationMessageProcessor
     @outcome ||= :no_change
     pending_order
   ensure
+    if outcome.in?(Constants::Conversation::PRODUCT_INQUIRY_OUTCOMES)
+      ConversationProductInquiry.new(pending_order).remember!(content)
+    elsif outcome.in?(Constants::Conversation::INQUIRY_RESET_OUTCOMES)
+      ConversationProductInquiry.new(pending_order).clear!
+    end
     @secondary_outcomes = mapped_secondary_outcomes
   end
 
   private
 
   attr_reader :message, :pending_order, :content, :interpretation
+
+  def handle_inquiry_follow_up
+    product = ConversationProductInquiry.new(pending_order).product
+    return false unless product && content.match?(Constants::Conversation::INQUIRY_VARIANT_FOLLOW_UP)
+    explicit = ProductResolutionService.new(business: pending_order.conversation.business, query: content).resolve
+    return false if explicit.matched? || explicit.ambiguous?
+    if content.match?(Constants::Conversation::INQUIRY_QUESTION)
+      @outcome = :product_variants_requested
+      return true
+    end
+    return false unless pending_order.collecting_product?
+
+    pending_order.update!(product: product, status: :collecting_variant)
+    collect_variant
+    collect_quantity_from_product_selection if pending_order.collecting_quantity?
+    true
+  end
 
   def begin_checkout_edit
     field = Constants::Conversation::CHECKOUT_EDIT_FIELDS.find { |_field, pattern| content.match?(pattern) }&.first
@@ -492,7 +515,7 @@ class ConversationMessageProcessor
 
   def restart_order
     conversation = pending_order.conversation
-    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product"))
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product", "product_inquiry", "last_referenced_product"))
     pending_order.pending_order_items.destroy_all
     pending_order.update!(
       product: nil,
@@ -819,7 +842,8 @@ class ConversationMessageProcessor
 
     return variants.first if normalized.match?(/\b(small|smallest|choto|trial|try)\b/)
     if normalized.match?(/\b(bigger|larger|next size|aro boro|আরও বড়)\b/)
-      current_size = variant_size_number(pending_order.product_variant) if pending_order.product_variant
+      current_variant = pending_order.product_variant || ConversationProductInquiry.new(pending_order).variant
+      current_size = variant_size_number(current_variant) if current_variant
       return variants.find { |variant| variant_size_number(variant) > current_size } if current_size
       return variants.last
     end
