@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_000200) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -244,6 +244,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_000200) do
     t.index ["pending_order_id"], name: "index_orders_on_pending_order_id", unique: true
   end
 
+  create_table "pending_order_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "pending_order_id", null: false
+    t.bigint "product_id", null: false
+    t.bigint "product_variant_id"
+    t.integer "quantity", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pending_order_id"], name: "index_pending_order_items_on_pending_order_id"
+    t.index ["product_id"], name: "index_pending_order_items_on_product_id"
+    t.index ["product_variant_id"], name: "index_pending_order_items_on_product_variant_id"
+  end
+
   create_table "pending_orders", force: :cascade do |t|
     t.text "address"
     t.jsonb "change_history", default: [], null: false
@@ -408,6 +420,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_000200) do
   add_foreign_key "orders", "businesses"
   add_foreign_key "orders", "conversations"
   add_foreign_key "orders", "pending_orders"
+  add_foreign_key "pending_order_items", "pending_orders"
+  add_foreign_key "pending_order_items", "product_variants"
+  add_foreign_key "pending_order_items", "products"
   add_foreign_key "pending_orders", "conversations"
   add_foreign_key "pending_orders", "product_variants"
   add_foreign_key "pending_orders", "products"

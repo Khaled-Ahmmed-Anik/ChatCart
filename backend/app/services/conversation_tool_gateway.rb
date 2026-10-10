@@ -183,6 +183,7 @@ class ConversationToolGateway
       "variant_id" => pending_order.product_variant_id,
       "variant_name" => pending_order.product_variant&.display_name,
       "quantity" => pending_order.quantity,
+      "items" => pending_order.item_snapshot,
       "unit_price" => pending_order.product.present? ? decimal(pending_order.unit_price) : nil,
       "total_price" => pending_order.product.present? && pending_order.quantity.present? ? decimal(pending_order.total_price) : nil,
       "has_customer_name" => pending_order.customer_name.present?,

@@ -12,7 +12,7 @@ class ProductRecommendationService
   def initialize(business:, message:, preferences: {}, limit: 3)
     @business = business
     @message = message.to_s
-    @preferences = preferences.to_h.stringify_keys
+    @preferences = CataloguePreferenceExtractor.new(message, business: business).call(existing: preferences)
     @limit = limit
   end
 
@@ -53,7 +53,7 @@ class ProductRecommendationService
   attr_reader :business, :message, :preferences, :limit
 
   def offers
-    @offers ||= business.products.active.order(:name).select { |product| eligible_product?(product) }.flat_map do |product|
+    @offers ||= business.products.available_for_sale.order(:name).select { |product| eligible_product?(product) }.flat_map do |product|
       if product.product_variants.any?
         product.available_variants.map do |variant|
           Offer.new(product: product, variant: variant, price: variant.price, stock_quantity: variant.stock_quantity)
@@ -90,8 +90,14 @@ class ProductRecommendationService
     searchable = searchable_text(offer.product, offer.variant)
     preference_terms.count { |term| searchable.include?(term) } * 10 +
       structured_preference_terms.count { |term| searchable.include?(term) } * 18 +
-      projection_preference_score(offer.product) +
+      attribute_score(offer.product) + projection_preference_score(offer.product) +
       [ offer.stock_quantity, 20 ].min
+  end
+
+  def attribute_score(product)
+    preferences["attributes"].to_h.sum do |key, values|
+      (Array(product.product_attributes.to_h[key]).map { |value| value.to_s.downcase } & Array(values).map { |value| value.to_s.downcase }).size * 40
+    end
   end
 
   def preferred_offer(product_options, minimum:, maximum:, exact_match:)
@@ -165,7 +171,13 @@ class ProductRecommendationService
     matches_format?(product) &&
       !product.id.in?(Array(preferences["rejected_product_ids"]).map(&:to_i)) &&
       avoids_excluded_families?(product) &&
-      acceptable_projection?(product)
+      acceptable_projection?(product) && acceptable_attributes?(product)
+  end
+
+  def acceptable_attributes?(product)
+    preferences["excluded_attributes"].to_h.none? do |key, values|
+      (Array(product.product_attributes.to_h[key]).map { |value| value.to_s.downcase } & Array(values).map { |value| value.to_s.downcase }).any?
+    end
   end
 
   def avoids_excluded_families?(product)
@@ -193,6 +205,15 @@ class ProductRecommendationService
   def clarification_question(budget_detected)
     return if budget_detected
     return if preferences["price_direction"].present? || preferences["projection_preference"].present?
+    profile = CataloguePreferenceExtractor.new(message, business: business)
+    unless profile.fragrance?
+      return if preferences["attributes"].to_h.values.any?(&:present?) || preference_terms.any? { |term| offers.any? { |offer| searchable_text(offer.product, offer.variant).include?(term) } }
+
+      key, values = profile.available_attributes.find { |_key, options| options.size > 1 }
+      return "What #{key.humanize.downcase} do you prefer: #{values.first(4).join(', ')}?" if key
+
+      return "What will you use it for, or what budget should I stay within?"
+    end
     dimensions = preference_dimensions
     if preferences["recommendation_count"].to_i > 1 && preferences["format"] == "single" && dimensions.size == 1
       return "What scent styles should the different fragrances cover—fresh, sweet, floral, woody/oud, or something else? You can also share your budget."

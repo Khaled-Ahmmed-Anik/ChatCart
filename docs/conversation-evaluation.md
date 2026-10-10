@@ -67,6 +67,19 @@ are needed for these changes.
 
 ## Further evaluation layers
 
+Public-dataset replays are supplemental stress tests, not the held-out intent
+benchmark above. Before replaying one, configure an isolated test business with
+matching catalogue facts, options and policies; disable outbound messaging and
+model API calls when evaluating the free deterministic path. Keep downloaded
+datasets, transcripts and reports outside Git, verify the dataset's license,
+and never connect a replay runner to production `DATABASE_URL`.
+
+Report language, sector, sample size, engine revision, business setup and
+whether turns were adapted. Replaying only customer turns from an unrelated
+assistant's dialogue can create artificial failures. Count clarification loops,
+incorrect field capture, unsupported claims, order-state errors and handovers
+separately; a safe handover is not proof of successful task completion.
+
 The dataset format is intentionally versioned so later PRs can add response
 grounding, order-state transitions, reference resolution, handover decisions,
 and end-to-end multi-turn scenarios without weakening the existing intent gate.

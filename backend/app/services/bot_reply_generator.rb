@@ -8,6 +8,14 @@ class BotReplyGenerator
   end
 
   def content
+    return cart_translation(:stock) if outcome == :cart_inventory_unavailable
+    if outcome == :cart_needs_details
+      return pending_order.conversation.conversation_state.to_h["cart_question"]
+    end
+    return cart_translation(:locked) if outcome == :cart_locked
+    if outcome == :cart_updated
+      return "#{cart_translation(:updated)}\n#{cart_lines.join("\n")}\n\n#{status_prompt}"
+    end
     outcome_reply || status_prompt
   end
 
@@ -17,6 +25,8 @@ class BotReplyGenerator
 
   def outcome_reply
     case outcome
+    when :unsupported_support_requested
+      repair_translation(:support)
     when :greeting
       greeting_reply
     when :help
@@ -36,7 +46,7 @@ class BotReplyGenerator
     when :human_agent
       "I’ll mark this for seller assistance. Please leave a short description of what you need help with."
     when :human_handover_started
-      I18n.t("bot_replies.human_handover_started", locale: :bn)
+      repair_translation(:handover)
     when :clarification_needed
       clarification_reply
     when :previous_question_explained
@@ -125,7 +135,7 @@ class BotReplyGenerator
     when :product_unavailable
       "Sorry, that product isn’t available right now. #{product_selection_prompt}"
     when :product_not_found
-      "Are you asking about a product, recommendation, price, delivery, payment, or an existing order? You can send the product name, or tell me what you want and your budget."
+      contextual_repair_reply
     when :product_ambiguous
       product_ambiguity_reply
     when :invalid_quantity
@@ -137,7 +147,7 @@ class BotReplyGenerator
     when :name_collected
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
     when :name_required
-      "What name should I put on the order? Please send the customer name only."
+      I18n.t("conversation_safety.#{banglish? ? 'banglish' : 'en'}.name_required")
     when :invalid_phone
       invalid_phone_reply
     when :phone_collected
@@ -245,7 +255,7 @@ class BotReplyGenerator
       *product_catalog_lines(visible_products),
       more_products_line,
       "",
-      "Know what you want? Send the product name. Not sure? Tell me whether you want a single perfume or combo, the scent style or occasion, and your budget (for example, “fresh for office under ৳1500”)."
+      repair_translation(:discovery)
     ].compact.join("\n")
   end
 
@@ -264,9 +274,27 @@ class BotReplyGenerator
     pending_order.conversation.business.name
   end
 
+  def repair_translation(key)
+    I18n.t("conversation_repair.#{repair_language}.#{key}")
+  end
+
+  def repair_language
+    language = interpretation&.language.presence || pending_order.conversation.conversation_state.to_h["preferred_language"]
+    return "bn" if language.in?(%w[bangla bengali bn]) || customer_message&.content.to_s.match?(/[\u0980-\u09FF]/)
+    return "banglish" if language == "banglish"
+
+    "en"
+  end
+
+  def contextual_repair_reply
+    context = ConversationRepairContext.new(conversation: pending_order.conversation, message: customer_message)
+    key = context.repeated? ? "retry_#{context.topic}" : "question_#{context.topic}"
+    repair_translation(key)
+  end
+
   def quantity_prompt
     selection = [ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(" ")
-    unit = pending_order.product_variant.present? ? "each" : "per bottle"
+    unit = "each"
     "#{selection} is #{formatted_price(pending_order.unit_price)} #{unit}. How many would you like?"
   end
 
@@ -316,8 +344,7 @@ class BotReplyGenerator
   def confirmation_prompt
     [
       "Here’s your order summary:",
-      "• #{pending_order.quantity} × #{[ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(' ')}",
-      *combo_component_lines,
+      *cart_lines,
       "• Total: #{formatted_price(pending_order.total_price)}",
       "• Name: #{pending_order.customer_name}",
       "• Phone: #{pending_order.phone}",
@@ -325,6 +352,17 @@ class BotReplyGenerator
       "",
       "Does everything look right? Reply “confirm” to place it or “cancel” to stop."
     ].join("\n")
+  end
+
+  def cart_lines
+    pending_order.line_items.flat_map do |item|
+      [ "• #{item.quantity} × #{item.label} — #{formatted_price(item.total_price)}",
+        *item.product.component_snapshot.map { |component| "  ↳ Includes #{component['quantity']} × #{component['name']}" } ]
+    end
+  end
+
+  def cart_translation(key)
+    I18n.t("#{banglish? ? 'cart_banglish' : 'cart'}.#{key}", locale: :en)
   end
 
   def help_reply
@@ -344,13 +382,12 @@ class BotReplyGenerator
   end
 
   def order_history_reply
-    orders = pending_order.conversation.pending_orders.order(created_at: :desc, id: :desc).limit(3)
+    orders = pending_order.conversation.pending_orders.where(status: [ :confirmed, :submitted_to_woocommerce ]).order(created_at: :desc, id: :desc).limit(3)
     return "You don’t have any previous orders yet." if orders.empty?
 
     lines = orders.map do |order|
-      product = order.product&.name || "Product not selected"
-      quantity = order.quantity || "—"
-      "• Order ##{order.id}: #{quantity} × #{product} — #{order.status.humanize}"
+      items = order.line_items.map { |item| "#{item.quantity} × #{item.label}" }.join(", ")
+      "• Order ##{order.id}: #{items} — #{order.status.humanize}"
     end
     ([ "Here are your latest orders:" ] + lines).join("\n")
   end
@@ -546,6 +583,10 @@ class BotReplyGenerator
       offer.product.description, offer.product.suitable_for, offer.product.product_attributes.to_h.flatten.join(" ") ]
       .compact.join(" ").downcase
     reasons = []
+    preferences["attributes"].to_h.each do |key, values|
+      matches = Array(offer.product.product_attributes.to_h[key]) & Array(values)
+      reasons << "#{matches.join(', ')} #{key.humanize.downcase} matches your preference" if matches.any?
+    end
     Array(preferences["scent_families"]).each do |family|
       reasons << "matches your #{family} preference" if searchable.include?(family.to_s.downcase)
     end

@@ -79,8 +79,10 @@ class CompactIntentClassifier
     return empty_result if checkout_value?
 
     ranked = self.class.examples.map do |intent, examples|
+      next if intent == "greeting" && !message.content.to_s.strip.match?(Constants::Conversation::GREETING_ONLY)
+      next if intent == "thanks" && !message.content.to_s.strip.match?(Constants::Conversation::THANKS_ONLY)
       [ intent, examples.map { |example| similarity(normalized, normalize(example)) }.max ]
-    end.sort_by { |_intent, score| -score }
+    end.compact.sort_by { |_intent, score| -score }
     intent, score = ranked.first
     runner_up_intent, runner_up = ranked.second
     runner_up = runner_up.to_f
