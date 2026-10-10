@@ -10,6 +10,23 @@ Watch the 62-second walkthrough to see customer product discovery, conversationa
 
 [Watch the demo](docs/assets/ChatCart_Demo.mp4) · [Download the MP4](docs/assets/ChatCart_Demo.mp4?raw=1) · [Open the live dashboard](https://chatcart-dashboard.pages.dev)
 
+## How Messenger conversations work
+
+![Animated ChatCart Messenger message-to-reply flow](docs/assets/messenger-flow.gif)
+
+The animation follows message receipt, signature validation, event recording and
+deduplication, fast webhook acknowledgement, background batching, intent
+classification, validated order actions, reply planning, optional AI wording,
+and outbound delivery with retries.
+
+This is a code-verified explanatory animation based on `main` commit
+[`6668db7`](https://github.com/Khaled-Ahmmed-Anik/ChatCart/commit/6668db73091eb575fbccdcc6bf88a6adc29887c8),
+not a live Messenger recording. Timing is illustrative; optional AI steps depend
+on feature flags and credentials. HTTP `200 OK` acknowledges the webhook, while
+Send API success does not prove the customer has read the reply.
+
+[Download the GIF](docs/assets/messenger-flow.gif?raw=1) · [Read the detailed conversation flow](docs/conversation-system.md)
+
 ## Production status
 
 The MVP is live on the following free-tier stack:
