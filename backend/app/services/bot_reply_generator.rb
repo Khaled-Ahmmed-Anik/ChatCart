@@ -841,6 +841,8 @@ class BotReplyGenerator
 
   def contextual_product
     return mentioned_product if mentioned_product.present?
+    inquiry_product = ConversationProductInquiry.new(pending_order).product
+    return inquiry_product if inquiry_product.present?
     return pending_order.product if pending_order.product.present?
 
     remembered_name = pending_order.conversation.conversation_state.to_h["last_referenced_product"]
