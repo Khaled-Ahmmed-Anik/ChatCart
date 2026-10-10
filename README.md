@@ -71,6 +71,7 @@ Detailed implementation documentation:
 - [Authentication and access lifecycle](docs/authentication-and-access.md) — sessions, revocation, account controls, and business suspension/disable behavior.
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
+- [Interactive architecture diagrams](docs/architecture-diagrams.md) — production topology, conversation/order lifecycle, and intent/context resolution.
 - [Tenant-scoped knowledge retrieval](docs/knowledge-retrieval.md) — product/policy indexing, lexical retrieval, citations, and the hybrid RAG boundary.
 - [Conversation evaluation](docs/conversation-evaluation.md) — reviewed multilingual benchmark cases, quality thresholds, and the regression command.
 - [Conversation action and customer-name safety](docs/conversation-safety.md) — explicit confirmation/cancellation commands, name validation, and safe evaluation-data handling.

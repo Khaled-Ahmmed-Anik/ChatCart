@@ -1,0 +1,170 @@
+{
+  "schema_version": 2,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "ChatCart Conversation and Order Lifecycle",
+    "output": ".archify/lifecycle-chatcart-conversation-order-20261005-021600/chatcart-conversation-order-lifecycle.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:Khaled-Ahmmed-Anik/ChatCart.git",
+      "revision": "184ece40d6961fe588cbde0bc70953dd4b8e94a2",
+      "link_mode": "local-only"
+    }
+  },
+  "lanes": [
+    { "id": "main", "label": "Order progress" },
+    { "id": "interruptions", "label": "Side questions and recovery" },
+    { "id": "seller", "label": "Seller takeover" },
+    { "id": "terminal", "label": "Terminal outcomes" }
+  ],
+  "states": [
+    {
+      "id": "discovering",
+      "type": "start",
+      "label": "Discovering",
+      "sublabel": "collecting product",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "sources": [
+        { "path": "backend/app/models/pending_order.rb", "line": 7, "end_line": 18, "label": "Order states" },
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 27, "end_line": 42, "label": "State dispatch" }
+      ]
+    },
+    {
+      "id": "configuring",
+      "type": "active",
+      "label": "Configuring Item",
+      "sublabel": "variant + quantity",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "sources": [
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 63, "end_line": 92, "label": "Selection plan" },
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 700, "end_line": 735, "label": "Variant resolution" }
+      ]
+    },
+    {
+      "id": "checkout",
+      "type": "active",
+      "label": "Checkout",
+      "sublabel": "name + phone + address",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "sources": [
+        { "path": "backend/app/models/pending_order.rb", "line": 22, "end_line": 28, "label": "Required fields" },
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 598, "end_line": 649, "label": "Collect checkout" }
+      ]
+    },
+    {
+      "id": "review",
+      "type": "waiting",
+      "label": "Awaiting Confirmation",
+      "sublabel": "customer reviews summary",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "sources": [
+        { "path": "backend/app/models/pending_order.rb", "line": 7, "end_line": 18, "label": "Confirmation state" },
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 85, "end_line": 92, "label": "Advance to review" }
+      ]
+    },
+    {
+      "id": "confirmed",
+      "type": "success",
+      "label": "Confirmed",
+      "sublabel": "durable order snapshot",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "sources": [{ "path": "backend/app/services/order_capture_service.rb", "line": 6, "end_line": 37, "label": "Capture order" }]
+    },
+    {
+      "id": "side_question",
+      "type": "waiting",
+      "label": "Side Question",
+      "sublabel": "answer without losing goal",
+      "lane": "interruptions",
+      "col": 2,
+      "sources": [
+        { "path": "backend/app/services/conversation_response_planner.rb", "line": 58, "end_line": 66, "label": "Interruption reply" },
+        { "path": "backend/app/services/conversation_turn_manager.rb", "line": 86, "end_line": 115, "label": "Paused task" }
+      ]
+    },
+    {
+      "id": "clarification",
+      "type": "decision",
+      "label": "Clarification",
+      "sublabel": "resolve ambiguous intent",
+      "lane": "interruptions",
+      "col": 1,
+      "sources": [
+        { "path": "backend/app/services/conversation_message_processor.rb", "line": 95, "end_line": 100, "label": "Clarification outcome" },
+        { "path": "backend/app/services/conversation_response_planner.rb", "line": 93, "end_line": 100, "label": "Focused question" }
+      ]
+    },
+    {
+      "id": "handover",
+      "type": "external",
+      "label": "Seller Takeover",
+      "sublabel": "automation paused",
+      "lane": "seller",
+      "col": 3,
+      "sources": [
+        { "path": "backend/app/services/conversation_escalation_policy.rb", "line": 10, "end_line": 20, "label": "Escalation gate" },
+        { "path": "backend/app/services/customer_message_recorder.rb", "line": 61, "end_line": 74, "label": "Start handover" },
+        { "path": "backend/app/controllers/api/conversations_controller.rb", "line": 23, "end_line": 47, "label": "Takeover + resume" }
+      ]
+    },
+    {
+      "id": "cancelled",
+      "type": "failure",
+      "label": "Cancelled",
+      "sublabel": "customer stops order",
+      "lane": "terminal",
+      "col": 3,
+      "sources": [{ "path": "backend/app/models/pending_order.rb", "line": 7, "end_line": 18, "label": "Cancelled state" }]
+    },
+    {
+      "id": "submitted",
+      "type": "success",
+      "label": "Submitted",
+      "sublabel": "delivery integration",
+      "lane": "terminal",
+      "col": 4,
+      "sources": [{ "path": "backend/app/jobs/submit_delivery_job.rb", "line": 4, "end_line": 22, "label": "Delivery submission" }]
+    }
+  ],
+  "transitions": [
+    { "id": "discover-product", "from": "discovering", "to": "configuring", "label": "product selected", "variant": "emphasis" },
+    { "id": "configure-item", "from": "configuring", "to": "checkout", "label": "item ready" },
+    { "id": "collect-details", "from": "checkout", "to": "review", "label": "details complete" },
+    { "id": "confirm-order", "from": "review", "to": "confirmed", "label": "confirm", "variant": "emphasis" },
+    { "id": "ambiguous-selection", "from": "configuring", "to": "clarification", "label": "ambiguous", "variant": "security" },
+    { "id": "clarified-selection", "from": "clarification", "to": "configuring", "label": "resolved" },
+    { "id": "checkout-question", "from": "checkout", "to": "side_question", "label": "side question", "variant": "dashed" },
+    { "id": "resume-checkout", "from": "side_question", "to": "checkout", "label": "resume" },
+    { "id": "needs-seller", "from": "review", "to": "handover", "label": "escalate", "variant": "security" },
+    { "id": "seller-resolved", "from": "handover", "to": "review", "label": "resume automation" },
+    { "id": "cancel-order", "from": "review", "to": "cancelled", "label": "cancel", "variant": "security" },
+    { "id": "submit-delivery", "from": "confirmed", "to": "submitted", "label": "delivery job", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Order ownership",
+      "items": ["PendingOrder is the source of product, size, quantity, and checkout state", "Confirmation creates a durable Order and immutable item snapshot"]
+    },
+    {
+      "dot": "amber",
+      "title": "Interruptions",
+      "items": ["Side questions should preserve the active goal", "Clarification returns to the exact unresolved step", "Seller takeover pauses bot replies until resumed"]
+    },
+    {
+      "dot": "rose",
+      "title": "Terminal outcomes",
+      "items": ["Cancellation stops the draft", "Confirmed orders may be submitted asynchronously to delivery"]
+    }
+  ]
+}
