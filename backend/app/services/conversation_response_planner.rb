@@ -250,7 +250,7 @@ class ConversationResponsePlanner
       "unit_price" => pending_order.product.present? ? pending_order.unit_price.to_s : nil,
       "total_price" => pending_order.product.present? && pending_order.quantity.present? ? pending_order.total_price.to_s : nil,
       "order_status" => pending_order.status
-    }.compact
+    }.compact.merge("items" => pending_order.item_snapshot)
     return facts.slice("business_name") if order_context_paused?
 
     facts

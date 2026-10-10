@@ -43,6 +43,7 @@ for diagnostics but are not shown to customers.
 | Tool | Purpose |
 | --- | --- |
 | `search_products` | Return up to three active, in-stock offers for customer preferences or budget |
+| `search_business_knowledge` | Retrieve tenant-scoped approved descriptions, FAQs, and policy explanations with internal citations |
 | `get_product_details` | Read grounded product descriptions and attributes |
 | `get_variant_availability` | Read active, in-stock variants, prices, and quantities |
 | `get_business_policy` | Read an approved payment, delivery, sales, or after-sales policy |
@@ -81,7 +82,7 @@ The naturalizer receives the safe structured context, required next question, ap
 
 ## Feature controls
 
-| Variable | Default | Purpose |
+| Variable | Supplied environment configuration | Purpose |
 | --- | --- | --- |
 | `CONVERSATION_PLANNER_ENABLED` | `false` | Enables Gemini tool selection during response generation |
 | `CONVERSATION_PLANNER_ROLLOUT_PERCENT` | `0` | Stable percentage of conversations eligible for tool planning |
@@ -91,6 +92,12 @@ The naturalizer receives the safe structured context, required next question, ap
 | `CONVERSATION_NATURALIZER_ALL_TURNS_ROLLOUT_PERCENT` | `0` | Stable percentage eligible for all-turn rewriting |
 
 Rollout assignment uses the conversation ID, so one customer conversation remains consistently inside or outside a percentage rollout.
+
+These values describe the checked-in `.env.example` and Render Blueprint, not
+the live provider settings. If a percentage variable is absent,
+`ConversationAiRollout` defaults that percentage to 100; the corresponding
+enable flag still gates the feature. Set flags and percentages explicitly when
+rolling out, and inspect provider settings to determine what production uses.
 
 Recommended production rollout:
 

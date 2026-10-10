@@ -56,6 +56,8 @@ Detailed implementation documentation:
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
 - [Tenant-scoped knowledge retrieval](docs/knowledge-retrieval.md) — product/policy indexing, lexical retrieval, citations, and the hybrid RAG boundary.
 - [Conversation evaluation](docs/conversation-evaluation.md) — reviewed multilingual benchmark cases, quality thresholds, and the regression command.
+- [Conversation action and customer-name safety](docs/conversation-safety.md) — explicit confirmation/cancellation commands, name validation, and safe evaluation-data handling.
+- [Sector recommendations and multi-product orders](docs/multi-product-orders.md) — catalogue attributes, cart changes, shared checkout, stock checks, and rollout.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 
@@ -119,13 +121,16 @@ npm run dev
 
 Open `http://localhost:4173`, select the account level, and sign in with email and password. Local seed accounts are configured through `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `CHATCART_OWNER_EMAIL`, and `CHATCART_OWNER_PASSWORD` in the ignored `backend/.env` file.
 
-Create a business and its first owner through the platform-admin API:
+Create a business and its first owner through the platform-admin API. Set
+`PLATFORM_ADMIN_SESSION` to the bearer token returned by `POST /auth/admin/login`.
+The example password below is a placeholder; replace it with a unique password
+of at least 12 characters and do not reuse it in production:
 
 ```bash
 curl -X POST http://localhost:3000/admin/businesses \
-  -H "Authorization: Bearer $PLATFORM_ADMIN_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_SESSION" \
   -H "Content-Type: application/json" \
-  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com"}}'
+  -d '{"business":{"name":"Demo Shop","slug":"demo-shop","category":"retail"},"owner":{"name":"Owner","email":"owner@example.com","password":"replace-with-a-unique-password"}}'
 ```
 
 The owner can immediately use the supplied email and password. Authentication returns an opaque 12-hour session token; passwords are stored only as salted PBKDF2 derivations.

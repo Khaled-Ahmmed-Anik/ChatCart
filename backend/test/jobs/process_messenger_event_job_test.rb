@@ -21,7 +21,7 @@ class ProcessMessengerEventJobTest < ActiveJob::TestCase
     assert event.processed_at.present?
     assert_equal "pending", delivery.status
     assert_equal event.sender_id, delivery.recipient_id
-    assert_equal "Nice choice! Fresh Musk is ৳750 per bottle. How many would you like?", delivery.message.content
+    assert_equal "Nice choice! Fresh Musk is ৳750 each. How many would you like?", delivery.message.content
   end
 
   test "does not process an already processed event twice" do

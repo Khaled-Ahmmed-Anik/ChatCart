@@ -4,6 +4,7 @@ class DatabaseSchemaHealth
     "businesses" => %w[status],
     "conversations" => %w[business_id conversation_state],
     "pending_orders" => %w[change_history product_variant_id],
+    "pending_order_items" => %w[pending_order_id product_id product_variant_id quantity],
     "products" => %w[business_id product_attributes product_type],
     "users" => %w[active password_digest]
   }.freeze

@@ -8,6 +8,7 @@ class Product < ApplicationRecord
     dependent: :restrict_with_error
   has_many :order_items, dependent: :restrict_with_error
   has_many :pending_orders, dependent: :restrict_with_error
+  has_many :pending_order_items, dependent: :restrict_with_error
   accepts_nested_attributes_for :product_variants, allow_destroy: true
   accepts_nested_attributes_for :combo_items, allow_destroy: true
 
@@ -56,7 +57,7 @@ class Product < ApplicationRecord
   end
 
   def deletable?
-    order_items.none? && pending_orders.none? && included_in_combo_items.none?
+    order_items.none? && pending_orders.none? && pending_order_items.none? && included_in_combo_items.none?
   end
 
   def searchable_names
