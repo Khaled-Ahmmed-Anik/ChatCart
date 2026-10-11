@@ -63,6 +63,9 @@ class ConversationActionPlanner
 
     resolved = CatalogueOptionResolver.call(product: product, text: content)
     return resolved if resolved
+    if ordering_cue? && product.available_variants.one? && product.available_variants.first.name.casecmp?("Standard")
+      return product.available_variants.first
+    end
 
     product.available_variants.find do |variant|
       !variant_explicitly_rejected?(variant) && [ variant.name, variant.size ].compact.any? do |label|
