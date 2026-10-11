@@ -791,6 +791,10 @@ class ConversationMessageProcessor
 
   def contextual_product_selection
     normalized = ConversationTextNormalizer.call(content)
+    ids = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommended_product_ids"]).map(&:to_i).uniq
+    if ids.one? && (relative_larger_variant_request? || combined_variant_quantity?)
+      return catalog.available_for_sale.find_by(id: ids.first)
+    end
     if normalized.match?(/\b(previous product|previous one|one before|ager product|ager ta)\b|আগের প্রোডাক্ট|আগেরটা/)
       history = Array(pending_order.conversation.conversation_state.to_h.dig("turn_manager", "reference_history"))
       current_id = pending_order.product_id || history.last&.dig("product_id")
@@ -1434,6 +1438,10 @@ class ConversationMessageProcessor
 
   def select_exact_catalog_product
     return false unless pending_order.collecting_product?
+    if combined_variant_quantity? && content.match?(ConversationActionPlanner::ORDERING_CUE) && contextual_product_selection.present?
+      collect_product
+      return true
+    end
     return false if pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
 
     normalized = normalize_catalog_name(content)
