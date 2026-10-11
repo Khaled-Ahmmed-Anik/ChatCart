@@ -3,7 +3,7 @@ class CatalogueOptionResolver
     normalized = normalize(text)
     aliases = product.product_attributes.to_h.fetch("option_aliases", {}).to_h
     matches = product.available_variants.select do |variant|
-      labels = [variant.name, variant.size, *Array(aliases[variant.name])].compact
+      labels = [ variant.name, variant.size, *Array(aliases[variant.name]) ].compact
       labels.any? do |label|
         token = Regexp.escape(normalize(label))
         normalized.match?(/(?:\A|\s)#{token}(?:\z|\s)/) &&
