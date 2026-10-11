@@ -242,6 +242,9 @@ class ConversationMessageProcessor
 
     pending_order.product = product
     pending_order.product_variant = matching_variant(product)
+    if pending_order.product_variant.blank? && product.available_variants.one? && product.available_variants.first.name.casecmp?("Standard")
+      pending_order.product_variant = product.available_variants.first
+    end
     pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
       :collecting_variant : :collecting_quantity
     pending_order.save!

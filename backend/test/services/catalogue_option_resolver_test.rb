@@ -11,7 +11,7 @@ class CatalogueOptionResolverTest < ActiveSupport::TestCase
 
   test "configured aliases are product scoped and ambiguous answers are refused" do
     product = Product.create!(name: "Bag", price: 450, stock_quantity: 10,
-      product_attributes: { option_aliases: { "Regular" => ["daily"] } })
+      product_attributes: { option_aliases: { "Regular" => [ "daily" ] } })
     regular = product.product_variants.create!(name: "Regular", price: 450, stock_quantity: 10)
     assert_equal regular, CatalogueOptionResolver.call(product: product, text: "daily")
     assert_nil CatalogueOptionResolver.call(product: product, text: "daily na")

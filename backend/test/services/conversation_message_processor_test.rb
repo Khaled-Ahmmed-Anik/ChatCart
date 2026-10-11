@@ -2,6 +2,14 @@ require "test_helper"
 
 class ConversationMessageProcessorTest < ActiveSupport::TestCase
   setup { Business.default.update!(category: "perfume") }
+  test "a sole Standard option does not ask for an imaginary size" do
+    product = create_product(name: "Canvas Bag", stock_quantity: 0)
+    variant = product.product_variants.create!(name: "Standard", price: 450, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    process_message(order, "Canvas Bag")
+    assert_equal variant, order.reload.product_variant
+    assert_predicate order, :collecting_quantity?
+  end
   test "product contents question does not consume the pending size answer" do
     product = create_product(name: "Combo", stock_quantity: 10)
     order = create_pending_order(product: product, status: :collecting_variant)
