@@ -1,6 +1,17 @@
 require "test_helper"
 
 class ConversationResponsePlannerTest < ActiveSupport::TestCase
+  test "product details answer has one next checkout question" do
+    product = Product.create!(name: "Cotton Shirt", price: 600, stock_quantity: 10, description: "Blue cotton shirt")
+    order = create_pending_order(product: product, quantity: 1, status: :collecting_name)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "what is included?")
+    plan = build_planner(order: order, message: message, outcome: :product_details_requested, interpretation: nil).plan
+    assert_includes plan.content, "Blue cotton shirt"
+    assert_includes plan.content, "What name should I put on the order?"
+    assert_not_includes plan.content, "would you like to order it"
+    assert_equal 1, plan.content.count("?")
+    assert_equal 1, order.reload.quantity
+  end
   setup { Business.default.update!(category: "perfume") }
   test "answers an interruption and returns to the pending order question" do
     order = create_pending_order(status: :collecting_phone, customer_name: "Anik")
