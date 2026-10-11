@@ -13,3 +13,12 @@ cue, exactly three lines, and a unique size. Normal stock validation still runs.
 Job regression tests use persisted webhook events and the test queue adapter.
 They do not send messages to Meta. Live timing, concurrent-worker behavior, and
 Meta delivery require separate production verification.
+
+## Four-PR replay verification
+
+The stacked purchase, option, discovery, and burst repairs passed all 40 local
+structural replay checks on revision `0061e33`. The earlier baseline passed
+33/40. The external dataset and replay artifacts remain local and are not
+committed. Structural checks validate expected order/cart outcomes, not every
+reply's naturalness or every possible customer intent. Gemini, live delivery,
+and concurrent-worker timing were not exercised.
