@@ -1,6 +1,26 @@
 require "test_helper"
 
 class ProcessMessengerEventJobTest < ActiveJob::TestCase
+  test "persisted product size quantity burst produces one reply and is idempotent" do
+    product = Product.create!(name: "The Oud", price: 580, stock_quantity: 0)
+    variant = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 580, stock_quantity: 10)
+    events = [ "The Oud nibo", "15", "2" ].each_with_index.map do |text, index|
+      create_webhook_event(text: text, message_id: "purchase-burst-#{index}")
+    end
+    assert_difference -> { MessengerDelivery.count }, 1 do
+      assert_difference -> { Message.bot.count }, 1 do
+        ProcessMessengerEventJob.perform_now(events.first)
+      end
+    end
+    order = Conversation.find_by!(external_customer_id: events.first.sender_id).pending_order
+    assert_equal variant, order.product_variant
+    assert_equal 2, order.quantity
+    assert_predicate order, :collecting_name?
+    assert events.all? { |event| event.reload.status == "processed" }
+    assert_no_difference [ -> { Message.count }, -> { MessengerDelivery.count } ] do
+      events.each { |event| ProcessMessengerEventJob.perform_now(event) }
+    end
+  end
   test "processes an inbound message and enqueues its outbound reply" do
     Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     event = create_webhook_event(text: "I want Fresh Musk")

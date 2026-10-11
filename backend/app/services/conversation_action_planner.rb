@@ -18,6 +18,7 @@ class ConversationActionPlanner
   ORDERING_CUE = /\b(want|need|take|give|send|order|buy|nibo|chai|den|dao|din|bottle|bottles|piece|pieces|ta|টা|নিব|চাই|দেন)\b/i
 
   def initialize(message:, business:, current_product: nil, interpretation: nil)
+    @lines = message.content.to_s.lines.map(&:strip).reject(&:blank?)
     @content = ConversationTextNormalizer.call(message.content)
     @business = business
     @current_product = current_product
@@ -26,11 +27,12 @@ class ConversationActionPlanner
 
   def call
     product = selected_product
+    burst = purchase_burst(product)
     variant = selected_variant(product || current_product)
     Plan.new(
       product: product,
-      variant: variant,
-      quantity: selected_quantity,
+      variant: burst&.first || variant,
+      quantity: burst&.last || selected_quantity,
       informational_outcomes: informational_outcomes,
       ordering_cue: ordering_cue?
     )
@@ -39,6 +41,18 @@ class ConversationActionPlanner
   private
 
   attr_reader :content, :business, :current_product, :interpretation
+
+  def purchase_burst(product)
+    return unless product && @lines.size == 3 && ordering_cue?
+    return unless @lines[1].match?(/\A\d+(?:\.\d+)?\z/) && @lines[2].match?(/\A[1-9]\d*\z/)
+    first = ConversationTextNormalizer.call(@lines.first)
+    return unless product.searchable_names.any? { |name| first.include?(ConversationTextNormalizer.call(name)) }
+
+    variants = product.available_variants.select do |variant|
+      variant.size.to_s[/\A\s*\d+(?:\.\d+)?/]&.strip == @lines[1]
+    end
+    [ variants.first, @lines.last.to_i ] if variants.one?
+  end
 
   def selected_product
     normalized = content.downcase
