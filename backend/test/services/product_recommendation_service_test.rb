@@ -1,6 +1,14 @@
 require "test_helper"
 
 class ProductRecommendationServiceTest < ActiveSupport::TestCase
+  test "does not pad a matching budget and scent recommendation with unrelated products" do
+    @business.products.create!(name: "Office", price: 480, stock_quantity: 10,
+      product_attributes: { scent_families: ["fresh"], occasions: ["office"] })
+    result = ProductRecommendationService.new(business: @business,
+      message: "fresh for office under 500", preferences: { "scent_families" => ["fresh"], "occasions" => ["office"] }).call
+    assert_equal ["Office"], result.offers.map { |offer| offer.product.name }
+    assert result.offers.all? { |offer| offer.price <= 500 }
+  end
   setup do
     @business = Business.create!(name: "Recommendation Shop", slug: "recommendation-shop")
     oud = @business.products.create!(

@@ -22,6 +22,8 @@ class ProductRecommendationService
       (minimum.blank? || offer.price >= minimum) && (maximum.blank? || offer.price <= maximum) &&
         matches_price_direction?(offer)
     end
+    preferred = eligible.select { |offer| matches_requested_profile?(offer.product) }
+    eligible = preferred if preferred.any?
     exact_match = eligible.any?
     candidates = exact_match ? eligible : closest_candidates(minimum: minimum, maximum: maximum)
     product_offers = candidates.group_by { |offer| offer.product.id }.values.map do |product_options|
@@ -92,6 +94,18 @@ class ProductRecommendationService
       structured_preference_terms.count { |term| searchable.include?(term) } * 18 +
       attribute_score(offer.product) + projection_preference_score(offer.product) +
       [ offer.stock_quantity, 20 ].min
+  end
+
+  def matches_requested_profile?(product)
+    searchable = searchable_text(product)
+    families = Array(preferences["scent_families"])
+    occasions = Array(preferences["occasions"])
+    (families.empty? || families.any? { |family| searchable.include?(family.to_s.downcase) }) &&
+      (occasions.empty? || occasions.any? { |occasion| searchable.include?(occasion.to_s.downcase) }) &&
+      preferences["attributes"].to_h.all? do |key, values|
+        wanted = Array(values).map { |value| value.to_s.downcase }
+        wanted.empty? || (Array(product.product_attributes.to_h[key]).map { |value| value.to_s.downcase } & wanted).any?
+      end
   end
 
   def attribute_score(product)
