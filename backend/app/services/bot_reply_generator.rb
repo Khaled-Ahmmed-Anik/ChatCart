@@ -143,7 +143,8 @@ class BotReplyGenerator
     when :invalid_quantity
       "How many would you like? You can send a number such as “2”, or write “two”."
     when :quantity_unavailable
-      "We currently have #{selected_stock} available for that option. Would you like all #{selected_stock}, a smaller quantity, or should I ask the seller about a bulk order?"
+      key = selected_stock.to_i.positive? ? "stock_limit" : "out_of_stock"
+      I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.#{key}", stock: selected_stock)
     when :quantity_collected
       "Perfect—#{pending_order.quantity} #{bottle_word(pending_order.quantity)}. What name should I put on the order?"
     when :name_collected

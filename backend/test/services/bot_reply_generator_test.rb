@@ -1,6 +1,16 @@
 require "test_helper"
 
 class BotReplyGeneratorTest < ActiveSupport::TestCase
+  test "zero stock never offers a zero quantity purchase in English or Banglish" do
+    order = create_pending_order(product: create_product(stock_quantity: 0), status: :collecting_quantity)
+    reply = BotReplyGenerator.new(pending_order: order, outcome: :quantity_unavailable).content
+    assert_includes reply, "out of stock"
+    assert_not_includes reply, "all 0"
+    order.conversation.update!(conversation_state: { preferred_language: "banglish" })
+    reply = BotReplyGenerator.new(pending_order: order, outcome: :quantity_unavailable).content
+    assert_includes reply, "stock-e nei"
+    assert_not_includes reply, "0 ta"
+  end
   test "asks customer to choose from available products" do
     Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     Product.create!(name: "Royal Oud", price: 1200, stock_quantity: 4)

@@ -1,0 +1,8 @@
+en:
+  reply_quality:
+    en:
+      out_of_stock: "This option is currently out of stock. Would you like an available alternative?"
+      stock_limit: "We currently have %{stock} available for that option. Would you like %{stock} or a smaller quantity?"
+    banglish:
+      out_of_stock: "Ei option-ta ekhon stock-e nei. Available onno kono option dekhte chan?"
+      stock_limit: "Ei option-er %{stock} ta available ache. %{stock} ta niben, naki kom quantity?"
