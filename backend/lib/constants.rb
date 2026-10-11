@@ -1,5 +1,6 @@
 module Constants
   module Conversation
+    CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i
     ENGINE_VERSION = "2026.10.7"
     CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)/i
