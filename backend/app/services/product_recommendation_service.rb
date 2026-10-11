@@ -115,11 +115,14 @@ class ProductRecommendationService
   end
 
   def preferred_offer(product_options, minimum:, maximum:, exact_match:)
-    return product_options.max_by(&:price) if unlimited_budget?
-
     unless exact_match
       return product_options.min_by { |offer| constraint_distance(offer, minimum:, maximum:) }
     end
+
+    unless CataloguePreferenceExtractor.new(message, business: business).fragrance?
+      return product_options.min_by(&:price)
+    end
+    return product_options.max_by(&:price) if unlimited_budget?
 
     return product_options.max_by(&:price) if maximum.present?
     return product_options.min_by(&:price) if minimum.present?

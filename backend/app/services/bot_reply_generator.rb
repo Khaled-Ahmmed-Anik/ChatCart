@@ -1,10 +1,11 @@
 class BotReplyGenerator
-  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil)
+  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil, include_follow_up: true)
     @pending_order = pending_order
     @customer_message = customer_message
     @outcome = outcome&.to_sym
     @interpretation = interpretation
     @address_preference = address_preference
+    @include_follow_up = include_follow_up
   end
 
   def content
@@ -127,7 +128,7 @@ class BotReplyGenerator
     when :variant_selected
       "Great—#{pending_order.product_variant.display_name}. #{quantity_prompt}"
     when :variant_not_found
-      "Which size would you like? You can send the size, option number, or position—for example, “30 ML”, “3”, or “last one”.\n\n#{variant_selection_prompt}"
+      variant_selection_prompt
     when :variant_size_unavailable
       variant_bundle_offer_reply
     when :variant_options_rejected
@@ -310,15 +311,11 @@ class BotReplyGenerator
 
     remember_options!(:variants, variants, product: pending_order.product)
 
-    options = variants.each_with_index.map do |variant, index|
-      guidance = if index.zero? && variants.many?
-        " — good for trying it first"
-      elsif index == variants.length - 1 && variants.many?
-        " — best value for regular use"
-      end
-      "• #{variant.display_name}: #{formatted_price(variant.price)}#{guidance}"
+    options = variants.map do |variant|
+      "• #{variant.display_name}: #{formatted_price(variant.price)}"
     end
-    ([ "Which size would suit you?", *options, "", "You can reply with the size, price, or say “small”, “medium”, or “best value”." ]).join("\n")
+    prefix = "reply_quality.#{banglish? ? 'banglish' : 'en'}"
+    ([ I18n.t("#{prefix}.choose_option"), *options, "", I18n.t("#{prefix}.option_hint") ]).join("\n")
   end
 
   def variant_bundle_offer_reply
@@ -442,7 +439,7 @@ class BotReplyGenerator
       component_names = product.combo_items.includes(:component_product).map { |item| "#{item.quantity} × #{item.component_product.name}" }
       lines << "Includes: #{component_names.to_sentence}." if component_names.any?
     end
-    lines << "Would you like a size recommendation or would you like to order it?"
+    lines << "Would you like a size recommendation or would you like to order it?" if @include_follow_up
     lines.join("\n")
   end
 
@@ -515,7 +512,15 @@ class BotReplyGenerator
       detail_lines << "  #{summary}" if reason.blank? && summary.present?
       tradeoff = recommendation_tradeoff(offer, previous_recommendations, result)
       detail_lines << "  #{tradeoff}" if tradeoff.present?
-      detail_lines << "  Best option: #{offer.variant.display_name} for #{formatted_price(offer.price)}." if offer.variant.present?
+      if offer.variant.present?
+        fragrance = CataloguePreferenceExtractor.new(customer_message&.content, business: pending_order.conversation.business).fragrance?
+        if fragrance
+          detail_lines << "  Option: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
+        else
+          available = offer.product.available_variants.map { |variant| "#{variant.display_name} #{formatted_price(variant.price)}" }.join(", ")
+          detail_lines << "  #{I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.available_options", options: available)}"
+        end
+      end
       heading = if result.budget_detected
         "• #{offer.product.name} — #{formatted_price(offer.price)}"
       else
@@ -836,7 +841,9 @@ class BotReplyGenerator
     options = variants.map do |variant|
       "• #{variant.display_name} — #{formatted_price(variant.price)} (#{variant.stock_quantity} in stock)"
     end
-    ([ "#{product.name} is available in:", *options, "", "Which size would you prefer?" ]).join("\n")
+    lines = [ "#{product.name} is available in:", *options ]
+    lines << "Which size would you prefer?" if @include_follow_up
+    lines.join("\n")
   end
 
   def general_product_variants_reply
@@ -876,7 +883,7 @@ class BotReplyGenerator
       key = larger.price > maximum ? "above_budget" : "within_budget"
       lines << I18n.t("#{prefix}.#{key}", budget: formatted_price(maximum), difference: formatted_price(larger.price - maximum))
     end
-    lines << I18n.t("#{prefix}.size_question")
+    lines << I18n.t("#{prefix}.size_question") if @include_follow_up
     lines.join("\n")
   end
 
