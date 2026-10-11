@@ -815,6 +815,10 @@ class BotReplyGenerator
     return general_product_variants_reply if general_variant_request?
 
     product = contextual_product
+    if product.blank?
+      ids = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommended_product_ids"]).map(&:to_i).uniq
+      product = catalog.available_for_sale.find_by(id: ids.first) if ids.one?
+    end
     return "Sure—which product would you like the size options for? Just send me its name." if product.blank?
 
     variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
@@ -823,6 +827,11 @@ class BotReplyGenerator
     end
 
     remember_options!(:variants, variants, product: product)
+
+    if customer_message&.content.to_s.match?(Constants::Conversation::LARGER_OPTION_QUESTION)
+      relative = larger_option_reply(product, variants)
+      return relative if relative.present?
+    end
 
     options = variants.map do |variant|
       "• #{variant.display_name} — #{formatted_price(variant.price)} (#{variant.stock_quantity} in stock)"
@@ -846,6 +855,29 @@ class BotReplyGenerator
       end
 
     ([ "Our common available size options are:", *options, "", "Exact sizes depend on the product. Tell me a product name if you want its full size and price list." ]).join("\n")
+  end
+
+  def larger_option_reply(product, variants)
+    recommendations = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommendations"])
+    recommendation = recommendations.find { |item| item["product_id"].to_i == product.id }
+    reference = pending_order.product_variant if pending_order.product_id == product.id
+    reference ||= product.available_variants.find_by(id: recommendation&.dig("variant_id"))
+    return unless reference && reference.display_name.match?(/\A\d+(?:\.\d+)?\s*ml\z/i)
+
+    larger = variants.select { |variant| variant.display_name.match?(/\A\d+(?:\.\d+)?\s*ml\z/i) && variant_size_number(variant) > variant_size_number(reference) }
+      .min_by { |variant| variant_size_number(variant) }
+    language = banglish? ? "banglish" : "en"
+    prefix = "reply_quality.#{language}"
+    return I18n.t("#{prefix}.largest_size", product: product.name, size: reference.display_name) unless larger
+
+    lines = [ I18n.t("#{prefix}.next_size", product: product.name, size: larger.display_name, price: formatted_price(larger.price)) ]
+    maximum = pending_order.conversation.conversation_state.to_h.dig("shopping_preferences", "maximum_price").presence&.to_d
+    if maximum
+      key = larger.price > maximum ? "above_budget" : "within_budget"
+      lines << I18n.t("#{prefix}.#{key}", budget: formatted_price(maximum), difference: formatted_price(larger.price - maximum))
+    end
+    lines << I18n.t("#{prefix}.size_question")
+    lines.join("\n")
   end
 
   def general_variant_request?

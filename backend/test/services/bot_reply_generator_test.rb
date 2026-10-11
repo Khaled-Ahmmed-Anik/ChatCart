@@ -1,6 +1,20 @@
 require "test_helper"
 
 class BotReplyGeneratorTest < ActiveSupport::TestCase
+  test "larger size follow-up uses a unique recommendation and checks the budget without selecting it" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    middle = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 10)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    order.conversation.update!(conversation_state: { shopping_preferences: { maximum_price: "500" } })
+    GuidedSalesConversation.new(order.conversation).remember_recommendations!([ product.id ], offers: [ { product_id: product.id, variant_id: middle.id, price: "480" } ])
+    message = order.conversation.messages.create!(sender_type: :customer, content: "bigger size ache ei budget e?")
+    reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_variants_requested).content
+    assert_includes reply, "30 ML at ৳850"
+    assert_includes reply, "৳350 above your ৳500 budget"
+    assert_not_includes reply, "which product"
+    assert_nil order.reload.product
+  end
   test "zero stock never offers a zero quantity purchase in English or Banglish" do
     order = create_pending_order(product: create_product(stock_quantity: 0), status: :collecting_quantity)
     reply = BotReplyGenerator.new(pending_order: order, outcome: :quantity_unavailable).content
