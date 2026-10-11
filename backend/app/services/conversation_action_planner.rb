@@ -61,6 +61,9 @@ class ConversationActionPlanner
   def selected_variant(product)
     return if product.blank? || product.available_variants.empty?
 
+    resolved = CatalogueOptionResolver.call(product: product, text: content)
+    return resolved if resolved
+
     product.available_variants.find do |variant|
       !variant_explicitly_rejected?(variant) && [ variant.name, variant.size ].compact.any? do |label|
         pattern = Regexp.escape(ConversationTextNormalizer.call(label)).gsub("\\ ", "\\s*")
