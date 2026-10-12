@@ -1,6 +1,19 @@
 require "test_helper"
 
 class BotReplyGeneratorTest < ActiveSupport::TestCase
+  test "clothing recommendations list only options within a matching budget" do
+    Business.default.update!(category: "clothing")
+    product = create_product(name: "Cotton Shirt", stock_quantity: 0)
+    product.product_variants.create!(name: "M", size: "M", price: 600, stock_quantity: 10)
+    product.product_variants.create!(name: "L", size: "L", price: 650, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "suggest under 620")
+    reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_recommendation_requested).content
+    assert_includes reply, "M ৳600"
+    assert_not_includes reply, "L ৳650"
+    assert_not_includes reply, "Best option"
+    assert_nil order.reload.product
+  end
   test "multiple recommendations do not guess the product for a size question" do
     first = create_product(name: "First")
     second = create_product(name: "Second")

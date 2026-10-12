@@ -517,7 +517,11 @@ class BotReplyGenerator
         if fragrance
           detail_lines << "  Option: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
         else
-          available = offer.product.available_variants.map { |variant| "#{variant.display_name} #{formatted_price(variant.price)}" }.join(", ")
+          options = offer.product.available_variants.select do |variant|
+            !result.exact_match || ((result.requested_minimum.blank? || variant.price >= result.requested_minimum) &&
+              (result.requested_maximum.blank? || variant.price <= result.requested_maximum))
+          end
+          available = options.map { |variant| "#{variant.display_name} #{formatted_price(variant.price)}" }.join(", ")
           detail_lines << "  #{I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.available_options", options: available)}"
         end
       end
