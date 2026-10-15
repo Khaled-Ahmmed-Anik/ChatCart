@@ -1,0 +1,10 @@
+en:
+  checkout_edit:
+    en:
+      customer_name: "What name should replace the current name on your order?"
+      phone: "What phone number should we use instead?"
+      address: "Please send the new full delivery address."
+    banglish:
+      customer_name: "Order-e notun kon nam dibo?"
+      phone: "Notun phone number-ta bolben?"
+      address: "Notun full delivery address-ta pathaben?"

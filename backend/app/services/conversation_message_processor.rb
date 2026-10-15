@@ -19,6 +19,9 @@ class ConversationMessageProcessor
       @outcome = :unsupported_support_requested
       return pending_order
     end
+    return pending_order if begin_checkout_edit
+    return pending_order if content.match?(Constants::Conversation::QUANTITY_CORRECTION) && handle_order_update_request
+    return pending_order if complete_checkout_edit
     return pending_order if handle_cart_request
     if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
       collect_variant
@@ -62,6 +65,38 @@ class ConversationMessageProcessor
 
   attr_reader :message, :pending_order, :content, :interpretation
 
+  def begin_checkout_edit
+    field = Constants::Conversation::CHECKOUT_EDIT_FIELDS.find { |_field, pattern| content.match?(pattern) }&.first
+    return false unless field && pending_order.product.present?
+    if pending_order.submitted_to_woocommerce? || pending_order.cancelled?
+      @outcome = pending_order.submitted_to_woocommerce? ? :submitted_order_change_requested : :cancelled_order_change_requested
+      return true
+    end
+    conversation = pending_order.conversation
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("checkout_edit" => { "field" => field, "pending_order_id" => pending_order.id }))
+    @outcome = :checkout_edit_requested
+    true
+  end
+
+  def complete_checkout_edit
+    conversation = pending_order.conversation
+    edit = conversation.conversation_state.to_h["checkout_edit"].to_h
+    return false unless edit["pending_order_id"] == pending_order.id && Constants::Conversation::CHECKOUT_EDIT_FIELDS.key?(edit["field"])
+    return false if pending_order.submitted_to_woocommerce? || pending_order.cancelled?
+    # Side questions must not become an address or name; keep the edit pending.
+    return false if content.include?("?") || content.match?(/\b(?:delivery|price|cancel|confirm|new order)\b/i)
+    field = edit["field"].to_sym
+    value = field == :phone ? valid_phone_candidate(content) : content
+    changed = field == :phone ? update_phone(value.to_s) : record_change(field, value)
+    unless changed
+      @outcome = :checkout_edit_requested
+      return true
+    end
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("checkout_edit"))
+    @outcome = reopen_confirmed_order(pending_order.confirmed?)
+    true
+  end
+
   def handle_cart_request
     result = ConversationCartManager.new(message: message, pending_order: pending_order).call
     return false unless result
@@ -80,6 +115,8 @@ class ConversationMessageProcessor
   end
 
   def apply_action_plan
+    return false if pending_order.confirmed? || pending_order.submitted_to_woocommerce?
+
     plan = ConversationActionPlanner.new(
       message: message,
       business: pending_order.conversation.business,
@@ -493,15 +530,15 @@ class ConversationMessageProcessor
   end
 
   def apply_correction
-    return update_variant_from_content if variant_correction_request?
     return update_product_from_content if product_correction_request?
+    return update_variant_from_content if variant_correction_request?
     return apply_ai_correction if ai_change_intent?
 
     case content
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+)?quantity\s+(?:to\s+)?(.+)\z/i,
       /\A(?:actually[\s,]*)?make\s+it\s+(.+)\z/i,
       /\A(.+?)\s+(?:ta|টা)?\s*(?:koren|করেন|hobe|হবে)\z/i
-      update_quantity(Regexp.last_match(1))
+      update_quantity(Regexp.last_match(1).sub(/\Aactually[\s,]*/i, ""))
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:my\s+)?phone\s+(?:number\s+)?(?:to\s+)?(.+)\z/i
       update_phone(Regexp.last_match(1))
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:my\s+)?name\s+(?:to\s+)?(.+)\z/i,
@@ -541,11 +578,7 @@ class ConversationMessageProcessor
   end
 
   def update_product_from_content
-    normalized = content.downcase
-    matches = catalog.available_for_sale.select do |product|
-      product.searchable_names.any? { |name| normalized.include?(name.downcase) }
-    end
-    product = matches.last
+    product = ConversationActionPlanner.new(message: message, business: pending_order.conversation.business).call.product
     return false if product.blank? || product == pending_order.product
 
     update_product_record(product)
@@ -1265,7 +1298,8 @@ class ConversationMessageProcessor
   end
 
   def correction_command?
-    content.match?(/\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+quantity|quantity|my\s+phone|phone|my\s+name|name|the\s+address|address)\b/i) ||
+    content.match?(Constants::Conversation::QUANTITY_CORRECTION) ||
+      content.match?(/\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+quantity|quantity|my\s+phone|phone|my\s+name|name|the\s+address|address)\b/i) ||
       content.match?(/\A(?:actually[\s,]*)?make\s+it\b/i) ||
       content.match?(/\A(?:my\s+name\s+is|amar\s+naam|amar\s+nam|name|naam)\s+.+(?:update|change).*(?:order)\b/i) ||
       variant_correction_request? || product_correction_request? ||
@@ -1369,6 +1403,7 @@ class ConversationMessageProcessor
 
     details = {}
     name = interpretation&.entities&.[](:customer_name).presence || leading_customer_name
+    name = nil if correction_command? && !content.match?(Constants::Conversation::CUSTOMER_NAME_PREFIX)
     details[:customer_name] = name unless name.blank? || non_name_reply?(name)
     phone = valid_phone_candidate(interpretation&.entities&.[](:phone), content)
     details[:phone] = phone if phone.present?

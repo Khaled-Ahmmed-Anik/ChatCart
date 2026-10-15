@@ -48,8 +48,11 @@ class ConversationActionPlanner
       end
     end
     matches.reject! do |product|
-      product.searchable_names.any? do |name|
-        normalized.match?(/\b(?:not|no|na|bad|বাদ|না)\s+#{Regexp.escape(name.downcase)}\b/)
+      product.searchable_names.flat_map { |name| [ name, name.sub(/\Athe\s+/i, "") ] }.any? do |name|
+        label = Regexp.escape(ConversationTextNormalizer.call(name))
+        normalized.match?(/(?:\A|\s)(?:not|no|bad|বাদ)\s+#{label}(?:\z|\s)/) ||
+          normalized.match?(/\A(?:na|না)\s+#{label}(?:\z|\s)/) ||
+          normalized.match?(/(?:\A|\s)#{label}\s+(?:na|no|not|না)(?:\z|\s)/)
       end
     end
     matches.max_by { |product| product.searchable_names.map(&:length).max }
