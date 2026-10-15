@@ -22,6 +22,10 @@ class ConversationMessageProcessor
     return pending_order if begin_checkout_edit
     return pending_order if content.match?(Constants::Conversation::QUANTITY_CORRECTION) && handle_order_update_request
     return pending_order if complete_checkout_edit
+    if pending_order.product.present? && content.match?(Constants::Conversation::PRODUCT_CONTENTS_QUESTION)
+      @outcome = :product_details_requested
+      return pending_order
+    end
     return pending_order if handle_inquiry_follow_up
     if content.match?(Constants::Conversation::CART_CONTENTS_REQUEST) && pending_order.line_items.any?
       @outcome = :order_details_requested
@@ -242,6 +246,9 @@ class ConversationMessageProcessor
 
     pending_order.product = product
     pending_order.product_variant = matching_variant(product)
+    if pending_order.product_variant.blank? && product.available_variants.one? && product.available_variants.first.name.casecmp?("Standard")
+      pending_order.product_variant = product.available_variants.first
+    end
     pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
       :collecting_variant : :collecting_quantity
     pending_order.save!
@@ -828,6 +835,9 @@ class ConversationMessageProcessor
 
   def matching_variant(product)
     return if product.blank? || product.product_variants.none?
+
+    resolved = CatalogueOptionResolver.call(product: product, text: content)
+    return resolved if resolved
 
     if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/)
       candidates = product.available_variants.select { |variant| variant.size.to_s[/\A\s*\d+(?:\.\d+)?/]&.strip == content.strip }

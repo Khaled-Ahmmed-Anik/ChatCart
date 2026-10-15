@@ -8,6 +8,15 @@ class ConversationCartManager
   end
 
   def call
+    if (correction = text.match(Constants::Conversation::CART_SHORT_CORRECTION))
+      products = order.line_items.map(&:product).uniq.select do |product|
+        ConversationTextNormalizer.call(product.name).split.include?(correction[1])
+      end
+      if products.one?
+        return Result.new(outcome: :cart_locked, question: nil) if order.confirmed? || order.submitted_to_woocommerce?
+        return update_item(product: products.first)
+      end
+    end
     matches = product_mentions
     repaired = resume_repair(matches)
     return repaired if repaired
