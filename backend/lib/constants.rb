@@ -1,6 +1,11 @@
 module Constants
   module Conversation
     ENGINE_VERSION = "2026.10.7"
+    CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)/i
+    CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|what is in (?:my |the )?cart)[?.! ]*\z/i
+    CART_MUTATION_CUE = /\b(?:add|remove|delete|drop|change|update|den|nibo|give|take)\b/i
+    CART_NAMED_QUANTITY = /\b(?:one|two|three|ekta|duita|\d+)\s+(?:koren|korun|করেন|করুন)\z/i
+    CART_DISCARD_UNKNOWN = /\b(?:bad|remove|ignore|drop)\b.*\b(?:shudhu|only)\b/i
     PRODUCT_INQUIRY_OUTCOMES = %i[price_inquiry stock_inquiry product_details_requested product_variants_requested].freeze
     INQUIRY_VARIANT_FOLLOW_UP = /\b\d+(?:\.\d+)?\s*ml\b|\b(?:bigger|larger|largest|smallest|boro|choto|medium|last one)\b/i
     INQUIRY_QUESTION = /[?？]|\b(?:ache|available|price|cost|koto|options?|sizes?)\b/i

@@ -9,9 +9,12 @@ class ConversationCartManager
 
   def call
     matches = product_mentions
+    repaired = resume_repair(matches)
+    return repaired if repaired
     addition = text.match?(/\b(?:add|include|adding)\b|\b(?:aro|r o)\b.*\b(?:product|item)\b/) && !text.match?(/\b(?:not|don t|do not)\b/)
     awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
-    command = addition || awaiting_addition || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
+    named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY)
+    command = addition || awaiting_addition || named_quantity || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
     explicit_list = matches.any? && message.content.match?(/\+|\b(?:and|ar|ebong)\b/i) && text.match?(/\d/)
@@ -29,27 +32,92 @@ class ConversationCartManager
       return clarification(I18n.t(key))
     end
     final_tail = text[matches.last[:finish]..].to_s
+    plans = build_plans(matches)
     if final_tail.match?(/\b(?:and|ar|ebong)\b\s+\S/) &&
         ConversationActionPlanner::INFORMATIONAL_PATTERNS.values.none? { |pattern| final_tail.match?(pattern) }
-      return clarification("Please send the exact product name for each item you want to add.")
+      store_repair(plans, replace_cart: explicit_list && !command, unknown: true)
+      return clarification(translation("unknown"))
     end
     return remove(matches) if text.match?(/\A(?:remove|delete|drop)\b|\b(?:bad den|bad din)\z/)
-    return update_item(matches.first) if text.match?(/\A(?:change|update)\b/) && matches.one?
+    return update_item(matches.first) if (named_quantity || text.match?(/\A(?:change|update)\b/)) && matches.one?
     if order.product.present? && (order.quantity.blank? || !order.variant_selected_if_required?) &&
         matches.any? { |match| match[:product].id != order.product_id }
       return clarification("Let’s finish the option and quantity for #{order.product.name} first, then add the next item.")
     end
 
-    plans = matches.each_with_index.map do |match, index|
+    if plans.any? { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
+      if plans.size > 1
+        store_repair(plans, replace_cart: explicit_list && !command)
+        return repair_question(plans)
+      end
+      return start_addition(plans.first)
+    end
+    replace_cart = explicit_list && !command
+    commit_plans(plans, replace_cart: replace_cart)
+  end
+
+  private
+
+  attr_reader :message, :order, :text
+
+  def build_plans(matches)
+    matches.each_with_index.map do |match, index|
       segment = text[match[:start]...matches[index + 1]&.fetch(:start)]
       prefix = text[0...match[:start]][/(?:\A|\s)(\d+)\s*\z/, 1]
       plan_for(match[:product], segment, prefix_quantity: prefix&.to_i)
     end
-    if plans.any? { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
-      return clarification("Please include the quantity and available option for each product you want to order.") if plans.size > 1
-      return start_addition(plans.first)
+  end
+
+  def store_repair(plans, replace_cart:, unknown: false)
+    saved = plans.map { |plan| { "product_id" => plan[:product].id, "variant_id" => plan[:variant]&.id, "quantity" => plan[:quantity] } }
+    conversation = order.conversation
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("cart_repair" => {
+      "pending_order_id" => order.id, "plans" => saved, "replace_cart" => replace_cart, "unknown" => unknown
+    }))
+  end
+
+  def resume_repair(matches)
+    repair = order.conversation.conversation_state.to_h["cart_repair"].to_h
+    return unless repair["pending_order_id"] == order.id && matches.any?
+    return if message.content.match?(/[?？]/) || ConversationActionPlanner::INFORMATIONAL_PATTERNS.values.any? { |pattern| text.match?(pattern) }
+    return if text.match?(/\A(?:remove|delete|drop|change|update)\b/)
+    return Result.new(outcome: :cart_locked, question: nil) if order.confirmed? || order.submitted_to_woocommerce?
+    plans = Array(repair["plans"]).filter_map do |saved|
+      product = order.conversation.business.products.available_for_sale.find_by(id: saved["product_id"])
+      next unless product
+      { product: product, variant: product.available_variants.find_by(id: saved["variant_id"]), quantity: saved["quantity"] }
     end
-    replace_cart = explicit_list && !command
+    return clarification(translation("unknown")) unless plans.size == Array(repair["plans"]).size
+    updates = build_plans(matches)
+    return unless updates.all? { |update| plans.any? { |plan| plan[:product] == update[:product] } }
+    return unless updates.any? { |update| update[:variant] || update[:quantity] } || text.match?(Constants::Conversation::CART_DISCARD_UNKNOWN)
+    updates.each do |update|
+      candidates = plans.select { |plan| plan[:product] == update[:product] }
+      return repair_question(plans) unless candidates.one?
+      candidates.first[:variant] = update[:variant] if update[:variant]
+      candidates.first[:quantity] = update[:quantity] if update[:quantity]
+    end
+    unknown = repair["unknown"] && !text.match?(Constants::Conversation::CART_DISCARD_UNKNOWN)
+    plans.select! { |plan| matches.any? { |match| match[:product] == plan[:product] } } if repair["unknown"] && !unknown
+    store_repair(plans, replace_cart: repair["replace_cart"], unknown: unknown)
+    return clarification(translation("unknown")) if unknown
+    return repair_question(plans) if plans.any? { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
+
+    commit_plans(plans, replace_cart: repair["replace_cart"])
+  end
+
+  def repair_question(plans)
+    missing = plans.select { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
+    clarification(translation("repair", products: missing.map { |plan| plan[:product].name }.join(", ")))
+  end
+
+  def translation(key, **options)
+    # Repair prompts follow the same deterministic language convention as existing cart prompts.
+    banglish = text.match?(/\b(?:ar|ekta|duita|koren|korbo|nibo|shudhu|bad)\b/)
+    I18n.t("#{banglish ? 'cart_banglish' : 'cart'}.#{key}", **options)
+  end
+
+  def commit_plans(plans, replace_cart:)
     return Result.new(outcome: :cart_inventory_unavailable, question: nil) unless available_additions?(plans, replace_cart: replace_cart)
 
     order.with_lock do
@@ -61,10 +129,6 @@ class ConversationCartManager
     clear_addition_context!
     Result.new(outcome: :cart_updated, question: nil)
   end
-
-  private
-
-  attr_reader :message, :order, :text
 
   def product_mentions
     matches = order.conversation.business.products.available_for_sale.flat_map do |product|
@@ -170,6 +234,6 @@ class ConversationCartManager
 
   def clear_addition_context!
     conversation = order.conversation
-    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product"))
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product", "cart_repair"))
   end
 end

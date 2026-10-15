@@ -21,7 +21,7 @@ class PendingOrder < ApplicationRecord
   validates :quantity, numericality: { greater_than: 0, only_integer: true }, allow_nil: true
 
   def ready_for_confirmation?
-    product.present? && variant_selected_if_required? &&
+    !unresolved_cart? && product.present? && variant_selected_if_required? &&
       quantity.present? &&
       customer_name.present? &&
       phone.present? &&
@@ -30,6 +30,10 @@ class PendingOrder < ApplicationRecord
 
   def total_price
     line_items.sum(&:total_price)
+  end
+
+  def unresolved_cart?
+    id.present? && conversation.conversation_state.to_h.dig("cart_repair", "pending_order_id") == id
   end
 
   def line_items

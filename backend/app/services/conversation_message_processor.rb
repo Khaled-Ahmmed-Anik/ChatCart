@@ -23,6 +23,14 @@ class ConversationMessageProcessor
     return pending_order if content.match?(Constants::Conversation::QUANTITY_CORRECTION) && handle_order_update_request
     return pending_order if complete_checkout_edit
     return pending_order if handle_inquiry_follow_up
+    if content.match?(Constants::Conversation::CART_CONTENTS_REQUEST) && pending_order.line_items.any?
+      @outcome = :order_details_requested
+      return pending_order
+    end
+    if content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_MUTATION_CUE) && pending_order.line_items.any?
+      @outcome = :cart_total_requested
+      return pending_order
+    end
     return pending_order if handle_cart_request
     if pending_order.collecting_variant? && content.match?(/\A\s*\d+(?:\.\d+)?\s*\z/) && matching_variant(pending_order.product)
       collect_variant
@@ -362,6 +370,10 @@ class ConversationMessageProcessor
   end
 
   def collect_confirmation
+    if confirmation? && pending_order.unresolved_cart?
+      @outcome = :cart_needs_details
+      return
+    end
     if confirmation? && !pending_order.inventory_available?
       @outcome = :cart_inventory_unavailable
       return
@@ -515,7 +527,7 @@ class ConversationMessageProcessor
 
   def restart_order
     conversation = pending_order.conversation
-    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product", "product_inquiry", "last_referenced_product"))
+    conversation.update!(conversation_state: conversation.conversation_state.to_h.except("cart_awaiting_product", "cart_repair", "product_inquiry", "last_referenced_product"))
     pending_order.pending_order_items.destroy_all
     pending_order.update!(
       product: nil,

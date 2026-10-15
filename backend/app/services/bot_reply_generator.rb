@@ -85,6 +85,8 @@ class BotReplyGenerator
       "I’ve prepared the same order again for you. #{confirmation_prompt}"
     when :order_details_requested
       order_details_reply
+    when :cart_total_requested
+      cart_translation("subtotal", amount: formatted_price(pending_order.total_price))
     when :order_history_requested
       order_history_reply
     when :resume_order_requested
@@ -349,12 +351,12 @@ class BotReplyGenerator
       "Here’s your order summary:",
       *cart_lines,
       "• Total: #{formatted_price(pending_order.total_price)}",
-      "• Name: #{pending_order.customer_name}",
-      "• Phone: #{pending_order.phone}",
-      "• Address: #{pending_order.address}",
+      ("• Name: #{pending_order.customer_name}" if pending_order.customer_name.present?),
+      ("• Phone: #{pending_order.phone}" if pending_order.phone.present?),
+      ("• Address: #{pending_order.address}" if pending_order.address.present?),
       "",
-      "Does everything look right? Reply “confirm” to place it or “cancel” to stop."
-    ].join("\n")
+      pending_order.ready_for_confirmation? ? "Does everything look right? Reply “confirm” to place it or “cancel” to stop." : missing_checkout_prompt
+    ].compact.join("\n")
   end
 
   def cart_lines
@@ -364,8 +366,20 @@ class BotReplyGenerator
     end
   end
 
-  def cart_translation(key)
-    I18n.t("#{banglish? ? 'cart_banglish' : 'cart'}.#{key}", locale: :en)
+  def cart_translation(key, **options)
+    I18n.t("#{banglish? ? 'cart_banglish' : 'cart'}.#{key}", locale: :en, **options)
+  end
+
+  def missing_checkout_prompt
+    return cart_translation("pending_repair") if pending_order.unresolved_cart?
+    key = if pending_order.product.blank? then "product"
+    elsif !pending_order.variant_selected_if_required? then "variant"
+    elsif pending_order.quantity.blank? then "quantity"
+    elsif pending_order.customer_name.blank? then "name"
+    elsif pending_order.phone.blank? then "phone"
+    else "address"
+    end
+    cart_translation("missing_#{key}")
   end
 
   def help_reply

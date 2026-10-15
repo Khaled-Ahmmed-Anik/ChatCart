@@ -54,6 +54,9 @@ class CustomerMessageRecorder
         interpretation: interpretation
       )
       processor.process
+      # Later planners must not overwrite repair/reset state with a stale snapshot.
+      conversation.reload
+      pending_order.conversation = conversation
       outcome = processor.outcome
       record_outcome(message, outcome)
       ConversationClassificationFeedback.new(message: message).record_outcome!(outcome)
