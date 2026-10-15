@@ -1,6 +1,22 @@
 require "test_helper"
 
 class ProductImportPreviewTest < ActiveSupport::TestCase
+  test "imports structured and relative images while warning about unsupported links" do
+    business = Business.create!(name: "Image Import", slug: "image-import")
+    url = "https://shop.example.com/product/shirt"
+    schema = { "@type" => "Product", "name" => "Cotton Shirt", "image" => [
+      { "@type" => "ImageObject", "url" => "/images/front.jpg" },
+      "https://cdn.example.com/back.jpg", "http://legacy.example.com/old.jpg"
+    ] }
+    html = "<html><head><script type='application/ld+json'>#{schema.to_json}</script></head></html>"
+    draft = ProductImportPreview.new(business: business, source_url: url, fetcher: FakeFetcher.new({ url => html })).create!
+    assert_equal "pending_review", draft.status
+    assert_equal [ "https://shop.example.com/images/front.jpg", "https://cdn.example.com/back.jpg" ], draft.extracted_data["image_urls"]
+    assert draft.extracted_data["warnings"].any? { |warning| warning.include?("Skipped 1 unsupported image link") }
+    product = ProductImportApprover.new(draft: draft).approve!
+    assert_equal draft.extracted_data["image_urls"], product.image_urls
+    assert_not product.active?
+  end
   FakeFetcher = Struct.new(:responses) do
     def fetch(url)
       body = responses.fetch(url)

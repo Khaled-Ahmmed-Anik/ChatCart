@@ -30,6 +30,10 @@ class ProductImportPreview
     title = api_data.dig("title", "rendered") || schema["name"] || document.at_css("h1")&.text || document.title
     long_html = api_data.dig("content", "rendered") || schema["description"]
     short_html = api_data.dig("excerpt", "rendered") || document.at_css('meta[name="description"]')&.[]("content")
+    candidates = image_candidates(document, schema, page.url)
+    images, rejected_images = candidates.partition { |url| ProductImageUrlsValidator.valid_url?(url) }
+    warnings = import_warnings(schema, document)
+    warnings << I18n.t("product_images.import_skipped", count: rejected_images.size) if rejected_images.any?
 
     {
       "name" => clean(title),
@@ -37,12 +41,12 @@ class ProductImportPreview
       "description" => clean(long_html),
       "source_url" => page.url,
       "woo_commerce_product_id" => api_data["id"]&.to_s,
-      "image_urls" => image_urls(document, schema),
+      "image_urls" => images.uniq.first(Constants::ProductImages::MAX_IMAGES),
       "category" => detect_combo?(api_data, title, long_html) ? "Combo" : nil,
       "product_type" => detect_combo?(api_data, title, long_html) ? "fixed_combo" : "standard",
       "tags" => Array(api_data["class_list"]).grep(/product_tag-/).map { |tag| tag.delete_prefix("product_tag-").tr("-", " ") }.join(", "),
       "variants" => variations(document),
-      "warnings" => import_warnings(schema, document)
+      "warnings" => warnings
     }.compact
   end
 
@@ -71,8 +75,16 @@ class ProductImportPreview
     []
   end
 
-  def image_urls(document, schema)
-    ([ schema["image"] ] + document.css('meta[property="og:image"]').map { |node| node["content"] }).flatten.compact.uniq.first(8)
+  def image_candidates(document, schema, page_url)
+    values = ([ schema["image"] ] + document.css('meta[property="og:image"]').map { |node| node["content"] }).flatten.compact
+    values.map do |image|
+      value = image.is_a?(Hash) ? image["url"] || image["contentUrl"] : image
+      next "" unless value.is_a?(String)
+
+      URI.join(page_url, value).to_s
+    rescue URI::InvalidURIError
+      value
+    end
   end
 
   def detect_combo?(api_data, title, content)
