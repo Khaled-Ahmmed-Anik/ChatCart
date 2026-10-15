@@ -1,6 +1,67 @@
 require "test_helper"
 
 class BotReplyGeneratorTest < ActiveSupport::TestCase
+  test "clothing recommendations list only options within a matching budget" do
+    Business.default.update!(category: "clothing")
+    product = create_product(name: "Cotton Shirt", stock_quantity: 0)
+    product.product_variants.create!(name: "M", size: "M", price: 600, stock_quantity: 10)
+    product.product_variants.create!(name: "L", size: "L", price: 650, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "suggest under 620")
+    reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_recommendation_requested).content
+    assert_includes reply, "M ৳600"
+    assert_not_includes reply, "L ৳650"
+    assert_not_includes reply, "Best option"
+    assert_nil order.reload.product
+  end
+  test "multiple recommendations do not guess the product for a size question" do
+    first = create_product(name: "First")
+    second = create_product(name: "Second")
+    order = create_pending_order(status: :collecting_product)
+    GuidedSalesConversation.new(order.conversation).remember_recommendations!([ first.id, second.id ])
+    message = order.conversation.messages.create!(sender_type: :customer, content: "bigger size?")
+    reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_variants_requested).content
+    assert_includes reply, "which product"
+    assert_nil order.reload.product
+  end
+  test "clothing option prompts use factual labels rather than value or bottle guidance" do
+    Business.default.update!(category: "clothing")
+    product = create_product(name: "Cotton Shirt", stock_quantity: 0)
+    product.product_variants.create!(name: "M", size: "M", price: 600, stock_quantity: 10)
+    product.product_variants.create!(name: "L", size: "L", price: 650, stock_quantity: 10)
+    order = create_pending_order(product: product, status: :collecting_variant)
+    reply = BotReplyGenerator.new(pending_order: order).content
+    assert_includes reply, "M: ৳600"
+    assert_includes reply, "L: ৳650"
+    assert_not_includes reply, "best value"
+    assert_not_includes reply, "trying it first"
+    assert_not_includes reply, "30 ML"
+    assert_equal 1, reply.count("?")
+  end
+  test "larger size follow-up uses a unique recommendation and checks the budget without selecting it" do
+    product = create_product(name: "The Office", stock_quantity: 0)
+    middle = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 480, stock_quantity: 10)
+    product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    order.conversation.update!(conversation_state: { shopping_preferences: { maximum_price: "500" } })
+    GuidedSalesConversation.new(order.conversation).remember_recommendations!([ product.id ], offers: [ { product_id: product.id, variant_id: middle.id, price: "480" } ])
+    message = order.conversation.messages.create!(sender_type: :customer, content: "bigger size ache ei budget e?")
+    reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_variants_requested).content
+    assert_includes reply, "30 ML at ৳850"
+    assert_includes reply, "৳350 above your ৳500 budget"
+    assert_not_includes reply, "which product"
+    assert_nil order.reload.product
+  end
+  test "zero stock never offers a zero quantity purchase in English or Banglish" do
+    order = create_pending_order(product: create_product(stock_quantity: 0), status: :collecting_quantity)
+    reply = BotReplyGenerator.new(pending_order: order, outcome: :quantity_unavailable).content
+    assert_includes reply, "out of stock"
+    assert_not_includes reply, "all 0"
+    order.conversation.update!(conversation_state: { preferred_language: "banglish" })
+    reply = BotReplyGenerator.new(pending_order: order, outcome: :quantity_unavailable).content
+    assert_includes reply, "stock-e nei"
+    assert_not_includes reply, "0 ta"
+  end
   test "asks customer to choose from available products" do
     Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
     Product.create!(name: "Royal Oud", price: 1200, stock_quantity: 4)
@@ -25,7 +86,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     )
   end
 
-  test "explains size tradeoffs instead of only listing variants" do
+  test "lists factual options without unsupported value claims" do
     product = create_product(name: "The Office", stock_quantity: 0)
     product.product_variants.create!(name: "30 ML", size: "30 ML", price: 850, stock_quantity: 10, position: 1)
     product.product_variants.create!(name: "10 ML", size: "10 ML", price: 350, stock_quantity: 10, position: 3)
@@ -36,9 +97,9 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     assert_operator reply.index("10 ML"), :<, reply.index("15 ML")
     assert_operator reply.index("15 ML"), :<, reply.index("30 ML")
-    assert_includes reply, "good for trying it first"
-    assert_includes reply, "best value for regular use"
-    assert_includes reply, "reply with the size, price"
+    assert_not_includes reply, "good for trying it first"
+    assert_not_includes reply, "best value for regular use"
+    assert_includes reply, "reply with the option name or number"
     offered = pending_order.conversation.reload.conversation_state.fetch("last_offered_options")
     assert_equal "variants", offered["kind"]
     assert_equal [ "10 ML", "15 ML", "30 ML" ], offered["options"].pluck("label")
@@ -250,15 +311,15 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     assert_includes reply, "Saved so far: name and address"
   end
 
-  test "offers a useful bulk-order recovery when requested quantity exceeds stock" do
+  test "offers an available quantity when requested quantity exceeds stock" do
     product = create_product(stock_quantity: 100)
     pending_order = create_pending_order(product: product, status: :collecting_quantity)
 
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :quantity_unavailable).content
 
-    assert_includes reply, "all 100"
+    assert_includes reply, "100 or a smaller quantity"
     assert_includes reply, "smaller quantity"
-    assert_includes reply, "bulk order"
+    assert_not_includes reply, "bulk order"
   end
 
   test "answers a Banglish performance follow-up about the remembered product" do

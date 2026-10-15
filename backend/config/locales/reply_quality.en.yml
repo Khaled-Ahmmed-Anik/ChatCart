@@ -1,0 +1,24 @@
+en:
+  reply_quality:
+    en:
+      choose_option: "Which option would you like?"
+      option_hint: "You can reply with the option name or number."
+      available_options: "Available options: %{options}."
+      next_size: "%{product}: the next larger option is %{size} at %{price}."
+      above_budget: "That is %{difference} above your %{budget} budget."
+      within_budget: "That is within your %{budget} budget."
+      largest_size: "%{size} is the largest available option for %{product}."
+      size_question: "Which available option would you prefer?"
+      out_of_stock: "This option is currently out of stock. Would you like an available alternative?"
+      stock_limit: "We currently have %{stock} available for that option. Would you like %{stock} or a smaller quantity?"
+    banglish:
+      choose_option: "Kon option-ta niben?"
+      option_hint: "Option-er nam ba number bolte paren."
+      available_options: "Available option: %{options}."
+      next_size: "%{product}-er next boro option %{size}, dam %{price}."
+      above_budget: "Eta apnar %{budget} budget-er cheye %{difference} beshi."
+      within_budget: "Eta apnar %{budget} budget-er moddhei ache."
+      largest_size: "%{product}-er shobcheye boro available option %{size}."
+      size_question: "Kon available option-ta niben?"
+      out_of_stock: "Ei option-ta ekhon stock-e nei. Available onno kono option dekhte chan?"
+      stock_limit: "Ei option-er %{stock} ta available ache. %{stock} ta niben, naki kom quantity?"

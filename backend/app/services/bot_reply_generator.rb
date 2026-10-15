@@ -1,10 +1,11 @@
 class BotReplyGenerator
-  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil)
+  def initialize(pending_order:, customer_message: nil, outcome: nil, interpretation: nil, address_preference: nil, include_follow_up: true)
     @pending_order = pending_order
     @customer_message = customer_message
     @outcome = outcome&.to_sym
     @interpretation = interpretation
     @address_preference = address_preference
+    @include_follow_up = include_follow_up
   end
 
   def content
@@ -127,7 +128,7 @@ class BotReplyGenerator
     when :variant_selected
       "Great—#{pending_order.product_variant.display_name}. #{quantity_prompt}"
     when :variant_not_found
-      "Which size would you like? You can send the size, option number, or position—for example, “30 ML”, “3”, or “last one”.\n\n#{variant_selection_prompt}"
+      variant_selection_prompt
     when :variant_size_unavailable
       variant_bundle_offer_reply
     when :variant_options_rejected
@@ -143,7 +144,8 @@ class BotReplyGenerator
     when :invalid_quantity
       "How many would you like? You can send a number such as “2”, or write “two”."
     when :quantity_unavailable
-      "We currently have #{selected_stock} available for that option. Would you like all #{selected_stock}, a smaller quantity, or should I ask the seller about a bulk order?"
+      key = selected_stock.to_i.positive? ? "stock_limit" : "out_of_stock"
+      I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.#{key}", stock: selected_stock)
     when :quantity_collected
       "Perfect—#{pending_order.quantity} #{bottle_word(pending_order.quantity)}. What name should I put on the order?"
     when :name_collected
@@ -309,15 +311,11 @@ class BotReplyGenerator
 
     remember_options!(:variants, variants, product: pending_order.product)
 
-    options = variants.each_with_index.map do |variant, index|
-      guidance = if index.zero? && variants.many?
-        " — good for trying it first"
-      elsif index == variants.length - 1 && variants.many?
-        " — best value for regular use"
-      end
-      "• #{variant.display_name}: #{formatted_price(variant.price)}#{guidance}"
+    options = variants.map do |variant|
+      "• #{variant.display_name}: #{formatted_price(variant.price)}"
     end
-    ([ "Which size would suit you?", *options, "", "You can reply with the size, price, or say “small”, “medium”, or “best value”." ]).join("\n")
+    prefix = "reply_quality.#{banglish? ? 'banglish' : 'en'}"
+    ([ I18n.t("#{prefix}.choose_option"), *options, "", I18n.t("#{prefix}.option_hint") ]).join("\n")
   end
 
   def variant_bundle_offer_reply
@@ -441,7 +439,7 @@ class BotReplyGenerator
       component_names = product.combo_items.includes(:component_product).map { |item| "#{item.quantity} × #{item.component_product.name}" }
       lines << "Includes: #{component_names.to_sentence}." if component_names.any?
     end
-    lines << "Would you like a size recommendation or would you like to order it?"
+    lines << "Would you like a size recommendation or would you like to order it?" if @include_follow_up
     lines.join("\n")
   end
 
@@ -514,7 +512,19 @@ class BotReplyGenerator
       detail_lines << "  #{summary}" if reason.blank? && summary.present?
       tradeoff = recommendation_tradeoff(offer, previous_recommendations, result)
       detail_lines << "  #{tradeoff}" if tradeoff.present?
-      detail_lines << "  Best option: #{offer.variant.display_name} for #{formatted_price(offer.price)}." if offer.variant.present?
+      if offer.variant.present?
+        fragrance = CataloguePreferenceExtractor.new(customer_message&.content, business: pending_order.conversation.business).fragrance?
+        if fragrance
+          detail_lines << "  Option: #{offer.variant.display_name} for #{formatted_price(offer.price)}."
+        else
+          options = offer.product.available_variants.select do |variant|
+            !result.exact_match || ((result.requested_minimum.blank? || variant.price >= result.requested_minimum) &&
+              (result.requested_maximum.blank? || variant.price <= result.requested_maximum))
+          end
+          available = options.map { |variant| "#{variant.display_name} #{formatted_price(variant.price)}" }.join(", ")
+          detail_lines << "  #{I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.available_options", options: available)}"
+        end
+      end
       heading = if result.budget_detected
         "• #{offer.product.name} — #{formatted_price(offer.price)}"
       else
@@ -814,6 +824,10 @@ class BotReplyGenerator
     return general_product_variants_reply if general_variant_request?
 
     product = contextual_product
+    if product.blank?
+      ids = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommended_product_ids"]).map(&:to_i).uniq
+      product = catalog.available_for_sale.find_by(id: ids.first) if ids.one?
+    end
     return "Sure—which product would you like the size options for? Just send me its name." if product.blank?
 
     variants = product.available_variants.to_a.sort_by { |variant| variant_size_number(variant) }
@@ -823,10 +837,17 @@ class BotReplyGenerator
 
     remember_options!(:variants, variants, product: product)
 
+    if customer_message&.content.to_s.match?(Constants::Conversation::LARGER_OPTION_QUESTION)
+      relative = larger_option_reply(product, variants)
+      return relative if relative.present?
+    end
+
     options = variants.map do |variant|
       "• #{variant.display_name} — #{formatted_price(variant.price)} (#{variant.stock_quantity} in stock)"
     end
-    ([ "#{product.name} is available in:", *options, "", "Which size would you prefer?" ]).join("\n")
+    lines = [ "#{product.name} is available in:", *options ]
+    lines << "Which size would you prefer?" if @include_follow_up
+    lines.join("\n")
   end
 
   def general_product_variants_reply
@@ -845,6 +866,29 @@ class BotReplyGenerator
       end
 
     ([ "Our common available size options are:", *options, "", "Exact sizes depend on the product. Tell me a product name if you want its full size and price list." ]).join("\n")
+  end
+
+  def larger_option_reply(product, variants)
+    recommendations = Array(GuidedSalesConversation.new(pending_order.conversation).context["last_recommendations"])
+    recommendation = recommendations.find { |item| item["product_id"].to_i == product.id }
+    reference = pending_order.product_variant if pending_order.product_id == product.id
+    reference ||= product.available_variants.find_by(id: recommendation&.dig("variant_id"))
+    return unless reference && reference.display_name.match?(/\A\d+(?:\.\d+)?\s*ml\z/i)
+
+    larger = variants.select { |variant| variant.display_name.match?(/\A\d+(?:\.\d+)?\s*ml\z/i) && variant_size_number(variant) > variant_size_number(reference) }
+      .min_by { |variant| variant_size_number(variant) }
+    language = banglish? ? "banglish" : "en"
+    prefix = "reply_quality.#{language}"
+    return I18n.t("#{prefix}.largest_size", product: product.name, size: reference.display_name) unless larger
+
+    lines = [ I18n.t("#{prefix}.next_size", product: product.name, size: larger.display_name, price: formatted_price(larger.price)) ]
+    maximum = pending_order.conversation.conversation_state.to_h.dig("shopping_preferences", "maximum_price").presence&.to_d
+    if maximum
+      key = larger.price > maximum ? "above_budget" : "within_budget"
+      lines << I18n.t("#{prefix}.#{key}", budget: formatted_price(maximum), difference: formatted_price(larger.price - maximum))
+    end
+    lines << I18n.t("#{prefix}.size_question") if @include_follow_up
+    lines.join("\n")
   end
 
   def general_variant_request?

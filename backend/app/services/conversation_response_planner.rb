@@ -72,7 +72,8 @@ class ConversationResponsePlanner
       customer_message: customer_message,
       outcome: outcome,
       interpretation: interpretation,
-      address_preference: address_preference
+      address_preference: address_preference,
+      include_follow_up: !interruption? || order_context_paused?
     ).content
   end
 
@@ -85,7 +86,8 @@ class ConversationResponsePlanner
         customer_message: customer_message,
         outcome: secondary_outcome,
         interpretation: interpretation,
-        address_preference: address_preference
+        address_preference: address_preference,
+        include_follow_up: false
       ).content
     end + [ base_reply ]
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")

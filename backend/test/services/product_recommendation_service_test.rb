@@ -1,6 +1,15 @@
 require "test_helper"
 
 class ProductRecommendationServiceTest < ActiveSupport::TestCase
+  test "clothing recommendation never treats the largest affordable size as preferred" do
+    business = Business.create!(name: "Fit Shop", slug: "fit-shop", category: "clothing")
+    product = business.products.create!(name: "Shirt", price: 600, stock_quantity: 0)
+    medium = product.product_variants.create!(name: "M", size: "M", price: 600, stock_quantity: 10)
+    product.product_variants.create!(name: "L", size: "L", price: 650, stock_quantity: 10)
+    result = ProductRecommendationService.new(business: business, message: "under 700").call
+    assert_equal medium, result.offers.first.variant
+    assert_equal 600.to_d, result.offers.first.price
+  end
   test "does not pad a matching budget and scent recommendation with unrelated products" do
     @business.products.create!(name: "Office", price: 480, stock_quantity: 10,
       product_attributes: { scent_families: [ "fresh" ], occasions: [ "office" ] })
