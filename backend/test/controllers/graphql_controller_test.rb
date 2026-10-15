@@ -1,6 +1,37 @@
 require "test_helper"
 
 class GraphqlControllerTest < ActionDispatch::IntegrationTest
+  test "image edits preserve cover ordering and reject unsafe links atomically" do
+    product = @business.products.create!(name: "Image product", price: 100, stock_quantity: 1)
+    query = <<~GRAPHQL
+      mutation Images($id: ID!, $input: ProductInput!) {
+        saveProduct(id: $id, input: $input) { product { id imageUrls } errors }
+      }
+    GRAPHQL
+    input = { name: product.name, price: "100", stockQuantity: 1,
+      imageUrls: [ "https://cdn.example.com/front.jpg", "https://cdn.example.com/back.jpg" ] }
+    post graphql_path, params: { query: query, variables: { id: product.id, input: input } }, headers: authorization, as: :json
+    assert_response :success
+    assert_equal input[:imageUrls], response.parsed_body.dig("data", "saveProduct", "product", "imageUrls")
+    post graphql_path, params: { query: query, variables: { id: product.id, input: input.merge(name: "Must not save", imageUrls: [ "javascript:alert(1)" ]) } }, headers: authorization, as: :json
+    assert_nil response.parsed_body.dig("data", "saveProduct", "product")
+    assert response.parsed_body.dig("data", "saveProduct", "errors").any?
+    assert_equal "Image product", product.reload.name
+    assert_equal input[:imageUrls], product.image_urls
+  end
+
+  test "image mutations cannot change another business product" do
+    product = @other_business.products.create!(name: "Private", price: 100, stock_quantity: 1)
+    post graphql_path, params: { query: <<~GRAPHQL }, headers: authorization, as: :json
+      mutation {
+        saveProduct(id: "#{product.id}", input: {name: "Private", price: "100", stockQuantity: 1, imageUrls: ["https://cdn.example.com/private.jpg"]}) {
+          product { id } errors
+        }
+      }
+    GRAPHQL
+    assert_equal "Record not found", response.parsed_body.dig("errors", 0, "message")
+    assert_empty product.reload.image_urls
+  end
   setup do
     @business = Business.create!(name: "Alpha", slug: "graphql-alpha", category: "retail")
     @other_business = Business.create!(name: "Beta", slug: "graphql-beta", category: "retail")
