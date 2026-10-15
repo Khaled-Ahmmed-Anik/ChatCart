@@ -2,6 +2,29 @@ require "test_helper"
 
 class ConversationMessageProcessorTest < ActiveSupport::TestCase
   setup { Business.default.update!(category: "perfume") }
+  test "Banglish purchase keeps the named product through size and quantity" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    variant = product.product_variants.create!(name: "15 ML", size: "15 ML", price: 580, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    process_message(order, "The Oud nibo")
+    assert_equal product, order.reload.product
+    process_message(order, "15")
+    process_message(order, "2")
+    assert_equal variant, order.reload.product_variant
+    assert_equal 2, order.quantity
+  end
+
+  test "overstock selection preserves option without accepting the invalid quantity" do
+    product = create_product(name: "The Oud", stock_quantity: 0)
+    variant = product.product_variants.create!(name: "30 ML", size: "30 ML", price: 1000, stock_quantity: 10)
+    order = create_pending_order(status: :collecting_product)
+    processor = process_message(order, "The Oud 30 ML 11 ta den")
+    assert_equal :quantity_unavailable, processor.outcome
+    assert_equal variant, order.reload.product_variant
+    assert_nil order.quantity
+    process_message(order, "2 ta den")
+    assert_equal 2, order.reload.quantity
+  end
   test "collects product by matching active in-stock product name" do
     product = create_product(name: "Fresh Musk")
     pending_order = create_pending_order(status: :collecting_product)

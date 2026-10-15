@@ -38,6 +38,10 @@ class ConversationMessageProcessor
     end
     return pending_order if accept_variant_bundle_offer
     return pending_order if apply_action_plan
+    if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(ConversationActionPlanner::ORDERING_CUE) && matching_product.blank?
+      collect_quantity
+      return pending_order
+    end
     return pending_order if handle_order_update_request
     return pending_order if collect_remembered_checkout_value
     return pending_order if collect_explicit_checkout_value
@@ -163,6 +167,9 @@ class ConversationMessageProcessor
 
     inventory = variant || product
     if plan.quantity.present? && !inventory.available_for_quantity?(plan.quantity)
+      if pending_order.product.blank? || (pending_order.quantity.blank? && !selected_inventory&.available_for_quantity?(1))
+        pending_order.update!(product: product, product_variant: variant, quantity: nil, status: :collecting_quantity)
+      end
       @outcome = :quantity_unavailable
       return true
     end
@@ -1420,6 +1427,7 @@ class ConversationMessageProcessor
     return false if pending_order.conversation.conversation_state.to_h["last_outcome"] == "product_variants_requested"
 
     normalized = normalize_catalog_name(content)
+    normalized = normalized.sub(/\s+(?:nibo|chai|please|den|dao)\z/, "")
     products = catalog.available_for_sale.select do |candidate|
       candidate.searchable_names.any? { |name| normalize_catalog_name(name).sub(/\Athe /, "") == normalized.sub(/\Athe /, "") }
     end
