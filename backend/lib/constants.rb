@@ -1,6 +1,12 @@
 module Constants
   module Conversation
     ENGINE_VERSION = "2026.10.7"
+    PRODUCT_INQUIRY_OUTCOMES = %i[price_inquiry stock_inquiry product_details_requested product_variants_requested].freeze
+    INQUIRY_VARIANT_FOLLOW_UP = /\b\d+(?:\.\d+)?\s*ml\b|\b(?:bigger|larger|largest|smallest|boro|choto|medium|last one)\b/i
+    INQUIRY_QUESTION = /[?？]|\b(?:ache|available|price|cost|koto|options?|sizes?)\b/i
+    INQUIRY_REFERENCE = /\b(?:this|that|it|eta|etar|eita|oita|oi)\b|এটা|ওটা/i
+    INQUIRY_RESET_OUTCOMES = %i[product_list_requested product_comparison_requested product_recommendation_requested
+      recommendations_rejected product_selected variant_selected multiple_details_collected cart_updated].freeze
     CHECKOUT_EDIT_FIELDS = {
       "phone" => /\A(?:change|update|edit)\s+(?:my\s+)?phone(?:\s+number)?[?.! ]*\z|\Aphone(?:\s+number)?\s+change\s+korbo[?.! ]*\z/i,
       "address" => /\A(?:change|update|edit)\s+(?:my\s+|the\s+)?address[?.! ]*\z|\Aaddress\s+change\s+korbo[?.! ]*\z/i,
@@ -32,7 +38,7 @@ module Constants
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
       "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
-      "ekta" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
+      "ekta" => 1, "ektai" => 1, "akta" => 1, "duita" => 2, "duta" => 2, "tinta" => 3, "charta" => 4
     }.freeze
     NON_NAME_REPLIES = %w[
       yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
