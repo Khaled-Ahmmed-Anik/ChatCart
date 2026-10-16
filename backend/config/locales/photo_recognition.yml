@@ -1,5 +1,10 @@
 en:
   photo_recognition:
+    quantity:
+      one: "%{count} piece"
+      other: "%{count} pieces"
+    caption_details: "I noted %{details}. After you confirm the product, I'll check availability and use these details. This does not place your order."
+    caption_clarification: "Your photo and message may refer to different items or quantities. Please send one product name, size and a whole-number quantity so we can choose correctly. Your order hasn't changed."
     photo: "[Customer photo]"
     match: "This looks like %{product} from our catalogue. Is that the product you mean? Say 'yes, this one' to choose it, or send another photo if it isn't. Your order hasn't changed."
     rejected: "No problem. Send another photo or the product name and we'll find the right one. Your order hasn't changed."
@@ -9,6 +14,11 @@ en:
     fallback: "Thanks for the photo! Please send the product name, or a clearer photo showing its label, so we can help you find the right one. Your order hasn't changed."
 bn:
   photo_recognition:
+    quantity:
+      one: "%{count}টি"
+      other: "%{count}টি"
+    caption_details: "%{details} লিখে রেখেছি। পণ্যটি নিশ্চিত করলে স্টক যাচাই করে এই তথ্য ব্যবহার করব। এতে অর্ডার চূড়ান্ত হবে না।"
+    caption_clarification: "ছবি ও লেখায় পণ্য বা পরিমাণ আলাদা হতে পারে। একটি পণ্যের নাম, সাইজ ও পূর্ণসংখ্যায় কতটি চান লিখুন। আপনার অর্ডার পরিবর্তন হয়নি।"
     photo: "[ক্রেতার ছবি]"
     match: "ছবিটি আমাদের %{product}-এর মতো লাগছে। আপনি কি এই পণ্যটিই চাচ্ছেন? বেছে নিতে 'হ্যাঁ' বলুন, অথবা অন্য ছবি দিন। আপনার অর্ডার পরিবর্তন হয়নি।"
     rejected: "সমস্যা নেই। অন্য ছবি বা পণ্যের নাম দিন, আমরা সঠিকটি খুঁজতে সাহায্য করব। আপনার অর্ডার পরিবর্তন হয়নি।"
@@ -18,6 +28,11 @@ bn:
     fallback: "ছবির জন্য ধন্যবাদ! পণ্যের নামটি লিখুন, অথবা লেবেল দেখা যায় এমন পরিষ্কার ছবি দিন, তাহলে সঠিক পণ্যটি খুঁজতে সাহায্য করতে পারব। আপনার অর্ডার পরিবর্তন হয়নি।"
 banglish:
   photo_recognition:
+    quantity:
+      one: "%{count} ta"
+      other: "%{count} ta"
+    caption_details: "%{details} note korechi. Product confirm korle stock check kore ei details use korbo. Ete order final hobe na."
+    caption_clarification: "Chobi ar message-e product ba quantity alada hote pare. Ekta product-er nam, size ar whole-number quantity likhun. Apnar order change hoyni."
     photo: "[Customer-er chobi]"
     match: "Chobita amader %{product}-er moto lagche. Apni ki ei product-ta chacchen? Choose korte 'ji' ba 'eita nibo' bolun, ba onno chobi din. Apnar order change hoyni."
     rejected: "Shomossha nei. Onno chobi ba product-er nam din, amra thik-ta khujte help korbo. Apnar order change hoyni."
