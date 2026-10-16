@@ -1,5 +1,5 @@
 class ConversationPhotoSuggestion
-  Result = Data.define(:product, :reply_key)
+  Result = Struct.new(:product, :reply_key, :details, keyword_init: true)
 
   def initialize(conversation)
     @conversation = conversation
@@ -34,26 +34,42 @@ class ConversationPhotoSuggestion
     offer = state["photo_suggestion"].to_h
     clear!
     return Result.new(product: nil, reply_key: "rejected") if rejects
-    return Result.new(product: nil, reply_key: "expired") unless valid_offer?(offer, reply)
-    if pending_order && (!pending_order.collecting_product? || pending_order.product_id || pending_order.pending_order_items.exists?)
-      return Result.new(product: nil, reply_key: "existing_order")
-    end
-
+    source = valid_offer_source(offer, reply)
+    return Result.new(product: nil, reply_key: "expired") unless source
     product = conversation.business.products.available_for_sale.find_by(id: offer["product_id"])
     return Result.new(product: nil, reply_key: "unavailable") unless product && product.total_available_stock.positive?
 
-    Result.new(product: product, reply_key: nil)
+    details = ConversationPhotoOrderDetails.new(product: product, caption: source.payload.dig("message", "text"))
+    return Result.new(reply_key: "caption_clarification") if details.ambiguous?
+    if pending_order && (!pending_order.collecting_product? || pending_order.product_id || pending_order.pending_order_items.exists?)
+      locked = pending_order.confirmed? || pending_order.submitted_to_woocommerce? || pending_order.cancelled?
+      return Result.new(reply_key: "existing_order") if locked || !details.addition?
+    end
+
+    Result.new(product: product, details: details)
   end
 
   def reply_text(key, **options)
-    language = state["preferred_language"].presence || conversation.business.default_language
-    locale = { "bengali" => :bn, "bn" => :bn, "banglish" => :banglish }.fetch(language, :en)
     I18n.t("photo_recognition.#{key}", locale: locale, **options)
+  end
+
+  def match_reply(product:, event:)
+    text = reply_text("match", product: product.name)
+    details = ConversationPhotoOrderDetails.new(product: product, caption: event.payload.dig("message", "text"))
+    summary = details.summary(locale: locale)
+    return text unless summary
+
+    "#{text}\n\n#{reply_text('caption_details', details: summary)}"
   end
 
   private
 
   attr_reader :conversation
+
+  def locale
+    language = state["preferred_language"].presence || conversation.business.default_language
+    { "bengali" => :bn, "bn" => :bn, "banglish" => :banglish }.fetch(language, :en)
+  end
 
   def state = conversation.conversation_state.to_h
 
@@ -65,16 +81,17 @@ class ConversationPhotoSuggestion
     conversation.update!(conversation_state: state.except("photo_suggestion")) if state.key?("photo_suggestion")
   end
 
-  def valid_offer?(offer, reply)
-    return false unless conversation.business.active? && offer["reply_id"] == reply.id &&
+  def valid_offer_source(offer, reply)
+    return unless conversation.business.active? && offer["reply_id"] == reply.id &&
       offer["product_id"] == reply.metadata["suggested_product_id"] && Time.iso8601(offer.fetch("expires_at")) > Time.current
 
     source = conversation.business.messenger_webhook_events.find_by(id: offer["event_id"], sender_id: conversation.external_customer_id, event_type: "customer_image")
-    return false unless source
+    return unless source
 
-    !conversation.business.messenger_webhook_events.where(event_type: "customer_image", sender_id: conversation.external_customer_id)
+    newer_photo = conversation.business.messenger_webhook_events.where(event_type: "customer_image", sender_id: conversation.external_customer_id)
       .where.not(status: "ignored").received_after(source).exists?
+    source unless newer_photo
   rescue ArgumentError, KeyError, TypeError
-    false
+    nil
   end
 end

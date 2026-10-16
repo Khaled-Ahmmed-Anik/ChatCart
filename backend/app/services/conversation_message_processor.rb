@@ -1,12 +1,13 @@
 class ConversationMessageProcessor
   attr_reader :outcome, :secondary_outcomes
 
-  def initialize(message:, pending_order:, interpretation: nil, photo_product: nil)
+  def initialize(message:, pending_order:, interpretation: nil, photo_product: nil, photo_details: nil)
     @message = message
     @pending_order = pending_order
     @content = message.content.to_s.strip
     @interpretation = ConversationEntityValidator.call(interpretation, @content)
     @photo_product = photo_product
+    @photo_details = photo_details
   end
 
   def process
@@ -16,13 +17,7 @@ class ConversationMessageProcessor
     end
 
     if @photo_product
-      product = catalog.available_for_sale.find_by(id: @photo_product.id)
-      if product && product.total_available_stock.positive? && pending_order.collecting_product? &&
-          pending_order.product_id.nil? && !pending_order.pending_order_items.exists?
-        select_product_record(product, collect_details: false)
-      else
-        @outcome = :product_unavailable
-      end
+      select_photo_product
       return pending_order
     end
 
@@ -98,6 +93,55 @@ class ConversationMessageProcessor
   private
 
   attr_reader :message, :pending_order, :content, :interpretation
+
+  def select_photo_product
+    product = catalog.available_for_sale.find_by(id: @photo_product.id)
+    unless product && product.total_available_stock.positive?
+      @outcome = :product_unavailable
+      return
+    end
+    occupied = !pending_order.collecting_product? || pending_order.product_id || pending_order.pending_order_items.exists?
+    if occupied
+      if @photo_details&.addition? && !pending_order.status.in?(%w[confirmed cancelled submitted_to_woocommerce])
+        add_photo_product(product)
+      else
+        @outcome = :cart_locked
+      end
+      return
+    end
+
+    select_product_record(product, collect_details: false)
+    apply_photo_details(product) if @photo_details&.requested?
+  end
+
+  def add_photo_product(product)
+    # Reuse cart inventory checks and partial-item protection, without rewriting the customer message.
+    cart_message = Struct.new(:content).new("add #{product.name} #{@photo_details.text}")
+    result = ConversationCartManager.new(message: cart_message, pending_order: pending_order).call
+    @outcome = result&.outcome || :cart_needs_details
+    if result&.question
+      conversation = pending_order.conversation
+      conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("cart_question" => result.question))
+    end
+  end
+
+  def apply_photo_details(product)
+    plan = @photo_details.plan
+    pending_order.update!(product_variant: plan.variant,
+      status: next_planned_status(product, plan.variant, nil)) if plan.variant
+    if pending_order.product_variants_required? && pending_order.product_variant.blank?
+      pending_order.update!(quantity: plan.quantity) if plan.quantity
+      return
+    end
+    return unless plan.quantity
+
+    if selected_inventory.available_for_quantity?(plan.quantity)
+      pending_order.update!(quantity: plan.quantity, status: next_planned_status(product, pending_order.product_variant, plan.quantity))
+      @outcome = :multiple_details_collected
+    else
+      @outcome = :quantity_unavailable
+    end
+  end
 
   def handle_inquiry_follow_up
     product = ConversationProductInquiry.new(pending_order).product
@@ -284,10 +328,14 @@ class ConversationMessageProcessor
 
     clear_variant_bundle_offer!
     pending_order.update!(product_variant: variant, status: :collecting_quantity)
-    quantity = parse_quantity(content) if combined_variant_quantity?
-    if quantity.present? && variant.available_for_quantity?(quantity)
-      pending_order.update!(quantity: quantity, status: :collecting_name)
+    quantity = combined_variant_quantity? ? parse_quantity(content) : pending_order.quantity
+    saved_quantity = pending_order.pending_order_items.where(product_id: pending_order.product_id, product_variant_id: variant.id).sum(:quantity)
+    if quantity.present? && variant.available_for_quantity?(quantity + saved_quantity)
+      pending_order.update!(quantity: quantity, status: next_planned_status(pending_order.product, variant, quantity))
       @outcome = :multiple_details_collected
+    elsif quantity.present?
+      pending_order.update!(quantity: nil)
+      @outcome = :quantity_unavailable
     else
       @outcome = :variant_selected
     end

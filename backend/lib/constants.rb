@@ -13,6 +13,13 @@ module Constants
     NAMED_ORDER_REFERENCE = /\border\b|অর্ডার/i
     PHOTO_ACCEPTANCE = /\A(?:yes(?:,? (?:this one|that one|please))?|this one|that(?:'s| is) the one|ji|jee|ha|haa|hya|(?:ha |ji )?(?:eta|eita)(?:i| nibo| chai)?|হ্যাঁ|হ্যা|জি|এটাই|এটা (?:নিবো|নেব))[.! ]*\z/i
     PHOTO_REJECTION = /\A(?:no(?:,? (?:not this|not this one|thanks))?|not this(?: one)?|na|nah|eta na|eita na|না|এটা না)[.! ]*\z/i
+    ORDER_REQUEST = /\b(?:want|need|take|give|send|buy|order|nibo|chai|den|dao|din|add|include)\b|নিবো|নেব|চাই|দেন|যোগ করুন/i
+    ORDER_NEGATION = /\b(?:not|no|don t|do not|later|pore|nibo na|chai na|or|ba|compare|instead)\b|না|পরে|অথবা|নাকি|বদলে/i
+    CART_ADDITION = /\b(?:add|include)\b|যোগ করুন/i
+    UNSAFE_CAPTION_QUANTITY = /(?:\A|\s)-\s*\d|\d+\.\d+\s*(?:pcs?|pieces?|bottles?|units?|টা|টি|পিস|বোতল)/i
+    CAPTION_WORDS = { "একটা" => "1 pcs", "একটি" => "1 pcs", "দুইটা" => "2 pcs", "দুইটি" => "2 pcs",
+      "দুটো" => "2 pcs", "তিনটা" => "3 pcs", "তিনটি" => "3 pcs", "চারটা" => "4 pcs",
+      "পাঁচটা" => "5 pcs", "বোতল" => "bottles", "পিস" => "pcs", "মিলি" => "ml" }.freeze
     MIN_CONFIDENCE = 0.85
     PROCESSING_LEASE = 5.minutes
     IMAGE_TIMEOUT_SECONDS = 5

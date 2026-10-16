@@ -70,11 +70,11 @@ class ProcessMessengerImageJob < ApplicationJob
 
   def create_delivery(event, conversation, product)
     product = event.business.products.where(active: true).find_by(id: product.id) if product
-    key = product ? "match" : "fallback"
+    suggestion = ConversationPhotoSuggestion.new(conversation)
     reply = conversation.messages.create!(sender_type: :bot,
-      content: ConversationPhotoSuggestion.new(conversation).reply_text(key, product: product&.name),
+      content: product ? suggestion.match_reply(product: product, event: event) : suggestion.reply_text("fallback"),
       metadata: { "photo_recognition" => true, "suggested_product_id" => product&.id })
-    ConversationPhotoSuggestion.new(conversation).offer!(product: product, reply: reply, event: event)
+    suggestion.offer!(product: product, reply: reply, event: event)
     MessengerDelivery.create!(messenger_webhook_event: event, message: reply, recipient_id: event.sender_id)
   end
 

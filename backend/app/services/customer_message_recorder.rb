@@ -69,7 +69,8 @@ class CustomerMessageRecorder
         message: message,
         pending_order: pending_order,
         interpretation: interpretation,
-        photo_product: photo_selection&.product
+        photo_product: photo_selection&.product,
+        photo_details: photo_selection&.details
       )
       processor.process
       # Later planners must not overwrite repair/reset state with a stale snapshot.
