@@ -1,16 +1,28 @@
 class ConversationMessageProcessor
   attr_reader :outcome, :secondary_outcomes
 
-  def initialize(message:, pending_order:, interpretation: nil)
+  def initialize(message:, pending_order:, interpretation: nil, photo_product: nil)
     @message = message
     @pending_order = pending_order
     @content = message.content.to_s.strip
     @interpretation = ConversationEntityValidator.call(interpretation, @content)
+    @photo_product = photo_product
   end
 
   def process
     unless message.customer?
       @outcome = :ignored
+      return pending_order
+    end
+
+    if @photo_product
+      product = catalog.available_for_sale.find_by(id: @photo_product.id)
+      if product && product.total_available_stock.positive? && pending_order.collecting_product? &&
+          pending_order.product_id.nil? && !pending_order.pending_order_items.exists?
+        select_product_record(product, collect_details: false)
+      else
+        @outcome = :product_unavailable
+      end
       return pending_order
     end
 
@@ -244,19 +256,23 @@ class ConversationMessageProcessor
       return
     end
 
+    select_product_record(product)
+  end
+
+  def select_product_record(product, collect_details: true)
     pending_order.product = product
-    pending_order.product_variant = matching_variant(product)
+    pending_order.product_variant = collect_details ? matching_variant(product) : nil
     if pending_order.product_variant.blank? && product.available_variants.one? && product.available_variants.first.name.casecmp?("Standard")
       pending_order.product_variant = product.available_variants.first
     end
     pending_order.status = pending_order.product_variants_required? && pending_order.product_variant.blank? ?
       :collecting_variant : :collecting_quantity
     pending_order.save!
-    if pending_order.collecting_variant? && requested_variant_sizes.any? && prepare_variant_bundle_offer
+    if collect_details && pending_order.collecting_variant? && requested_variant_sizes.any? && prepare_variant_bundle_offer
       @outcome = :variant_size_unavailable
       return
     end
-    @outcome = collect_quantity_from_product_selection ? :multiple_details_collected : :product_selected
+    @outcome = collect_details && collect_quantity_from_product_selection ? :multiple_details_collected : :product_selected
   end
 
   def collect_variant

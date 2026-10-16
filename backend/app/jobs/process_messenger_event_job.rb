@@ -102,9 +102,14 @@ class ProcessMessengerEventJob < ApplicationJob
     ).name
     return if name.blank?
 
-    conversation.update!(conversation_state: state.merge(
-      "customer_profile" => state["customer_profile"].to_h.merge("name" => name, "source" => "messenger")
-    ))
+    conversation.with_lock do
+      current_state = conversation.conversation_state.to_h
+      next if current_state.dig("customer_profile", "name").present?
+
+      conversation.update!(conversation_state: current_state.merge(
+        "customer_profile" => current_state["customer_profile"].to_h.merge("name" => name, "source" => "messenger")
+      ))
+    end
   end
 
   def log_processed(webhook_event, processing)

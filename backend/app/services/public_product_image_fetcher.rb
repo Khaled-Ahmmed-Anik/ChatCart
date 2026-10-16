@@ -37,17 +37,20 @@ class PublicProductImageFetcher
 
       mime = response["content-type"].to_s.split(";").first
       raise UnsafeImage unless ALLOWED_MIME_TYPES.include?(mime)
-      raise UnsafeImage if response["content-length"].to_i > Constants::PhotoRecognition::MAX_IMAGE_BYTES
+      raise UnsafeImage if response["content-length"].to_i > Constants::PhotoRecognition::MAX_DOWNLOAD_BYTES
 
       response.read_body do |chunk|
-        raise UnsafeImage if bytes.bytesize + chunk.bytesize > Constants::PhotoRecognition::MAX_IMAGE_BYTES || monotonic_time > deadline
+        raise UnsafeImage if bytes.bytesize + chunk.bytesize > Constants::PhotoRecognition::MAX_DOWNLOAD_BYTES || monotonic_time > deadline
 
         bytes << chunk
       end
     end
     raise UnsafeImage unless valid_signature?(bytes, mime)
 
-    Image.new(mime_type: mime, data: Base64.strict_encode64(bytes))
+    normalized = PhotoImageNormalizer.new.normalize(bytes)
+    Image.new(mime_type: "image/jpeg", data: Base64.strict_encode64(normalized))
+  rescue PhotoImageNormalizer::InvalidImage
+    raise UnsafeImage
   end
 
   private

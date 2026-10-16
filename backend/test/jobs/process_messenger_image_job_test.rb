@@ -21,7 +21,7 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
     end
     assert_equal "processed", @event.reload.status
     assert_includes @event.messenger_delivery.message.content, "Blue Shirt"
-    assert_includes @event.messenger_delivery.message.content, "send its name"
+    assert_includes @event.messenger_delivery.message.content, "yes, this one"
     assert_no_difference([ -> { Message.count }, -> { MessengerDelivery.count } ]) { run_job }
   end
 

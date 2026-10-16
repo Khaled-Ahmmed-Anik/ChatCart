@@ -72,26 +72,21 @@ class ProcessMessengerImageJob < ApplicationJob
     product = event.business.products.where(active: true).find_by(id: product.id) if product
     key = product ? "match" : "fallback"
     reply = conversation.messages.create!(sender_type: :bot,
-      content: I18n.t("photo_recognition.#{key}", product: product&.name, locale: reply_locale(conversation)),
+      content: ConversationPhotoSuggestion.new(conversation).reply_text(key, product: product&.name),
       metadata: { "photo_recognition" => true, "suggested_product_id" => product&.id })
+    ConversationPhotoSuggestion.new(conversation).offer!(product: product, reply: reply, event: event)
     MessengerDelivery.create!(messenger_webhook_event: event, message: reply, recipient_id: event.sender_id)
   end
 
   def newer_customer_event?(event)
     event.business.messenger_webhook_events.processable
       .where(sender_id: event.sender_id).where.not(status: "ignored")
-      .where("created_at > :received_at OR (created_at = :received_at AND id > :event_id)",
-        received_at: event.created_at, event_id: event.id).exists?
+      .received_after(event).exists?
   end
 
   def mark_failed(event, claim_time, error)
     event.with_lock do
       event.update!(status: "failed", last_error: error.class.name) if event.status == "processing" && event.updated_at == claim_time
     end
-  end
-
-  def reply_locale(conversation)
-    language = conversation.conversation_state.to_h["preferred_language"].presence || conversation.business.default_language
-    { "bengali" => :bn, "bn" => :bn, "banglish" => :banglish }.fetch(language, :en)
   end
 end
