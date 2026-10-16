@@ -8,13 +8,10 @@ class ProcessMessengerEventJob < ApplicationJob
     return skip_inactive_business(webhook_event) unless webhook_event.business.active?
     return enqueue_existing_delivery(webhook_event) if webhook_event.messenger_delivery.present?
     return if webhook_event.status == "processed"
-    if (image = MessengerPhotoTurn.companion(webhook_event))
-      ProcessMessengerImageJob.perform_later(image)
-      return
-    end
-
     result = process_events(webhook_event)
     return if result.blank?
+    result.fetch(:photo_events).each { |image| ProcessMessengerImageJob.perform_later(image) }
+    return unless result[:result]
 
     SendMessengerReplyJob.perform_later(result.fetch(:delivery)) if result[:delivery]
     log_processed(result.fetch(:webhook_event), result)
@@ -47,10 +44,17 @@ class ProcessMessengerEventJob < ApplicationJob
     result = nil
     delivery = nil
     processed_event = nil
+    photo_events = []
 
     MessengerWebhookEvent.transaction do
       events = pending_customer_events(webhook_event).lock.to_a
       return if events.empty?
+      events.reject! do |event|
+        image = MessengerPhotoTurn.companion(event)
+        photo_events << image if image
+        image.present?
+      end
+      next if events.empty?
 
       events.each { |event| event.update!(status: "processing", last_error: nil) }
       processed_event = events.last
@@ -71,7 +75,7 @@ class ProcessMessengerEventJob < ApplicationJob
       events.each { |event| event.update!(status: "processed", processed_at: Time.current, last_error: nil) }
     end
 
-    { result: result, delivery: delivery, webhook_event: processed_event }
+    { result: result, delivery: delivery, webhook_event: processed_event, photo_events: photo_events.uniq(&:id) }
   end
 
   def pending_customer_events(webhook_event)

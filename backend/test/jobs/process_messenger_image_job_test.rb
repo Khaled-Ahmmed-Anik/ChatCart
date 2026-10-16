@@ -26,6 +26,7 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
   end
 
   test "combines adjacent photo order text in either receipt order without changing the cart" do
+    @event.update!(created_at: 5.seconds.ago)
     [ -1, 1 ].each do |offset|
       @event.update!(status: "received", processed_at: nil)
       caption = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", status: "received",
@@ -50,6 +51,53 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
     MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", status: "received",
       sender_id: @event.sender_id, payload: { message: { text: "how much is delivery?" } }, created_at: @event.created_at + 1.second)
     assert_nil MessengerPhotoTurn.companion(@event)
+  end
+
+  test "an older queued text job excludes every eligible photo caption from its batch" do
+    earlier = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", sender_id: @event.sender_id,
+      payload: { message: { text: "hello" } }, created_at: @event.created_at - 10.seconds)
+    caption = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", sender_id: @event.sender_id,
+      payload: { message: { text: "add this one 2 bottles" } }, created_at: @event.created_at - 1.second)
+
+    assert_enqueued_with(job: ProcessMessengerImageJob) { run_text_job(earlier) }
+
+    assert_equal "processed", earlier.reload.status
+    assert_equal "received", caption.reload.status
+    conversation = @business.conversations.find_by!(external_customer_id: @event.sender_id)
+    assert_equal [ "hello" ], conversation.messages.customer.pluck(:content)
+    assert_nil conversation.pending_order&.product_id
+
+    run_job
+    assert_equal caption, @event.reload.caption_event
+    assert_equal "processed", caption.reload.status
+    assert_includes @event.messenger_delivery.message.content, "2"
+  end
+
+  test "an image with an inline caption cannot absorb or defer a separate text" do
+    @event.update!(created_at: 5.seconds.ago, payload: @event.payload.deep_merge("message" => { "text" => "add this one" }))
+    text = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", sender_id: @event.sender_id,
+      payload: { message: { text: "I want this in 30 ml" } }, created_at: @event.created_at + 1.second)
+    assert_nil MessengerPhotoTurn.companion(text)
+    assert_nil MessengerPhotoTurn.companion(@event)
+
+    assert_no_enqueued_jobs(only: ProcessMessengerImageJob) { run_text_job(text) }
+    assert_equal "processed", text.reload.status
+    assert_includes @business.conversations.find_by!(external_customer_id: text.sender_id).messages.customer.pluck(:content), text.payload.dig("message", "text")
+  end
+
+  test "pairing must be unambiguous from both receipt windows" do
+    text = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", sender_id: @event.sender_id,
+      payload: { message: { text: "add this one" } }, created_at: @event.created_at - 2.seconds)
+    MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", sender_id: @event.sender_id,
+      payload: { message: { text: "delivery charge?" } }, created_at: @event.created_at + 2.seconds)
+    assert_nil MessengerPhotoTurn.companion(text)
+    assert_nil MessengerPhotoTurn.companion(@event)
+  end
+
+  def run_text_job(event)
+    with_photo_stub(MessengerCustomerProfile, :new, ->(**) { Struct.new(:name).new(nil) }) do
+      ProcessMessengerEventJob.perform_now(event)
+    end
   end
 
   test "late captions and captions from other senders remain independent" do

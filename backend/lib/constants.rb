@@ -1,5 +1,11 @@
 module Constants
+  module Knowledge
+    QUESTION_WORDS = %w[what are is the a an do does you your our please tell me about how much can i we have].freeze
+  end
+
   module PhotoRecognition
+    CAPTION_WINDOW = 3.seconds
+    PHOTO_REFERENCE = /\b(?:this|that|photo|picture|image|eta|eita)\b|এইটা|এইটার|এটা|ছবি/i
     MAX_CUSTOMER_IMAGES = 3
     MAX_PRODUCTS = 20
     MAX_REFERENCE_IMAGES = 24
