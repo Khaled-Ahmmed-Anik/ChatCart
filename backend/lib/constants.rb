@@ -1,4 +1,16 @@
 module Constants
+  module PhotoRecognition
+    MAX_CUSTOMER_IMAGES = 3
+    MAX_PRODUCTS = 20
+    MAX_REFERENCE_IMAGES = 24
+    REFERENCES_PER_PRODUCT = 2
+    MAX_IMAGE_BYTES = 512.kilobytes
+    MIN_CONFIDENCE = 0.85
+    PROCESSING_LEASE = 5.minutes
+    IMAGE_TIMEOUT_SECONDS = 5
+    REFERENCE_BUDGET_SECONDS = 45
+  end
+
   module ProductImages
     MAX_IMAGES = 8
     MAX_URL_LENGTH = 2048
@@ -152,6 +164,7 @@ module Constants
   end
 
   module Meta
+    MESSENGER_PROCESSABLE_EVENT_TYPES = %w[customer_text customer_image].freeze
     GRAPH_API_VERSION = "v21.0"
     WHATSAPP_MESSAGES_URL = "https://graph.facebook.com/%{version}/%{phone_number_id}/messages"
     RETRYABLE_STATUS_CODES = [ 408, 429 ].freeze
