@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_17_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -196,7 +196,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000100) do
     t.string "sender_id"
     t.string "status", default: "received", null: false
     t.datetime "updated_at", null: false
+    t.bigint "caption_event_id"
     t.index ["business_id"], name: "index_messenger_webhook_events_on_business_id"
+    t.index ["caption_event_id"], name: "index_messenger_webhook_events_on_caption_event_id", unique: true
     t.index ["external_event_id"], name: "index_messenger_webhook_events_on_external_event_id", unique: true, where: "(external_event_id IS NOT NULL)"
     t.index ["sender_id"], name: "index_messenger_webhook_events_on_sender_id"
     t.index ["status"], name: "index_messenger_webhook_events_on_status"
@@ -414,6 +416,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000100) do
   add_foreign_key "messenger_deliveries", "messages"
   add_foreign_key "messenger_deliveries", "messenger_webhook_events"
   add_foreign_key "messenger_webhook_events", "businesses"
+  add_foreign_key "messenger_webhook_events", "messenger_webhook_events", column: "caption_event_id"
   add_foreign_key "order_items", "orders"
   add_foreign_key "order_items", "product_variants"
   add_foreign_key "order_items", "products"

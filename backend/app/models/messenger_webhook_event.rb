@@ -1,5 +1,10 @@
 class MessengerWebhookEvent < ApplicationRecord
   belongs_to :business, default: -> { Business.default }
+  belongs_to :caption_event, class_name: "MessengerWebhookEvent", optional: true
+
+  def photo_caption
+    payload.dig("message", "text").presence || caption_event&.payload&.dig("message", "text")
+  end
   EVENT_TYPES = %w[
     customer_text customer_image message_echo delivery read postback attachment malformed_message unknown
   ].freeze

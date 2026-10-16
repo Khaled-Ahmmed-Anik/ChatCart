@@ -8,12 +8,17 @@ class ProcessMessengerEventJob < ApplicationJob
     return skip_inactive_business(webhook_event) unless webhook_event.business.active?
     return enqueue_existing_delivery(webhook_event) if webhook_event.messenger_delivery.present?
     return if webhook_event.status == "processed"
+    if (image = MessengerPhotoTurn.companion(webhook_event))
+      ProcessMessengerImageJob.perform_later(image)
+      return
+    end
 
     result = process_events(webhook_event)
     return if result.blank?
 
     SendMessengerReplyJob.perform_later(result.fetch(:delivery)) if result[:delivery]
     log_processed(result.fetch(:webhook_event), result)
+    remember_customer_name(result.fetch(:result).conversation, webhook_event.business)
   rescue StandardError => error
     webhook_event.update!(status: "failed", last_error: error.message) if webhook_event&.persisted?
     MessengerSafeLogger.error(
@@ -66,8 +71,6 @@ class ProcessMessengerEventJob < ApplicationJob
       events.each { |event| event.update!(status: "processed", processed_at: Time.current, last_error: nil) }
     end
 
-    remember_customer_name(result.conversation, webhook_event.business)
-
     { result: result, delivery: delivery, webhook_event: processed_event }
   end
 
@@ -77,7 +80,8 @@ class ProcessMessengerEventJob < ApplicationJob
       sender_id: webhook_event.sender_id,
       event_type: "customer_text",
       status: %w[received failed]
-    ).where("created_at <= ?", Time.current).order(:created_at, :id)
+    ).where.not(id: MessengerWebhookEvent.where.not(caption_event_id: nil).select(:caption_event_id))
+      .where("created_at <= ?", Time.current).order(:created_at, :id)
   end
 
   def combined_text(events)

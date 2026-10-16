@@ -31,9 +31,10 @@ module Webhooks
       result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
 
       if result.created && event_type == :customer_text
-        ProcessMessengerEventJob.set(wait: messenger_message_debounce).perform_later(result.event)
+        delay = MessengerPhotoTurn.caption_candidate?(event.dig("message", "text")) ? MessengerPhotoTurn::WINDOW : messenger_message_debounce
+        ProcessMessengerEventJob.set(wait: delay).perform_later(result.event)
       elsif result.created && event_type == :customer_image
-        ProcessMessengerImageJob.perform_later(result.event)
+        ProcessMessengerImageJob.set(wait: MessengerPhotoTurn::WINDOW).perform_later(result.event)
       end
       log_received(result.event, result.created)
 

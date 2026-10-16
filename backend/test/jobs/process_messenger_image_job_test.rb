@@ -25,6 +25,41 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
     assert_no_difference([ -> { Message.count }, -> { MessengerDelivery.count } ]) { run_job }
   end
 
+  test "combines adjacent photo order text in either receipt order without changing the cart" do
+    [ -1, 1 ].each do |offset|
+      @event.update!(status: "received", processed_at: nil)
+      caption = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", status: "received",
+        sender_id: @event.sender_id, payload: { message: { text: "এইটার ৩০ মিলি দুইটা চাই" } }, created_at: @event.created_at + offset.seconds)
+      assert_equal caption, MessengerPhotoTurn.companion(@event)
+      assert_no_difference -> { PendingOrder.count } do
+        assert_enqueued_with(job: ProcessMessengerImageJob) { ProcessMessengerEventJob.perform_now(caption) }
+        assert_equal "received", caption.reload.status
+        run_job
+      end
+      assert_equal "processed", caption.reload.status
+      assert_equal caption, @event.reload.caption_event
+      assert_includes @event.messenger_delivery.message.content, "Blue Shirt"
+      @event.messenger_delivery.destroy!
+      @event.update!(caption_event: nil)
+      @event.reload
+      caption.destroy!
+    end
+  end
+
+  test "does not consume unrelated text as a photo caption" do
+    MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", status: "received",
+      sender_id: @event.sender_id, payload: { message: { text: "how much is delivery?" } }, created_at: @event.created_at + 1.second)
+    assert_nil MessengerPhotoTurn.companion(@event)
+  end
+
+  test "late captions and captions from other senders remain independent" do
+    caption = MessengerWebhookEvent.create!(business: @business, event_type: "customer_text", status: "received",
+      sender_id: @event.sender_id, payload: { message: { text: "add this one" } }, created_at: @event.created_at + 4.seconds)
+    assert_nil MessengerPhotoTurn.companion(@event)
+    caption.update!(created_at: @event.created_at, sender_id: "other-customer")
+    assert_nil MessengerPhotoTurn.companion(@event)
+  end
+
   test "handed over conversation records photo but never calls recognition or sends a bot reply" do
     conversation = @business.conversations.create!(channel: "facebook", external_customer_id: @event.sender_id, status: :handed_over)
     with_photo_stub(CustomerPhotoRecognizer, :new, ->(**) { flunk "Must not call AI during takeover" }) do
