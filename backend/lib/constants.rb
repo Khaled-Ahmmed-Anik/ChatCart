@@ -5,6 +5,13 @@ module Constants
     MAX_REFERENCE_IMAGES = 24
     REFERENCES_PER_PRODUCT = 2
     MAX_IMAGE_BYTES = 512.kilobytes
+    MAX_DOWNLOAD_BYTES = 8.megabytes
+    MAX_IMAGE_PIXELS = 25_000_000
+    MAX_IMAGE_DIMENSION = 16_384
+    ENCODING_OPTIONS = [ [ 1280, 85 ], [ 960, 75 ], [ 640, 65 ] ].map(&:freeze).freeze
+    SUGGESTION_LIFETIME = 10.minutes
+    PHOTO_ACCEPTANCE = /\A(?:yes(?:,? (?:this one|that one|please))?|this one|that(?:'s| is) the one|ji|jee|ha|haa|hya|(?:ha |ji )?(?:eta|eita)(?:i| nibo| chai)?|হ্যাঁ|হ্যা|জি|এটাই|এটা (?:নিবো|নেব))[.! ]*\z/i
+    PHOTO_REJECTION = /\A(?:no(?:,? (?:not this|not this one|thanks))?|not this(?: one)?|na|nah|eta na|eita na|না|এটা না)[.! ]*\z/i
     MIN_CONFIDENCE = 0.85
     PROCESSING_LEASE = 5.minutes
     IMAGE_TIMEOUT_SECONDS = 5
