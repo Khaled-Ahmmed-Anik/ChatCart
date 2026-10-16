@@ -13,6 +13,8 @@ class Product < ApplicationRecord
   accepts_nested_attributes_for :combo_items, allow_destroy: true
 
   after_commit :refresh_business_knowledge
+  before_validation :normalize_image_urls, if: :will_save_change_to_image_urls?
+  validates :image_urls, product_image_urls: true, if: :will_save_change_to_image_urls?
 
   scope :active, -> { where(active: true) }
   scope :available_for_sale, -> { active.where(archived_at: nil) }
@@ -72,6 +74,12 @@ class Product < ApplicationRecord
   end
 
   private
+
+  def normalize_image_urls
+    return unless image_urls.nil? || image_urls.is_a?(Array)
+
+    self.image_urls = Array(image_urls).map { |url| url.is_a?(String) ? url.strip : url }.reject(&:blank?).uniq
+  end
 
   def refresh_business_knowledge
     SyncBusinessKnowledgeJob.perform_later(business_id)

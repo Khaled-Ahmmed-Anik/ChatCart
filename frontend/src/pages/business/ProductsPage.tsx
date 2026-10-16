@@ -5,6 +5,8 @@ import { ErrorState, LoadingState } from "../../components/ui/Feedback";
 import { Modal } from "../../components/ui/Modal";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
+import { ProductImage } from "../../components/products/ProductImage";
+import { ProductImagesField } from "../../components/products/ProductImagesField";
 import { ApproveDashboardProductImportDocument, ArchiveDashboardProductDocument, DashboardProductsDocument, PreviewDashboardProductImportDocument, SaveDashboardProductDocument, type DashboardProductsQuery, type ProductInput } from "../../graphql/generated/graphql";
 import { graphqlRequest } from "../../lib/graphqlClient";
 import { parseProductAttributes, formatProductAttributes } from "../../lib/productAttributes";
@@ -16,6 +18,8 @@ type ComboDraft = { id?: string; componentProductId: string; quantity: number; s
 const blankVariant = (): VariantDraft => ({ name: "", size: "", sku: "", price: "", stockQuantity: 0, active: true, position: 0 });
 
 export function ProductsPage() {
+  const imageLanguage = navigator.language.split("-")[0];
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
   const [variants, setVariants] = useState<VariantDraft[]>([]);
@@ -42,10 +46,10 @@ export function ProductsPage() {
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState error={query.error} />;
 
-  const edit = (product: Product) => { setEditing(product); setVariants(product.variants); setComboItems(product.comboItems.map(item=>({id:item.id,componentProductId:item.componentProduct.id,quantity:item.quantity,selectionGroup:item.selectionGroup||undefined,required:item.required,position:item.position}))); setOpen(true); };
+  const edit = (product: Product) => { setEditing(product); setImageUrls(product.imageUrls); setVariants(product.variants); setComboItems(product.comboItems.map(item=>({id:item.id,componentProductId:item.componentProduct.id,quantity:item.quantity,selectionGroup:item.selectionGroup||undefined,required:item.required,position:item.position}))); setOpen(true); };
   const updateVariant = (index: number, values: Partial<VariantDraft>) => setVariants(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
   const columns = [
-    { key: "name", label: "Product", render: (row: Product) => <div><strong>{row.name}</strong><small>{row.shortDescription || row.description || "No description"}</small></div> },
+    { key: "name", label: "Product", render: (row: Product) => <div className="product-catalogue-cell"><ProductImage url={row.imageUrls[0]} productName={row.name} language={imageLanguage} /><div><strong>{row.name}</strong><small>{row.shortDescription || row.description || "No description"}</small></div></div> },
     { key: "price", label: "Price", render: (row: Product) => row.variants.length ? `${Math.min(...row.variants.map(v => Number(v.price)))}–${Math.max(...row.variants.map(v => Number(v.price)))} BDT` : `${row.price} BDT` },
     { key: "stockQuantity", label: "Stock", render: (row: Product) => row.variants.length ? row.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0) : row.stockQuantity },
     { key: "variants", label: "Options", render: (row: Product) => row.variants.length || "Single" },
@@ -67,17 +71,19 @@ export function ProductsPage() {
       productType: String(values.product_type), stockStrategy: String(values.stock_strategy),
       aliases: String(values.aliases||"").split(",").map(value=>value.trim()).filter(Boolean),
       sourceUrl: String(values.source_url||""),
+      imageUrls,
       variants: variants.filter(variant => variant.name && variant.price !== "").map((variant, position) => ({ ...variant, position })),
       comboItems: comboItems.filter(item=>item.componentProductId).map((item,position)=>({...item,position}))
     } });
   }
 
   return <>
-    <PageHeader title="Products" description="The catalog, variants, combos, aliases, and verified facts used for recommendations." actions={<><button className="button secondary" onClick={()=>{setImportDraft(null);setImportOpen(true)}}>Import from URL</button><button onClick={() => { setEditing(null); setVariants([]); setComboItems([]); setOpen(true); }}>Add product</button></>} />
+    <PageHeader title="Products" description="The catalog, variants, combos, aliases, and verified facts used for recommendations." actions={<><button className="button secondary" onClick={()=>{setImportDraft(null);setImportOpen(true)}}>Import from URL</button><button onClick={() => { setEditing(null); setImageUrls([]); setVariants([]); setComboItems([]); setOpen(true); }}>Add product</button></>} />
     <Panel><DataTable columns={columns} rows={query.data!.products} emptyMessage="Add a product to start taking orders." /></Panel>
     <Modal title={editing ? "Edit product" : "Add product"} open={open} onClose={() => { setOpen(false); setEditing(null); }}>
       <form key={editing?.id || "new"} onSubmit={submit}>
         <label>Product name<input name="name" defaultValue={editing?.name} required /></label>
+        <ProductImagesField value={imageUrls} onChange={setImageUrls} productName={editing?.name || ""} language={imageLanguage} />
         <label>Aliases <small>Comma-separated English, Bangla, or Banglish names</small><input name="aliases" defaultValue={editing?.aliases.join(", ")||""} placeholder="Club, TheClub, ক্লাব" /></label>
         <div className="form-grid"><label>Product type<select name="product_type" defaultValue={editing?.productType||"standard"}><option value="standard">Standard product</option><option value="fixed_combo">Fixed combo</option><option value="configurable_combo">Configurable combo</option></select></label><label>Stock strategy<select name="stock_strategy" defaultValue={editing?.stockStrategy||"independent"}><option value="independent">Independent stock</option><option value="component_derived">Derived from components</option><option value="manual">Manual availability</option></select></label></div>
         <div className="form-grid"><label>Category<input name="category" defaultValue={editing?.category || ""} placeholder="Fragrance" /></label><label>Tags<input name="tags" defaultValue={editing?.tags || ""} placeholder="oud, woody, premium" /></label><label>Base price<input name="price" type="number" min="0" step="0.01" defaultValue={editing?.price} required /></label><label>Base stock<input name="stock_quantity" type="number" min="0" defaultValue={editing?.stockQuantity} required /></label></div>

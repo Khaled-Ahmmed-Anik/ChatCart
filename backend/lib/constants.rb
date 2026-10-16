@@ -1,4 +1,11 @@
 module Constants
+  module ProductImages
+    MAX_IMAGES = 8
+    MAX_URL_LENGTH = 2048
+    PUBLIC_HOST = /\A(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}\z/i
+    LOCAL_SUFFIXES = %w[.localhost .local .internal].freeze
+  end
+
   module Conversation
     LARGER_OPTION_QUESTION = /\b(?:bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/i
     CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i

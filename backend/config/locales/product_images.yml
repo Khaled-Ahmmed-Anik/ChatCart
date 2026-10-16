@@ -1,0 +1,24 @@
+en:
+  product_images:
+    import_skipped:
+      one: "Skipped %{count} unsupported image link. You can add a valid HTTPS image after importing."
+      other: "Skipped %{count} unsupported image links. You can add valid HTTPS images after importing."
+  errors:
+    messages:
+      invalid_image_urls: "must be a list of image links"
+      invalid_image_url: "link %{position} must be an HTTPS URL of at most %{max_length} characters with a public hostname, no credentials, and the default port"
+      too_many_images:
+        one: "can contain at most %{count} image"
+        other: "can contain at most %{count} images"
+bn:
+  product_images:
+    import_skipped:
+      one: "%{count}টি অনুপযুক্ত ছবির লিংক বাদ দেওয়া হয়েছে। ইমপোর্টের পরে বৈধ HTTPS ছবির লিংক যোগ করতে পারবেন।"
+      other: "%{count}টি অনুপযুক্ত ছবির লিংক বাদ দেওয়া হয়েছে। ইমপোর্টের পরে বৈধ HTTPS ছবির লিংক যোগ করতে পারবেন।"
+  errors:
+    messages:
+      invalid_image_urls: "ছবির লিংকের তালিকা হতে হবে"
+      invalid_image_url: "%{position} নম্বর লিংকটি সর্বোচ্চ %{max_length} অক্ষরের HTTPS লিংক হতে হবে, পাবলিক হোস্টনেম ও ডিফল্ট পোর্ট ব্যবহার করতে হবে এবং লগইন তথ্য থাকা যাবে না"
+      too_many_images:
+        one: "সর্বোচ্চ %{count}টি ছবি রাখা যাবে"
+        other: "সর্বোচ্চ %{count}টি ছবি রাখা যাবে"

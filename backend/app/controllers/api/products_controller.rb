@@ -45,7 +45,7 @@ module Api
     def product_params
       params.expect(product: [
         :name, :woo_commerce_product_id, :price, :stock_quantity, :description, :short_description,
-        :category, :benefits, :usage_instructions, :suitable_for, :tags, :active, product_attributes: {},
+        :category, :benefits, :usage_instructions, :suitable_for, :tags, :active, image_urls: [], product_attributes: {},
         product_variants_attributes: [ :id, :name, :size, :sku, :price, :stock_quantity, :active, :position, :_destroy ]
       ])
     end
