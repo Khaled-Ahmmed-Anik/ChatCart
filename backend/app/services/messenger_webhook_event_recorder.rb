@@ -32,12 +32,16 @@ class MessengerWebhookEventRecorder
       external_event_id: external_event_id,
       sender_id: payload.dig(:sender, :id),
       payload: payload,
-      status: event_type == "customer_text" ? "received" : "ignored",
-      processed_at: event_type == "customer_text" ? nil : Time.current
+      status: processable? ? "received" : "ignored",
+      processed_at: processable? ? nil : Time.current
     }
   end
 
   def external_event_id
     payload.dig(:message, :mid).presence
+  end
+
+  def processable?
+    event_type.in?(Constants::Meta::MESSENGER_PROCESSABLE_EVENT_TYPES)
   end
 end

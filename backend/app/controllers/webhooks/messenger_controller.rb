@@ -32,6 +32,8 @@ module Webhooks
 
       if result.created && event_type == :customer_text
         ProcessMessengerEventJob.set(wait: messenger_message_debounce).perform_later(result.event)
+      elsif result.created && event_type == :customer_image
+        ProcessMessengerImageJob.perform_later(result.event)
       end
       log_received(result.event, result.created)
 

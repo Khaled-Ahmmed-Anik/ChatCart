@@ -31,6 +31,13 @@ class MessengerEventClassifierTest < ActiveSupport::TestCase
     )
   end
 
+  test "classifies downloadable customer photos but never page echoes" do
+    event = { sender: { id: "fb-user" }, message: { attachments: [ { type: "image", payload: { url: "https://images.example.com/photo.jpg" } } ] } }
+    assert_equal :customer_image, classify(event)
+    event[:message][:is_echo] = true
+    assert_equal :message_echo, classify(event)
+  end
+
   test "classifies malformed messages" do
     assert_equal :malformed_message, classify(sender: {}, message: {})
   end

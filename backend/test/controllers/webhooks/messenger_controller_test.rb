@@ -191,6 +191,18 @@ module Webhooks
       assert_equal 0, MessengerWebhookEvent.count
     end
 
+    test "photos are recorded and queued without calling AI and duplicate deliveries are deduplicated" do
+      payload = messenger_payload(sender_id: "photo-user", text: "Is this available?", message_id: "photo-mid")
+      payload[:entry].first[:messaging].first[:message][:attachments] = [ { type: "image", payload: { url: "https://images.example.com/customer.png" } } ]
+      assert_no_difference [ -> { Conversation.count }, -> { Message.count } ] do
+        assert_enqueued_with(job: ProcessMessengerImageJob) { post_signed_payload(payload) }
+      end
+      assert_response :ok
+      assert_equal "received", MessengerWebhookEvent.find_by!(external_event_id: "photo-mid").status
+      assert_no_enqueued_jobs { post_signed_payload(payload) }
+      assert_equal "duplicate", JSON.parse(response.body)["status"]
+    end
+
     private
 
     def post_signed_payload(payload)
