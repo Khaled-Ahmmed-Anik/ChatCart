@@ -26,7 +26,10 @@ an order. Captions are recorded but do not execute order instructions. Human
 takeover suppresses automated replies and avoids recognition when already active;
 business deactivation is rechecked before persisting results. If a newer customer
 turn has arrived while recognition runs, the old photo is recorded in received
-order but its delayed reply is suppressed.
+order but its delayed reply is suppressed. Newness uses the business/customer's
+processable webhook receipts ordered by `(created_at, id)`, not the time a delayed
+text-processing job creates its conversation message. Pending newer text/photo
+receipts count too; ignored events, echoes and other customers/businesses do not.
 
 ## Enable after deployment
 
@@ -67,7 +70,11 @@ and service terms; do not promise that photos are never retained by the provider
 - Up to 20 active catalogue products. Larger catalogues fall back rather than
   silently searching an arbitrary first page. Up to the first two photo links per
   product, at most 24 reference images, within a 45-second reference-fetch budget.
-  Missing/broken/oversized references are skipped; remaining products can still match.
+  One usable reference per product is attempted before extra views fill remaining
+  slots. If a cover is unavailable, its second link can supply that first usable
+  reference. Missing/broken/oversized references are skipped; the fetch-time budget
+  can still end the search early, so this is not a guarantee of full coverage when
+  hosts are slow or unreachable.
 - No visual embeddings/index/cache: each request fetches references again. For a
   larger catalogue, a tenant-scoped visual index is the next step, not raising all limits.
 - Gallery thumbnails are not customer-photo previews in the conversation UI.
@@ -94,7 +101,8 @@ provider failures produce a fallback instead of indefinite model retries.
 
 Automated tests use an isolated local database, fake image bytes and fake Gemini
 responses. They cover signed/duplicate webhooks, async acknowledgement, tenant
-isolation, multiple references/photos, unknown/fractional IDs, confidence bounds,
+isolation, multiple references/photos, all 20 products under the 24-image budget,
+broken-cover recovery, receipt-order ties and delayed text processing, unknown/fractional IDs, confidence bounds,
 disabled businesses, takeover, delayed replies, leases, language fallback, unsafe
 DNS, redirects, MIME spoofing, byte limits and provider failure. They do not measure
 real-world recognition accuracy or prove a specific model is available to your account.
