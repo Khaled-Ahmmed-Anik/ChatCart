@@ -34,21 +34,38 @@ class CustomerPhotoRecognizer
   def append_references(parts, products)
     ids = []
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Constants::PhotoRecognition::REFERENCE_BUDGET_SECONDS
-    products.each do |product|
-      Array(product.image_urls).first(Constants::PhotoRecognition::REFERENCES_PER_PRODUCT).each do |url|
-        return ids if ids.size >= Constants::PhotoRecognition::MAX_REFERENCE_IMAGES || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    remaining_urls = products.to_h do |product|
+      [ product, Array(product.image_urls).first(Constants::PhotoRecognition::REFERENCES_PER_PRODUCT).dup ]
+    end
+    # Give each product a usable reference before spending slots on extra views.
+    Constants::PhotoRecognition::REFERENCES_PER_PRODUCT.times do
+      remaining_urls.each do |product, urls|
+        return ids.uniq if ids.size >= Constants::PhotoRecognition::MAX_REFERENCE_IMAGES || reference_deadline_expired?(deadline)
 
-        begin
-          image = @fetcher.fetch(url)
-        rescue StandardError
-          next
-        end
+        image = next_available_reference(urls, deadline)
+        next unless image
+
         parts << { text: "Catalogue product ID #{product.id}: #{product.name}" }
         parts << image_part(image)
         ids << product.id
       end
     end
     ids.uniq
+  end
+
+  def next_available_reference(urls, deadline)
+    until urls.empty? || reference_deadline_expired?(deadline)
+      begin
+        return @fetcher.fetch(urls.shift)
+      rescue StandardError
+        next
+      end
+    end
+    nil
+  end
+
+  def reference_deadline_expired?(deadline)
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
   end
 
   def image_part(image)

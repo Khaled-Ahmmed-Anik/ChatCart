@@ -42,6 +42,43 @@ class CustomerPhotoRecognizerTest < ActiveSupport::TestCase
     end
   end
 
+  test "all twenty products get a reference before extra views consume the budget" do
+    products = [ @product ] + Array.new(Constants::PhotoRecognition::MAX_PRODUCTS - 1) do |index|
+      @business.products.create!(name: "Catalogue Product #{index}", price: 500,
+        image_urls: [ "https://images.example.com/#{index}-front.png", "https://images.example.com/#{index}-back.png" ])
+    end
+    parts = nil
+    recognizer = build_recognizer
+    with_photo_stub(recognizer, :request_match, ->(input) { parts = input; { "product_id" => products.last.id, "confidence" => 0.95 } }) do
+      assert_equal products.last, recognizer.recognize
+    end
+    ids = catalogue_reference_ids(parts)
+    assert_equal Constants::PhotoRecognition::MAX_REFERENCE_IMAGES, ids.size
+    assert_equal products.map(&:id), ids.first(products.size)
+    assert_equal products.first(4).map(&:id), ids.drop(products.size)
+    assert_equal Constants::PhotoRecognition::MAX_REFERENCE_IMAGES + 1, parts.count { |part| part[:inlineData] }
+  end
+
+  test "a broken cover does not starve a late product with a usable second photo" do
+    products = [ @product ] + Array.new(Constants::PhotoRecognition::MAX_PRODUCTS - 1) do |index|
+      @business.products.create!(name: "Reference Product #{index}", price: 500,
+        image_urls: [ "https://images.example.com/#{index}-front.png", "https://images.example.com/#{index}-back.png" ])
+    end
+    broken_cover = products.last.image_urls.first
+    @fetcher.define_singleton_method(:fetch) do |url|
+      raise PublicProductImageFetcher::UnsafeImage if url == broken_cover
+
+      PublicProductImageFetcher::Image.new(mime_type: "image/png", data: "ZmFrZQ==")
+    end
+    parts = nil
+    recognizer = build_recognizer
+    with_photo_stub(recognizer, :request_match, ->(input) { parts = input; { "product_id" => products.last.id, "confidence" => 0.95 } }) do
+      assert_equal products.last, recognizer.recognize
+    end
+    assert_equal products.map(&:id), catalogue_reference_ids(parts).first(products.size)
+    assert_equal Constants::PhotoRecognition::MAX_REFERENCE_IMAGES, catalogue_reference_ids(parts).size
+  end
+
   test "disabled flag missing key or too many photos never fetches" do
     test_case = self
     @fetcher.define_singleton_method(:fetch) { |_| test_case.flunk "Must not fetch" }
@@ -99,6 +136,10 @@ class CustomerPhotoRecognizerTest < ActiveSupport::TestCase
   end
 
   private
+
+  def catalogue_reference_ids(parts)
+    parts.filter_map { |part| part[:text]&.match(/\ACatalogue product ID (\d+):/)&.captures&.first&.to_i }
+  end
 
   def build_recognizer(urls: [ "https://images.example.com/customer.png" ])
     CustomerPhotoRecognizer.new(business: @business, urls: urls, fetcher: @fetcher)
