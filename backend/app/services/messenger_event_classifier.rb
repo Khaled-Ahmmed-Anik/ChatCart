@@ -8,6 +8,8 @@ class MessengerEventClassifier
     return :delivery if event[:delivery].present?
     return :read if event[:read].present?
     return :postback if event[:postback].present?
+    return :customer_image if event.dig(:sender, :id).present? &&
+      Array(message[:attachments]).any? { |attachment| attachment[:type] == "image" && attachment.dig(:payload, :url).present? }
     return :attachment if message[:attachments].present?
     return :customer_text if event.dig(:sender, :id).present? && message[:text].present?
     return :malformed_message if event.key?(:message)

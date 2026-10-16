@@ -8,9 +8,10 @@ GraphQL product input/query. REST product writes use the same model validation.
 No migration, new environment variable, storage account, image-processing backend,
 or model API call is required.
 
-This is the catalogue foundation, **not photo recognition**. It does not identify
-customer-uploaded images, send product pictures through Messenger, or change cart,
-checkout, confirmation, or human-takeover behavior.
+The gallery itself does not make model calls or change checkout. The optional
+[customer-photo recognition extension](customer-photo-recognition.md) can compare
+Messenger photos with these references when explicitly enabled. Sending product
+pictures through Messenger and direct seller file uploads remain separate work.
 
 ## Seller workflow
 

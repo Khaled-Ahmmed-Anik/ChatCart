@@ -1,0 +1,15 @@
+en:
+  photo_recognition:
+    photo: "[Customer photo]"
+    match: "This looks like %{product} from our catalogue. Is that the product you mean? Please send its name to continue, or send another photo if it isn't. Your order hasn't changed."
+    fallback: "Thanks for the photo! Please send the product name, or a clearer photo showing its label, so we can help you find the right one. Your order hasn't changed."
+bn:
+  photo_recognition:
+    photo: "[ক্রেতার ছবি]"
+    match: "ছবিটি আমাদের %{product}-এর মতো লাগছে। আপনি কি এই পণ্যটিই চাচ্ছেন? এগোতে পণ্যের নামটি লিখুন, অথবা অন্য ছবি দিন। আপনার অর্ডার পরিবর্তন হয়নি।"
+    fallback: "ছবির জন্য ধন্যবাদ! পণ্যের নামটি লিখুন, অথবা লেবেল দেখা যায় এমন পরিষ্কার ছবি দিন, তাহলে সঠিক পণ্যটি খুঁজতে সাহায্য করতে পারব। আপনার অর্ডার পরিবর্তন হয়নি।"
+banglish:
+  photo_recognition:
+    photo: "[Customer-er chobi]"
+    match: "Chobita amader %{product}-er moto lagche. Apni ki ei product-ta chacchen? Egiye jete product-er nam likhun, ba onno chobi din. Apnar order change hoyni."
+    fallback: "Chobir jonno dhonnobad! Product-er nam likhun, ba label dekha jay emon porishkar chobi din, tahole thik product-ta khujte help korte parbo. Apnar order change hoyni."
