@@ -12,4 +12,8 @@ class MessengerWebhookEvent < ApplicationRecord
   validates :external_event_id, uniqueness: true, allow_nil: true
 
   scope :processable, -> { where(event_type: Constants::Meta::MESSENGER_PROCESSABLE_EVENT_TYPES) }
+  scope :received_after, ->(event) {
+    where("created_at > :received_at OR (created_at = :received_at AND id > :event_id)",
+      received_at: event.created_at, event_id: event.id)
+  }
 end

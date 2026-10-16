@@ -44,14 +44,32 @@ class CustomerMessageRecorder
         next
       end
       current_order = conversation.pending_order
-      interpretation = classify_intent(message, current_order, conversation)
+      photo_suggestion = ConversationPhotoSuggestion.new(conversation)
+      photo_selection = photo_suggestion.resolve(message: message, pending_order: current_order)
+      if photo_selection&.reply_key
+        pending_order = current_order
+        outcome = :photo_confirmation_clarification
+        record_outcome(message, outcome)
+        bot_reply = conversation.messages.create!(sender_type: :bot, content: photo_suggestion.reply_text(photo_selection.reply_key),
+          metadata: bot_reply_metadata.merge("photo_recognition" => true))
+        next
+      end
+      interpretation = if photo_selection&.product
+        message.update!(metadata: message.metadata.merge("intent_classifier" => "photo_confirmation"))
+        AiIntentClassifier::Result.new(intent: "select_product", confidence: 1.0, entities: {}.with_indifferent_access,
+          language: conversation.conversation_state.to_h["preferred_language"].presence || business.default_language,
+          sentiment: "neutral", needs_clarification: false, possible_intents: [])
+      else
+        classify_intent(message, current_order, conversation)
+      end
       record_classification_feedback(message, interpretation)
       record_intelligence(message, interpretation)
       pending_order = pending_order_for(conversation, interpretation)
       processor = ConversationMessageProcessor.new(
         message: message,
         pending_order: pending_order,
-        interpretation: interpretation
+        interpretation: interpretation,
+        photo_product: photo_selection&.product
       )
       processor.process
       # Later planners must not overwrite repair/reset state with a stale snapshot.
@@ -140,6 +158,7 @@ class CustomerMessageRecorder
 
   def final_reply_content(message, pending_order, outcome, interpretation, response_plan)
     return response_plan.content if interpretation.blank?
+    return response_plan.content if message.metadata["intent_classifier"] == "photo_confirmation"
     if message.metadata["intent_classifier"] == "local" &&
         !ConversationAiRollout.enabled?(:naturalizer_all_turns, conversation: pending_order.conversation)
       return response_plan.content
@@ -209,6 +228,8 @@ class CustomerMessageRecorder
   end
 
   def record_classification_feedback(message, interpretation)
+    return if message.metadata["intent_classifier"] == "photo_confirmation"
+
     classifier = message.metadata["intent_classifier"].presence || "fallback"
     ConversationClassificationFeedback.new(message: message).record_prediction!(
       classifier: classifier,
