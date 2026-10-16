@@ -77,6 +77,7 @@ Detailed implementation documentation:
 - [Conversation action and customer-name safety](docs/conversation-safety.md) — explicit confirmation/cancellation commands, name validation, and safe evaluation-data handling.
 - [Sector recommendations and multi-product orders](docs/multi-product-orders.md) — catalogue attributes, cart changes, shared checkout, stock checks, and rollout.
 - [Product image catalogue](docs/product-image-catalogue.md) — image links, cover selection, previews, validation, and the boundary before photo recognition.
+- [Customer photo recognition](docs/customer-photo-recognition.md) — opt-in Messenger matching, Gemini privacy, safe downloads, confirmation and MVP limits.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 

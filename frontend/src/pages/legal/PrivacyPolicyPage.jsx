@@ -2,7 +2,7 @@ import { LegalPage } from "../../components/legal/LegalPage";
 
 export function PrivacyPolicyPage() {
   return (
-    <LegalPage eyebrow="Legal" title="Privacy Policy" updatedAt="September 21, 2026">
+    <LegalPage eyebrow="Legal" title="Privacy Policy" updatedAt="October 16, 2026">
       <p>
         ChatCart provides conversational commerce tools that help businesses answer customer questions,
         recommend products, capture orders, and coordinate fulfilment through supported messaging channels.
@@ -42,6 +42,12 @@ export function PrivacyPolicyPage() {
           ChatCart may use automated systems and third-party AI services to understand a message and prepare a
           response. Product prices, availability, order totals, and confirmations are taken from the business&apos;s
           configured data. A customer may ask for a human representative at any time.
+        </p>
+        <p>
+          When optional photo recognition is enabled, customer photos sent through Messenger and reference
+          photos from that business&apos;s catalog may be sent to Google Gemini to suggest a product match.
+          Photos can contain personal information; please avoid sending sensitive images. A suggested match
+          does not place or change an order. You can send the product name instead of a photo.
         </p>
       </section>
 
