@@ -115,6 +115,8 @@ a newer photo or a seller reply invalidate that proposal rather than guessing.
 Confirmation rechecks the source event/customer/business, current product
 ownership, active/non-archived state, stock and cart state. Accepted proposals are
 consumed once and use the existing product-selection method and response planner.
+Messenger profile enrichment merges into freshly locked conversation state after
+its network lookup, so it cannot overwrite a newer photo proposal or other turn state.
 The original customer text is retained; the word “one” is not interpreted as a
 bottle quantity. This confirmation path makes no additional Gemini call.
 
@@ -141,7 +143,8 @@ broken-cover recovery, receipt-order ties and delayed text processing, unknown/f
 disabled businesses, takeover, delayed replies, leases, language fallback, unsafe
 DNS, redirects, MIME spoofing, download/output/pixel limits, EXIF removal,
 orientation, transparency, multi-frame rejection, multilingual single-use approval,
-existing-checkout protection, size/quantity continuation and provider failure. They do not measure
+existing-checkout protection, size/quantity continuation, concurrent profile enrichment
+and provider failure. They do not measure
 real-world recognition accuracy or prove a specific model is available to your account.
 
 Before enabling for customers, run an opted-in smoke test using your own product

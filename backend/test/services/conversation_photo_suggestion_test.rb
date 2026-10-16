@@ -168,6 +168,31 @@ class ConversationPhotoSuggestionTest < ActiveJob::TestCase
     end
   end
 
+  test "slow Messenger profile lookup cannot overwrite a newly offered photo suggestion" do
+    @conversation.update!(conversation_state: {})
+    earlier_text = MessengerWebhookEvent.create!(business: @business, sender_id: @conversation.external_customer_id,
+      event_type: "customer_text", status: "received", external_event_id: "profile-text",
+      created_at: @event.created_at - 1.second, payload: { message: { text: "delivery charge?" } })
+    new_photo = MessengerWebhookEvent.create!(business: @business, sender_id: @conversation.external_customer_id,
+      event_type: "customer_image", status: "received", external_event_id: "during-profile-photo", payload: @event.payload)
+    recognizer = Object.new
+    product = @product
+    recognizer.define_singleton_method(:recognize) { product }
+    profile = Object.new
+    profile.define_singleton_method(:name) do
+      ProcessMessengerImageJob.perform_now(new_photo)
+      "Test Buyer"
+    end
+    with_photo_stub(CustomerPhotoRecognizer, :new, recognizer) do
+      with_photo_stub(MessengerCustomerProfile, :new, profile) do
+        ProcessMessengerEventJob.perform_now(earlier_text)
+      end
+    end
+    state = @conversation.reload.conversation_state
+    assert_equal @product.id, state.dig("photo_suggestion", "product_id")
+    assert_equal "Test Buyer", state.dig("customer_profile", "name")
+  end
+
   private
 
   def say(text)
