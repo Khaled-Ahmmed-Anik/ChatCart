@@ -97,9 +97,43 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
     later_time = @event.created_at + 1.second
     conversation.messages.create!(sender_type: :customer, content: "Never mind, show delivery charges", created_at: later_time)
     conversation.update!(last_message_at: later_time)
+    create_customer_event(created_at: later_time, external_event_id: "later-text")
     run_job
     assert_nil @event.reload.messenger_delivery
     assert_equal later_time.to_i, conversation.reload.last_message_at.to_i
+  end
+
+  test "earlier text processed after photo receipt does not suppress the recognized reply" do
+    earlier_text = create_customer_event(created_at: @event.created_at - 1.second, external_event_id: "earlier-text")
+    earlier_text.update!(status: "received")
+    profile = Object.new
+    profile.define_singleton_method(:name) { nil }
+    with_photo_stub(MessengerCustomerProfile, :new, profile) { ProcessMessengerEventJob.perform_now(earlier_text) }
+    conversation = @business.conversations.find_by!(channel: "facebook", external_customer_id: @event.sender_id)
+    assert_operator conversation.messages.customer.last.created_at, :>, @event.created_at
+    run_job
+    assert_equal "processed", @event.reload.status
+    assert_includes @event.messenger_delivery.message.content, @product.name
+  end
+
+  test "newer text receipt suppresses the photo even while text processing is pending" do
+    create_customer_event(created_at: @event.created_at + 1.second, external_event_id: "pending-text", status: "received")
+    run_job
+    assert_equal "processed", @event.reload.status
+    assert_nil @event.messenger_delivery
+  end
+
+  test "receipt ID resolves equal timestamps and ignores foreign customers businesses and receipts" do
+    create_customer_event(created_at: @event.created_at - 1.second, external_event_id: "old-receipt")
+    create_customer_event(created_at: @event.created_at + 1.second, external_event_id: "other-sender", sender_id: "another-customer")
+    other_business = Business.create!(name: "Other receipts", slug: "other-receipts")
+    create_customer_event(created_at: @event.created_at + 1.second, external_event_id: "other-business", business: other_business)
+    create_customer_event(created_at: @event.created_at + 1.second, external_event_id: "ignored-receipt", status: "ignored")
+    create_customer_event(created_at: @event.created_at + 1.second, external_event_id: "echo-receipt", event_type: "message_echo")
+    job = ProcessMessengerImageJob.new
+    refute job.send(:newer_customer_event?, @event)
+    create_customer_event(created_at: @event.created_at, external_event_id: "same-time-later-id")
+    assert job.send(:newer_customer_event?, @event)
   end
 
   test "disabling business while vision runs prevents persistence of a reply" do
@@ -121,6 +155,11 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
   end
 
   private
+
+  def create_customer_event(**attributes)
+    MessengerWebhookEvent.create!({ business: @business, event_type: "customer_text", status: "processed",
+      sender_id: @event.sender_id, payload: { message: { text: "Delivery charge?" } } }.merge(attributes))
+  end
 
   def run_job
     with_photo_stub(CustomerPhotoRecognizer, :new, @recognizer) { ProcessMessengerImageJob.perform_now(@event) }

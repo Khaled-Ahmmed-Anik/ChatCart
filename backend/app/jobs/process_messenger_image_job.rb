@@ -53,7 +53,7 @@ class ProcessMessengerImageJob < ApplicationJob
       delivery = nil
       conversation = event.business.conversations.find_or_create_by!(channel: "facebook", external_customer_id: event.sender_id)
       conversation.with_lock do
-        newer_customer_turn = conversation.messages.customer.where("created_at > ?", event.created_at).exists?
+        newer_customer_turn = newer_customer_event?(event)
         caption = event.payload.dig("message", "text").to_s
         conversation.messages.create!(sender_type: :customer, content: caption.presence || I18n.t("photo_recognition.photo"),
           created_at: event.created_at,
@@ -75,6 +75,13 @@ class ProcessMessengerImageJob < ApplicationJob
       content: I18n.t("photo_recognition.#{key}", product: product&.name, locale: reply_locale(conversation)),
       metadata: { "photo_recognition" => true, "suggested_product_id" => product&.id })
     MessengerDelivery.create!(messenger_webhook_event: event, message: reply, recipient_id: event.sender_id)
+  end
+
+  def newer_customer_event?(event)
+    event.business.messenger_webhook_events.processable
+      .where(sender_id: event.sender_id).where.not(status: "ignored")
+      .where("created_at > :received_at OR (created_at = :received_at AND id > :event_id)",
+        received_at: event.created_at, event_id: event.id).exists?
   end
 
   def mark_failed(event, claim_time, error)
