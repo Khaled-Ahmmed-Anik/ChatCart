@@ -19,12 +19,15 @@ custom model. Matching is probabilistic, especially for similar packaging.
 4. The reply says the photo **looks like** the product. An immediate “yes, this one”,
    “ji”, “eita nibo” or “হ্যাঁ” can select that product for an empty cart, after which
    the existing size, quantity and checkout flow continues. Product names still work.
-5. Unavailable AI, no references, unsafe/oversized images, missing key, uncertain
+5. Explicit ordering captions can retain the selected option and quantity until
+   that product approval; see [Photo captions and order details](#photo-captions-and-order-details).
+6. Unavailable AI, no references, unsafe/oversized images, missing key, uncertain
    results, and provider errors use a helpful product-name/clearer-photo fallback.
 
 The image job and suggestion alone do not create, select, confirm, or change an
 order. Explicit photo approval selects only the product, never quantity or final
-checkout confirmation. Captions are recorded but do not execute order instructions. Human
+checkout confirmation. Captions are recorded but never execute order instructions
+on image receipt alone. Human
 takeover suppresses automated replies and avoids recognition when already active;
 business deactivation is rechecked before persisting results. If a newer customer
 turn has arrived while recognition runs, the old photo is recorded in received
@@ -130,6 +133,53 @@ retain their existing confirmation behavior. Rejection/expired-match replies
 remain marked as photo clarification so repeated “yes” cannot accidentally confirm
 an unrelated existing checkout.
 
+## Photo captions and order details
+
+Messenger captions in the **same image event** can supply explicit order details:
+
+- `I want this one 30 ML two bottles`
+- `eitar 30 ml duita chai`
+- `এইটার ৩০ মিলি দুইটা চাই`
+- `want large two pieces` for a clothing product with a Large option
+- `add this one 30 ML two bottles` to append to a mutable existing draft
+
+The image job still asks the customer to approve the pictured product. A localized
+preview shows recognized option/quantity details as pending, not as a placed order.
+After an immediate `yes, this one` / `ji` / `হ্যাঁ`, the details are read from the
+validated source event and resolved against the current business catalogue.
+`ConversationPhotoOrderDetails` normalizes supported Bengali number/unit words
+and digits, then reuses `ConversationActionPlanner` and `CatalogueOptionResolver`.
+It does not send captions through an additional model call or trust model-supplied
+prices, stock, quantities or order actions. The original messages remain unchanged.
+
+Current option prices and stock are used at approval. Missing size asks for an
+option while retaining an explicit quantity; choosing a size checks its stock
+before proceeding. An unavailable size is never silently replaced with a smaller
+one. Missing quantity is asked for rather than interpreting “this one” or `30 ML`
+as a bottle count. Customer details follow the existing checkout flow, and a
+separate final confirmation remains required.
+
+Only explicit `add` / `include` / `যোগ করুন` captions can append to an existing
+draft. Those additions use `ConversationCartManager`, including aggregate stock
+checks, saved items, and protection for an unfinished current item. Existing
+customer details are preserved. Confirmed/submitted/cancelled orders remain locked;
+a plain approval cannot replace an existing cart or start a repeat order.
+
+Questions, deferrals, negations and alternative-size captions are not purchase
+instructions; approval then selects only the product. Conflicting named products,
+detected fractional/negative quantities or multiple quantity instructions ask for
+clarification without changing the cart. Expired proposals, newer photos, side
+questions, rejection, takeover and cross-business events retain the existing guards.
+
+Limits: this is bounded deterministic extraction, not unrestricted multilingual
+semantic understanding. Supported Bengali number words currently cover common
+one-to-five forms; numeric digits and existing English/Banglish number words also
+work. Separate photo and text events are **not** combined by this change. Detailed
+approval corrections such as `yes, but 15 ML instead` use normal conversation
+routing rather than executing a retained caption. For the deterministic path,
+approve the photo first and then correct the size through the normal flow.
+No migration, dependency, or new environment variable is required.
+
 Event claims have a five-minute lease to prevent concurrent duplicate model work.
 Result recording, bot message, delivery and processed status are atomic. Reprocessing
 a completed event reuses its existing delivery; normal outbound retries remain intact.
@@ -146,7 +196,9 @@ broken-cover recovery, receipt-order ties and delayed text processing, unknown/f
 disabled businesses, takeover, delayed replies, leases, language fallback, unsafe
 DNS, redirects, MIME spoofing, download/output/pixel limits, EXIF removal,
 orientation, transparency, multi-frame rejection, multilingual single-use approval,
-existing-checkout protection, size/quantity continuation, concurrent profile enrichment
+existing-checkout protection, caption detail retention, explicit cart additions,
+aggregate stock, missing-size continuation, localized previews, conflicting captions,
+size/quantity continuation, concurrent profile enrichment
 and provider failure. They do not measure
 real-world recognition accuracy or prove a specific model is available to your account.
 

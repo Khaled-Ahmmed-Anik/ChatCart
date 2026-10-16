@@ -10,6 +10,15 @@ This is catalogue matching, not universal semantic understanding: missing attrib
 
 ## One order, several items
 
+### Photo-based additions (WC-065)
+
+An image caption such as `add this one 30 ML two bottles` can append the recognized
+product after the customer explicitly approves the photo match. The existing cart
+manager handles current prices, aggregate stock and partial-item protection; the
+photo itself never changes an order. Confirmed/submitted/cancelled orders remain
+locked. See [photo captions and order details](customer-photo-recognition.md#photo-captions-and-order-details)
+for language support, missing-detail behavior and intentional limits.
+
 ### Clarification and totals (WC-056)
 
 Incomplete multi-item requests now store their intended known items in `conversation_state.cart_repair`, scoped to the pending order. The existing cart remains unchanged until all intended options and quantities are supplied and stock is rechecked. A follow-up such as `Oud 30 ml` completes the missing Oud option while preserving the other intended additions. Unknown items are not silently dropped: customers must explicitly discard the unknown item and identify which known items to keep. A new order clears pending repairs.

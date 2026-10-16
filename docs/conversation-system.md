@@ -53,7 +53,7 @@ The Messenger endpoint is `POST /webhooks/messenger`.
 
 1. Verifies `X-Hub-Signature-256` with `MESSENGER_APP_SECRET`.
 2. Iterates through every `entry` and every `messaging` event in the payload.
-3. Classifies each event, including customer text, downloadable customer image, other attachment, delivery receipt, read receipt, echo, or unknown event. Images use a separate asynchronous [photo-recognition flow](customer-photo-recognition.md), never the text-order mutation path.
+3. Classifies each event, including customer text, downloadable customer image, other attachment, delivery receipt, read receipt, echo, or unknown event. Images use a separate asynchronous [photo-recognition flow](customer-photo-recognition.md). Image receipt never mutates an order. After explicit product approval, supported ordering-caption details can continue size/quantity collection or append an explicitly requested cart item through the existing deterministic ordering services; final checkout confirmation is still separate.
 4. Resolves the correct business from the Facebook page's `ChannelConnection`.
 5. Records the event with its external event ID for deduplication.
 6. Enqueues customer-text events for background processing.
