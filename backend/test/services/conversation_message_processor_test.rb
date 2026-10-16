@@ -1,6 +1,17 @@
 require "test_helper"
 
 class ConversationMessageProcessorTest < ActiveSupport::TestCase
+  test "Bengali quantity correction preserves the selected product during checkout" do
+    product = create_product(name: "The Oud", stock_quantity: 10)
+    order = create_pending_order(product: product, quantity: 3, status: :collecting_name)
+
+    process_message(order, "পরিমাণ ২টা করুন")
+
+    assert_equal 2, order.reload.quantity
+    assert_equal product, order.product
+    assert_nil order.customer_name
+  end
+
   setup { Business.default.update!(category: "perfume") }
   test "a sole Standard option does not ask for an imaginary size" do
     product = create_product(name: "Canvas Bag", stock_quantity: 0)

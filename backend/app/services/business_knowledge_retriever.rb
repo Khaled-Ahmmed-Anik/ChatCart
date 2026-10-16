@@ -1,6 +1,7 @@
 class BusinessKnowledgeRetriever
   DEFAULT_LIMIT = 5
   MAXIMUM_LIMIT = 10
+  QUESTION_WORDS = %w[what are is the a an do does you your our please tell me about how much can i we have].freeze
   SEARCH_VECTOR = "to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(content, ''))"
 
   Result = Data.define(:document, :score) do
@@ -13,6 +14,8 @@ class BusinessKnowledgeRetriever
   def initialize(business:, query:, source_types: nil, limit: DEFAULT_LIMIT)
     @business = business
     @query = query.to_s.squish
+    words = @query.downcase.scan(/[\p{L}\p{M}\p{N}]+/u)
+    @query = words.reject { |word| QUESTION_WORDS.include?(word) }.join(" ") unless @query.match?(/["-]|\bOR\b/)
     @source_types = Array(source_types).presence
     @limit = limit.to_i.clamp(1, MAXIMUM_LIMIT)
   end

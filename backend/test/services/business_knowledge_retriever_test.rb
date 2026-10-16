@@ -1,6 +1,17 @@
 require "test_helper"
 
 class BusinessKnowledgeRetrieverTest < ActiveSupport::TestCase
+  test "natural question words do not prevent delivery policy retrieval" do
+    business = Business.create!(name: "Question Shop", slug: "question-shop")
+    business.create_business_policy!(delivery_areas: "Inside Dhaka", delivery_charges: "Delivery charges inside Dhaka: 70")
+    BusinessKnowledgeIndexer.new(business: business).sync!
+
+    results = BusinessKnowledgeRetriever.new(business: business, query: "What are the delivery charges inside Dhaka?").call
+
+    assert_equal [ "business_policy" ], results.map { |result| result.document.source_type }
+    assert_empty BusinessKnowledgeRetriever.new(business: business, query: "What are the unicorn spaceships?").call
+  end
+
   test "returns ranked active knowledge only from the requested business" do
     first = create_business_with_product("First Retrieval Shop", "first-retrieval-shop", "Office Cotton Shirt",
       "Breathable formal clothing for office meetings")
