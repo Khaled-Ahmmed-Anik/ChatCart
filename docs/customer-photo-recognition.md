@@ -122,8 +122,11 @@ bottle quantity. This confirmation path makes no additional Gemini call.
 
 If a cart already has items or is in checkout/confirmed, acknowledging a photo
 does not overwrite it, confirm it, or silently create a repeat order. The bot asks
-for an explicit change or `new order`. An explicit final `confirm` still goes
-through the existing checkout confirmation path. Rejection/expired-match replies
+for an explicit change or `new order`. After a photo prompt, bare existing
+confirmation/cancellation aliases (including `y`, `confirm` and `cancel`) refer
+to the photo, not an unrelated checkout. Explicit `confirm my order` and
+`cancel my order` still use the existing order paths; ordinary checkout prompts
+retain their existing confirmation behavior. Rejection/expired-match replies
 remain marked as photo clarification so repeated “yes” cannot accidentally confirm
 an unrelated existing checkout.
 

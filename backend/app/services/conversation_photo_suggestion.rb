@@ -19,8 +19,8 @@ class ConversationPhotoSuggestion
     return unless conversation.channel == "facebook"
 
     text = message.content.to_s.unicode_normalize(:nfkc).downcase.squish
-    accepts = text.match?(Constants::PhotoRecognition::PHOTO_ACCEPTANCE)
-    rejects = text.match?(Constants::PhotoRecognition::PHOTO_REJECTION)
+    accepts = text.match?(Constants::PhotoRecognition::PHOTO_ACCEPTANCE) || photo_command?(text, Constants::Conversation::EXPLICIT_CONFIRMATION)
+    rejects = text.match?(Constants::PhotoRecognition::PHOTO_REJECTION) || photo_command?(text, Constants::Conversation::EXPLICIT_CANCELLATION)
     unless accepts || rejects
       clear!
       return
@@ -56,6 +56,10 @@ class ConversationPhotoSuggestion
   attr_reader :conversation
 
   def state = conversation.conversation_state.to_h
+
+  def photo_command?(text, pattern)
+    text.match?(pattern) && !text.match?(Constants::PhotoRecognition::NAMED_ORDER_REFERENCE)
+  end
 
   def clear!
     conversation.update!(conversation_state: state.except("photo_suggestion")) if state.key?("photo_suggestion")

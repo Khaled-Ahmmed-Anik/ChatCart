@@ -10,6 +10,7 @@ module Constants
     MAX_IMAGE_DIMENSION = 16_384
     ENCODING_OPTIONS = [ [ 1280, 85 ], [ 960, 75 ], [ 640, 65 ] ].map(&:freeze).freeze
     SUGGESTION_LIFETIME = 10.minutes
+    NAMED_ORDER_REFERENCE = /\border\b|অর্ডার/i
     PHOTO_ACCEPTANCE = /\A(?:yes(?:,? (?:this one|that one|please))?|this one|that(?:'s| is) the one|ji|jee|ha|haa|hya|(?:ha |ji )?(?:eta|eita)(?:i| nibo| chai)?|হ্যাঁ|হ্যা|জি|এটাই|এটা (?:নিবো|নেব))[.! ]*\z/i
     PHOTO_REJECTION = /\A(?:no(?:,? (?:not this|not this one|thanks))?|not this(?: one)?|na|nah|eta na|eita na|না|এটা না)[.! ]*\z/i
     MIN_CONFIDENCE = 0.85

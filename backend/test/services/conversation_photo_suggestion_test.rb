@@ -74,9 +74,26 @@ class ConversationPhotoSuggestionTest < ActiveJob::TestCase
     end
     assert_predicate cart.reload, :awaiting_confirmation?
     assert_difference -> { Order.count }, 1 do
-      say("confirm")
+      say("confirm my order")
     end
     assert_predicate cart.reload, :confirmed?
+  end
+
+  test "bare confirmation and cancellation commands refer to the photo not an unrelated checkout" do
+    cart = @conversation.create_pending_order!(product: @product, product_variant: @variant, quantity: 2,
+      customer_name: "Test Buyer", phone: "01712345678", address: "Badda", status: :awaiting_confirmation)
+    original = cart.attributes
+    [ "y", "confirm", "confirmed", "নিশ্চিত করুন", "cancel", "cancelled", "stop", "বাতিল করুন" ].each do |text|
+      offer_again
+      assert_no_difference -> { Order.count } do
+        say(text)
+      end
+      assert_equal original, cart.reload.attributes, text
+    end
+    assert_no_difference -> { Order.count } do
+      say("cancel my order")
+    end
+    assert_predicate cart.reload, :cancelled?
   end
 
   test "photo approval cannot silently start a new cart after an already confirmed order" do

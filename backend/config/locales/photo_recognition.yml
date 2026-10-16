@@ -5,7 +5,7 @@ en:
     rejected: "No problem. Send another photo or the product name and we'll find the right one. Your order hasn't changed."
     expired: "Please send the product name or a new photo so we can make sure we're choosing the right one. Your order hasn't changed."
     unavailable: "That product isn't available to order right now. Would you like to see another option? Your order hasn't changed."
-    existing_order: "You already have an order in progress. Tell me what you'd like to change, or say 'new order' to start separately. Confirming the photo hasn't changed or placed your order."
+    existing_order: "You already have an order in progress. Tell me what you'd like to change, or say 'new order' to start separately. To place the existing order, say 'confirm my order'. Confirming the photo hasn't changed or placed your order."
     fallback: "Thanks for the photo! Please send the product name, or a clearer photo showing its label, so we can help you find the right one. Your order hasn't changed."
 bn:
   photo_recognition:
@@ -14,7 +14,7 @@ bn:
     rejected: "সমস্যা নেই। অন্য ছবি বা পণ্যের নাম দিন, আমরা সঠিকটি খুঁজতে সাহায্য করব। আপনার অর্ডার পরিবর্তন হয়নি।"
     expired: "সঠিক পণ্যটি বেছে নিতে পণ্যের নাম বা নতুন ছবি দিন। আপনার অর্ডার পরিবর্তন হয়নি।"
     unavailable: "এই পণ্যটি এখন অর্ডার করা যাচ্ছে না। অন্য কোনো পণ্য দেখতে চান? আপনার অর্ডার পরিবর্তন হয়নি।"
-    existing_order: "আপনার একটি অর্ডার চলমান আছে। কী পরিবর্তন করতে চান বলুন, অথবা আলাদা অর্ডারের জন্য 'new order' লিখুন। ছবিটি নিশ্চিত করায় অর্ডার পরিবর্তন বা চূড়ান্ত হয়নি।"
+    existing_order: "আপনার একটি অর্ডার চলমান আছে। কী পরিবর্তন করতে চান বলুন, অথবা আলাদা অর্ডারের জন্য 'new order' লিখুন। আগের অর্ডার চূড়ান্ত করতে 'confirm my order' লিখুন। ছবিটি নিশ্চিত করায় অর্ডার পরিবর্তন বা চূড়ান্ত হয়নি।"
     fallback: "ছবির জন্য ধন্যবাদ! পণ্যের নামটি লিখুন, অথবা লেবেল দেখা যায় এমন পরিষ্কার ছবি দিন, তাহলে সঠিক পণ্যটি খুঁজতে সাহায্য করতে পারব। আপনার অর্ডার পরিবর্তন হয়নি।"
 banglish:
   photo_recognition:
@@ -23,5 +23,5 @@ banglish:
     rejected: "Shomossha nei. Onno chobi ba product-er nam din, amra thik-ta khujte help korbo. Apnar order change hoyni."
     expired: "Thik product-ta choose korte product-er nam ba notun chobi din. Apnar order change hoyni."
     unavailable: "Ei product-ta ekhon order kora jacche na. Onno option dekhte chan? Apnar order change hoyni."
-    existing_order: "Apnar ekta order cholche. Ki change korte chan bolun, ba alada kore shuru korte 'new order' likhun. Chobi confirm koray apnar order change ba place hoyni."
+    existing_order: "Apnar ekta order cholche. Ki change korte chan bolun, ba alada kore shuru korte 'new order' likhun. Ager order place korte 'confirm my order' likhun. Chobi confirm koray apnar order change ba place hoyni."
     fallback: "Chobir jonno dhonnobad! Product-er nam likhun, ba label dekha jay emon porishkar chobi din, tahole thik product-ta khujte help korte parbo. Apnar order change hoyni."
