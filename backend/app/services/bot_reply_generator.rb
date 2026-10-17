@@ -274,7 +274,7 @@ class BotReplyGenerator
   end
 
   def available_products
-    catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }
+    catalog.available_for_sale.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }
   end
 
   def business_name
@@ -789,8 +789,7 @@ class BotReplyGenerator
   end
 
   def available_product_names
-    catalog.active.includes(:product_variants).order(:name).select { |product| product.total_available_stock.positive? }
-      .map(&:name).to_sentence.presence || "none right now"
+    available_products.map(&:name).to_sentence.presence || "none right now"
   end
 
   def product_information(kind)
@@ -851,7 +850,7 @@ class BotReplyGenerator
   end
 
   def general_product_variants_reply
-    grouped_variants = catalog.active.includes(:product_variants).flat_map(&:available_variants).group_by do |variant|
+    grouped_variants = available_products.flat_map(&:available_variants).group_by do |variant|
       variant.display_name.upcase
     end
     return "Sizes vary by product. Send me a product name and I’ll show its exact available options." if grouped_variants.empty?

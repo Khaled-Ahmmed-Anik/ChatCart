@@ -17,6 +17,23 @@ class CustomerPhotoRecognizerTest < ActiveSupport::TestCase
     %w[CUSTOMER_PHOTO_RECOGNITION_ENABLED GEMINI_API_KEY].each { |key| ENV[key] = @previous[key] }
   end
 
+  test "legacy archived products are excluded from reference photos and match results" do
+    archived = @business.products.create!(name: "Archived Secret", price: 100,
+      image_urls: [ "https://images.example.com/archived.png" ])
+    archived.update_columns(archived_at: Time.current)
+    recognizer = build_recognizer
+    archived_id = archived.id
+    captured_parts = nil
+    with_photo_stub(recognizer, :request_match, ->(parts) {
+      captured_parts = parts
+      { "product_id" => archived_id, "confidence" => 0.95 }
+    }) do
+      assert_nil recognizer.recognize
+    end
+    assert captured_parts.present?
+    assert_not_includes captured_parts.to_json, "Archived Secret"
+  end
+
   test "compares multiple customer and reference photos without loading another business" do
     other = Business.create!(name: "Other", slug: "other-photo-shop")
     other_product = other.products.create!(name: "Private Product", price: 100)

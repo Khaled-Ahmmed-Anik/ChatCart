@@ -164,7 +164,7 @@ class ConversationResponsePlanner
   end
 
   def product_options
-    names = conversation.business.products.active.in_stock.order(:name).pluck(:name).to_sentence
+    names = conversation.business.products.available_for_sale.in_stock.order(:name).pluck(:name).to_sentence
     names.present? ? "Available products: #{names}." : "No products are currently available."
   end
 

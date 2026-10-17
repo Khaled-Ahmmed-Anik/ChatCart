@@ -1,6 +1,23 @@
 require "test_helper"
 
 class BotReplyGeneratorTest < ActiveSupport::TestCase
+  test "catalogue prompts and general sizes exclude legacy archived stock" do
+    active = create_product(name: "Available Shirt", stock_quantity: 0)
+    active.product_variants.create!(name: "M", size: "M", price: 500, stock_quantity: 10)
+    archived = create_product(name: "Archived Secret", stock_quantity: 0)
+    archived.product_variants.create!(name: "ARCHIVED SIZE", size: "ARCHIVED SIZE", price: 700, stock_quantity: 10)
+    archived.update_columns(archived_at: Time.current)
+    order = create_pending_order(status: :collecting_product)
+    message = order.conversation.messages.create!(sender_type: :customer, content: "general size options")
+
+    %i[greeting product_list_requested restarted product_variants_requested].each do |outcome|
+      reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: outcome).content
+      assert_not_includes reply, "Archived Secret"
+      assert_not_includes reply, "ARCHIVED SIZE"
+      assert_includes reply, "Available Shirt" unless outcome == :product_variants_requested
+    end
+  end
+
   test "clothing recommendations list only options within a matching budget" do
     Business.default.update!(category: "clothing")
     product = create_product(name: "Cotton Shirt", stock_quantity: 0)
