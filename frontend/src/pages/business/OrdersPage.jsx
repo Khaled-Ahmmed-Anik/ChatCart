@@ -4,6 +4,7 @@ import { DataTable } from "../../components/ui/DataTable";
 import { ErrorState, LoadingState } from "../../components/ui/Feedback";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
+import { formatCurrency } from "../../lib/formatCurrency";
 
 export function OrdersPage() {
   const query = useQuery({ queryKey: ["orders"], queryFn: () => apiRequest("/api/orders") });
@@ -16,7 +17,7 @@ export function OrdersPage() {
     { key: "items", label: "Items", render: row => <div>{row.items.map((item, index) => <div key={`${item.product_id}-${item.product_variant_id}-${index}`}>
       {item.quantity} × {item.product_name}{item.variant_name ? ` — ${item.variant_name}` : ""}
     </div>)}</div> },
-    { key: "total", label: "Total", render: row => `${row.total} ${row.currency}` },
+    { key: "total", label: "Total", render: row => formatCurrency(row.total, row.currency) },
     { key: "status", label: "Status", render: row => <span className={`status ${row.status}`}>{row.status.replaceAll("_", " ")}</span> },
   ];
   return <>

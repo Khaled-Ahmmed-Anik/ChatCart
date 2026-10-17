@@ -57,6 +57,23 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal "text/csv", response.media_type
   end
 
+  test "order export preserves multiple variants Unicode and quoted customer fields" do
+    order = create_order(@business, number: "ORD-CSV-QA")
+    order.update!(customer_name: 'SQA "Buyer"', address: "SQA TEST, ঢাকা", subtotal: 450, total: 450)
+    order.order_items.first.update!(variant_name: "15 ML")
+    order.order_items.create!(product_name: "The Office", variant_name: "10 ML", quantity: 1, unit_price: 350, total: 350)
+
+    get export_api_orders_path, headers: authorization(@token)
+
+    assert_response :success
+    assert_equal "text/csv", response.media_type
+    assert_includes response.headers["Content-Disposition"], "attachment"
+    assert_includes response.body, '"SQA ""Buyer"""'
+    assert_includes response.body, '"SQA TEST, ঢাকা"'
+    assert_includes response.body, "1 x Product ORD-CSV-QA 15 ML; 1 x The Office 10 ML"
+    assert_includes response.body, '"450.0","0.0","450.0","BDT"'
+  end
+
   test "human takeover pauses automated replies and permits seller replies" do
     conversation = @business.conversations.create!(channel: "instagram", external_customer_id: "buyer-1")
     conversation.create_pending_order!

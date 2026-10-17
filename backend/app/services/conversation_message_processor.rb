@@ -281,7 +281,7 @@ class ConversationMessageProcessor
   end
 
   def mapped_secondary_outcomes
-    planned = Array(@planned_secondary_outcomes)
+    planned = (Array(@planned_secondary_outcomes) + ConversationActionPlanner.policy_information_outcomes(content)).uniq - [ outcome ]
     return planned if interpretation.blank? || interpretation.needs_clarification
 
     mapped = interpretation.secondary_intents.filter_map do |intent|

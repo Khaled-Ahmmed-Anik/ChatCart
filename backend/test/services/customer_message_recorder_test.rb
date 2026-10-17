@@ -1,6 +1,41 @@
 require "test_helper"
 
 class CustomerMessageRecorderTest < ActiveSupport::TestCase
+  test "answers delivery cost and time together without consuming checkout details" do
+    business = Business.create!(name: "Policy Shop", slug: "policy-qa-shop")
+    business.create_business_policy!(delivery_charges: "Inside Dhaka - 70 TK", delivery_time: "2-3 Business days")
+    product = business.products.create!(name: "Blue Shirt", price: 500, stock_quantity: 10)
+
+    [ "Dhaka te delivery charge koto? Ar koto dine pabo?",
+      "What is the shipping cost and delivery time?",
+      "ডেলিভারি চার্জ কত এবং কত দিন লাগবে?" ].each do |text|
+      conversation = business.conversations.create!(channel: "facebook", external_customer_id: SecureRandom.uuid)
+      draft = conversation.create_pending_order!(product: product, quantity: 2, status: :collecting_name)
+      result = CustomerMessageRecorder.new(business: business, channel: "facebook",
+        external_customer_id: conversation.external_customer_id, content: text).record
+
+      assert_includes result.bot_reply.content, "70 TK"
+      assert_includes result.bot_reply.content, "2-3 Business days"
+      assert_equal 1, result.bot_reply.content.scan("70 TK").size
+      assert_equal 1, result.bot_reply.content.scan("2-3 Business days").size
+      assert_predicate draft.reload, :collecting_name?
+      assert_equal product, draft.product
+      assert_equal 2, draft.quantity
+      assert_nil draft.customer_name
+    end
+  end
+
+  test "fresh order never lists a legacy archived active product" do
+    product = Product.create!(name: "Archived Secret", price: 750, stock_quantity: 10)
+    product.update_columns(archived_at: Time.current)
+    Product.create!(name: "Available Shirt", price: 500, stock_quantity: 10)
+
+    result = record_message("new order")
+
+    assert_includes result.bot_reply.content, "Available Shirt"
+    assert_not_includes result.bot_reply.content, "Archived Secret"
+  end
+
   test "records customer message, processes pending order, and creates bot reply" do
     product = Product.create!(name: "Fresh Musk", price: 750, stock_quantity: 10)
 
