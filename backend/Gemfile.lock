@@ -203,7 +203,7 @@ GEM
     pg (1.7.0-x86_64-linux-musl)
     pp (0.6.4)
       prettyprint
-    prettyprint (0.2.0)
+    prettyprint (0.2.1)
     prism (1.9.0)
     puma (8.0.2)
       nio4r (~> 2.0)
@@ -294,7 +294,7 @@ GEM
       ffi (~> 1.12)
       logger
     securerandom (0.4.1)
-    solid_cable (3.0.12)
+    solid_cable (4.1.0)
       actioncable (>= 7.2)
       activejob (>= 7.2)
       activerecord (>= 7.2)
@@ -329,7 +329,7 @@ GEM
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
-    uri (1.1.1)
+    uri (1.1.2)
     useragent (0.16.11)
     websocket-driver (0.8.2)
       base64
