@@ -17,6 +17,13 @@ class ConversationActionPlanner
 
   ORDERING_CUE = /\b(want|need|take|give|send|order|buy|nibo|chai|den|dao|din|bottle|bottles|piece|pieces|ta|টা|নিব|চাই|দেন)\b/i
 
+  def self.policy_information_outcomes(text)
+    normalized = ConversationTextNormalizer.call(text)
+    INFORMATIONAL_PATTERNS.except(:stock_inquiry, :price_inquiry).filter_map do |outcome, pattern|
+      outcome if normalized.match?(pattern)
+    end
+  end
+
   def initialize(message:, business:, current_product: nil, interpretation: nil)
     @lines = message.content.to_s.lines.map(&:strip).reject(&:blank?)
     @content = ConversationTextNormalizer.call(message.content)
