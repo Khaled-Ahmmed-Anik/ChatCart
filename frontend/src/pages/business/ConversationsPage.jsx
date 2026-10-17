@@ -1,119 +1,95 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../auth/useAuth";
 import { apiRequest } from "../../lib/apiClient";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/Feedback";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Panel } from "../../components/ui/Panel";
+import { InboxList } from "../../components/inbox/InboxList";
+import { ConversationThread } from "../../components/inbox/ConversationThread";
+import { ConversationContext } from "../../components/inbox/ConversationContext";
+import { MANAGING_ROLES, needsAttention } from "../../lib/inbox";
 import { pollInterval } from "../../lib/polling";
 
-const reasonLabels = {
-  customer_requested_human: "Customer requested a person", repeated_complaint: "Repeated complaint",
-  repeated_confusion: "Repeated unresolved questions", refund_or_replacement: "Refund or replacement request",
-  processed_order_change: "Processed order needs changing", delivery_dispute: "Delivery dispute",
-  damaged_or_wrong_product: "Damaged or incorrect product", seller_takeover: "Taken over by seller"
-};
-
-const reviewLabels = {
-  successful: "Successful", abandoned: "Abandoned", confusing: "Confusing",
-  needs_follow_up: "Needs follow-up", incorrect_reply: "Incorrect reply"
-};
-
-function CustomerIdentity({ conversation, compact = false }) {
-  if (!conversation) return "Conversation";
-  const fallbackName = {
-    facebook: "Messenger customer",
-    instagram: "Instagram customer",
-    whatsapp: "WhatsApp customer"
-  }[conversation.channel] || "Customer";
-  return <span className={`customer-identity ${compact ? "compact" : ""}`}>
-    <strong>{conversation.customer_name || fallbackName}</strong>
-    <small>{conversation.channel} · ID {conversation.external_customer_id}</small>
-  </span>;
-}
+const MOBILE_INBOX_QUERY = "(max-width: 900px)";
+const INBOX_ACTION_KEY = ["inbox-action"];
 
 export function ConversationsPage() {
+  const { auth } = useAuth();
   const [selectedId, setSelectedId] = useState(null);
-  const messagesEndRef = useRef(null);
+  const [drafts, setDrafts] = useState({});
+  const [reviewDrafts, setReviewDrafts] = useState({});
+  const [failedActions, setFailedActions] = useState({});
+  const detailRef = useRef(null);
   const client = useQueryClient();
   const list = useQuery({ queryKey: ["conversations"], queryFn: () => apiRequest("/api/conversations") });
-  const detail = useQuery({ queryKey: ["conversation", selectedId], queryFn: () => apiRequest(`/api/conversations/${selectedId}`), enabled: Boolean(selectedId), refetchInterval: selectedId ? pollInterval : false, refetchIntervalInBackground: false });
+  const detail = useQuery({
+    queryKey: ["conversation", selectedId], queryFn: () => apiRequest(`/api/conversations/${selectedId}`),
+    enabled: Boolean(selectedId), refetchInterval: selectedId ? pollInterval : false, refetchIntervalInBackground: false
+  });
   const action = useMutation({
+    mutationKey: INBOX_ACTION_KEY,
     mutationFn: ({ id, path, body }) => apiRequest(`/api/conversations/${id}/${path}`, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-    onSuccess: () => { client.invalidateQueries({ queryKey: ["conversations"] }); client.invalidateQueries({ queryKey: ["conversation", selectedId] }); }
+    retry: false,
+    onError: (_error, variables) => setFailedActions((current) => ({ ...current, [variables.id]: true })),
+    onSuccess: (_result, variables) => {
+      setFailedActions((current) => ({ ...current, [variables.id]: false }));
+      if (variables.path === "reply") setDrafts((current) => current[variables.id] === variables.draftValue ? { ...current, [variables.id]: "" } : current);
+      return Promise.all([
+        client.invalidateQueries({ queryKey: ["conversations"] }),
+        client.invalidateQueries({ queryKey: ["conversation", variables.id] })
+      ]);
+    }
   });
   const selected = detail.data;
+  const canManage = MANAGING_ROLES.includes(auth.actor?.role);
+  const busy = useIsMutating({ mutationKey: INBOX_ACTION_KEY }) > 0;
+  const actionError = Boolean(failedActions[selectedId]);
+  const actionSuccess = action.isSuccess && action.variables?.id === selectedId ? {
+    reply: "Reply saved. Messenger delivery may still be processing.", review: "Review saved.", feedback: "Feedback saved.",
+    handover: "Assistant paused for this conversation.", resume: "Conversation handed back to the assistant."
+  }[action.variables.path] : null;
 
-  useEffect(() => { if (selected?.messages?.length) messagesEndRef.current?.scrollIntoView({ block: "end" }); }, [selected?.messages?.length, selectedId]);
-
-  if (list.isLoading) return <LoadingState />;
-  if (list.isError) return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
-
-  function reply(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    action.mutate({ id: selectedId, path: "reply", body: { content: new FormData(form).get("content") } }, { onSuccess: () => form.reset() });
+  function selectConversation(id) {
+    setSelectedId(id);
+    if (window.matchMedia(MOBILE_INBOX_QUERY).matches) requestAnimationFrame(() => detailRef.current?.scrollIntoView({ block: "start" }));
   }
 
-  function review(event) {
-    event.preventDefault();
-    action.mutate({ id: selectedId, path: "review", body: Object.fromEntries(new FormData(event.currentTarget)) });
+  function backToList() {
+    setSelectedId(null);
+    requestAnimationFrame(() => document.getElementById("inbox-search")?.focus());
   }
 
-  const handover = selected?.handover_summary;
-  const attentionCount = list.data.filter((conversation) => conversation.needs_attention).length;
+  async function refreshConversation() {
+    const id = selectedId;
+    const result = await detail.refetch();
+    if (!result.isError) setFailedActions((current) => ({ ...current, [id]: false }));
+  }
 
-  return <>
-    <PageHeader title="Conversations" description="Review customer context and step in when a human is needed." actions={attentionCount > 0 && <span className="attention-summary">{attentionCount} waiting for a seller</span>} />
-    <div className="conversation-layout">
-      <Panel className="conversation-list" title="Inbox">
-        {list.data.length ? list.data.map((conversation) => <button key={conversation.id} className={`conversation-row ${selectedId === conversation.id ? "selected" : ""} ${conversation.needs_attention ? "needs-attention" : ""}`} onClick={() => setSelectedId(conversation.id)}>
-          <span>
-            <CustomerIdentity conversation={conversation} compact />
-            <small>{conversation.message_count} messages</small>
-            {conversation.needs_attention && <small className="attention-reason">{reasonLabels[conversation.handover_reason] || "Seller response needed"}</small>}
-            {conversation.quality?.flags?.length > 0 && <small className="attention-reason">Quality {conversation.quality.score}/100 · {conversation.quality.flags.length} issue(s)</small>}
-          </span>
-          <span className={`status ${conversation.status}`}>{conversation.needs_attention ? "Needs reply" : conversation.status.replaceAll("_", " ")}</span>
-        </button>) : <EmptyState description="Customer conversations will appear here." />}
-      </Panel>
+  const conversations = list.data || [];
+  const attentionCount = conversations.filter(needsAttention).length;
 
-      <div className="conversation-workspace">
-        <Panel className="transcript" title={<CustomerIdentity conversation={selected} />} actions={selected && <button className="button secondary small" disabled={action.isPending} onClick={() => action.mutate({ id: selected.id, path: selected.status === "handed_over" ? "resume" : "handover" })}>{selected.status === "handed_over" ? "Resume AI" : "Take over"}</button>}>
-          {detail.isLoading && <p className="muted">Loading conversation…</p>}
-          {selected ? <>
-            {selected.status === "handed_over" && handover && <aside className="handover-summary urgent">
-              <strong>Seller response required</strong>
-              <span>Reason: {reasonLabels[handover.reason] || handover.reason.replaceAll("_", " ")}</span>
-              {handover.active_order && <span>Order: {[handover.active_order.quantity, handover.active_order.product, handover.active_order.status].filter(Boolean).join(" · ")}</span>}
-              {handover.recent_topics?.length > 0 && <span>Recent topics: {handover.recent_topics.join(", ").replaceAll("_", " ")}</span>}
-            </aside>}
-            <div className="messages">
-              {selected.messages.map((message) => <article key={message.id} className={`message ${message.sender_type}`}><small>{message.sender_type}</small><p>{message.content}</p></article>)}
-              <div ref={messagesEndRef} />
+  return <div className="inbox-page">
+    <PageHeader title="Inbox" description="Help buyers, follow the conversation, and step in when needed." actions={<span className="home-period">{list.data ? `${attentionCount} ${attentionCount === 1 ? "chat needs" : "chats need"} you` : "Checking Inbox…"}</span>} />
+    {list.isPending ? <LoadingState /> : list.isError && !list.data ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : <>
+      {list.isError && <p className="knowledge-notice" role="status">Couldn’t refresh the Inbox. Showing the last loaded conversations. <button className="button secondary small" onClick={() => list.refetch()}>Retry Inbox</button></p>}
+      <div className={`inbox-layout ${selectedId ? "has-selection" : ""}`}>
+        <InboxList conversations={conversations} selectedId={selectedId} onSelect={selectConversation} />
+        <div className="inbox-detail" ref={detailRef}>
+          {selectedId ? detail.isPending ? <LoadingState /> : detail.isError && !selected ? <div><button className="button secondary small" onClick={backToList}>← Chats</button><ErrorState error={detail.error} onRetry={() => detail.refetch()} /></div> : selected && <>
+            <div className="inbox-thread-area">
+              {detail.isError && <p className="knowledge-notice" role="status">Couldn’t refresh this conversation. Actions are disabled until it refreshes.</p>}
+              <button className="button secondary small inbox-refresh" onClick={refreshConversation} disabled={detail.isFetching || busy}>Refresh conversation</button>
+              <ConversationThread key={selected.id} conversation={selected} canManage={canManage && !detail.isError} draft={drafts[selected.id] || ""}
+                onDraft={(value) => setDrafts((current) => ({ ...current, [selected.id]: value }))}
+                onReply={() => action.mutate({ id: selected.id, path: "reply", draftValue: drafts[selected.id], body: { content: drafts[selected.id].trim() } })}
+                onAction={(path) => action.mutate({ id: selected.id, path })} busy={busy} actionError={actionError} actionSuccess={actionSuccess} onBack={backToList} />
             </div>
-            {selected.status === "handed_over" && <form className="reply-form" onSubmit={reply}><input name="content" placeholder="Write a seller reply…" required /><button disabled={action.isPending}>Send</button></form>}
-          </> : !detail.isLoading && <EmptyState title="Select a conversation" description="Choose a customer from the inbox to see the transcript." />}
-        </Panel>
-
-        {selected && <aside className="review-panel" aria-label="Conversation review">
-          <div className="review-heading">
-            <div><p className="eyebrow">Internal review</p><h2>Conversation quality</h2></div>
-            <div className="quality-score"><strong>{selected.quality.score}<small>/100</small></strong><span className={`status ${selected.quality.grade}`}>{selected.quality.grade.replaceAll("_", " ")}</span></div>
-          </div>
-          <p className="review-diagnostics">{selected.quality.flags.length > 0 ? <>Detected: {selected.quality.flags.join(", ").replaceAll("_", " ")}</> : <>No automatic quality issues detected.</>}</p>
-          <form className="review-form" onSubmit={review}>
-            <label>Outcome<select name="label" defaultValue={selected.quality.review?.label || "successful"}>{Object.entries(reviewLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label>Reviewer note<input name="notes" defaultValue={selected.quality.review?.notes || ""} placeholder="Add context for your team (optional)" /></label>
-            <button className="button secondary small" disabled={action.isPending}>Save review</button>
-          </form>
-          <div className="feedback-actions">
-            <span>Was the automated reply helpful?</span>
-            <button className="button secondary small" onClick={() => action.mutate({ id: selected.id, path: "feedback", body: { rating: "helpful" } })}>Helpful</button>
-            <button className="button secondary small" onClick={() => action.mutate({ id: selected.id, path: "feedback", body: { rating: "unhelpful" } })}>Not helpful</button>
-            {selected.quality.customer_feedback && <small>Saved: {selected.quality.customer_feedback.rating}</small>}
-          </div>
-        </aside>}
+            <ConversationContext key={`context-${selected.id}`} conversation={selected} canManage={canManage && !detail.isError} busy={busy || actionError}
+              reviewDraft={reviewDrafts[selected.id]} onReviewDraft={(value) => setReviewDrafts((current) => ({ ...current, [selected.id]: value }))}
+              onAction={(path, body) => action.mutate({ id: selected.id, path, body })} />
+          </> : <EmptyState title="Choose a conversation" description="Select a buyer to view their messages and order details." />}
+        </div>
       </div>
-    </div>
-  </>;
+    </>}
+  </div>;
 }
