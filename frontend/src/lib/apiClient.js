@@ -1,4 +1,5 @@
 import { API_URL } from "./apiBaseUrl";
+import { requestFetch } from "./requestFetch";
 
 export class ApiError extends Error {
   constructor(message, status, details) {
@@ -15,7 +16,7 @@ export async function apiRequest(path, options = {}) {
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const response = await requestFetch(`${API_URL}${path}`, { ...options, headers });
   if (!response.ok) {
     const details = await response.json().catch(() => ({}));
     if (response.status === 401 && !path.includes("/auth/")) {
@@ -32,7 +33,7 @@ export async function apiRequest(path, options = {}) {
 
 export async function downloadFile(path, filename) {
   const token = localStorage.getItem("chatcart_session_token");
-  const response = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const response = await requestFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new ApiError("Download failed", response.status);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");

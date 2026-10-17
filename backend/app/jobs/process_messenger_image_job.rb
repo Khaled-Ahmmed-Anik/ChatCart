@@ -31,7 +31,13 @@ class ProcessMessengerImageJob < ApplicationJob
       next false if event.status.in?(%w[processed ignored]) ||
         (event.status == "processing" && event.updated_at > Constants::PhotoRecognition::PROCESSING_LEASE.ago)
 
-      event.update!(status: "processing", last_error: nil)
+      caption = event.caption_event || MessengerPhotoTurn.companion(event)
+      if caption
+        caption.lock!
+        return false unless caption.status.in?(%w[received failed processing])
+        caption.update!(status: "processing", last_error: nil)
+      end
+      event.update!(status: "processing", last_error: nil, caption_event: caption)
       true
     end
   end
@@ -54,7 +60,7 @@ class ProcessMessengerImageJob < ApplicationJob
       conversation = event.business.conversations.find_or_create_by!(channel: "facebook", external_customer_id: event.sender_id)
       conversation.with_lock do
         newer_customer_turn = newer_customer_event?(event)
-        caption = event.payload.dig("message", "text").to_s
+        caption = event.photo_caption.to_s
         conversation.messages.create!(sender_type: :customer, content: caption.presence || I18n.t("photo_recognition.photo"),
           created_at: event.created_at,
           metadata: { "photo_count" => urls.size, "messenger_message_id" => event.external_event_id })
@@ -64,12 +70,13 @@ class ProcessMessengerImageJob < ApplicationJob
         end
       end
       event.update!(status: "processed", processed_at: Time.current, last_error: nil)
+      event.caption_event&.update!(status: "processed", processed_at: Time.current, last_error: nil)
       delivery
     end
   end
 
   def create_delivery(event, conversation, product)
-    product = event.business.products.where(active: true).find_by(id: product.id) if product
+    product = event.business.products.available_for_sale.find_by(id: product.id) if product
     suggestion = ConversationPhotoSuggestion.new(conversation)
     reply = conversation.messages.create!(sender_type: :bot,
       content: product ? suggestion.match_reply(product: product, event: event) : suggestion.reply_text("fallback"),
@@ -81,6 +88,7 @@ class ProcessMessengerImageJob < ApplicationJob
   def newer_customer_event?(event)
     event.business.messenger_webhook_events.processable
       .where(sender_id: event.sender_id).where.not(status: "ignored")
+      .where.not(id: event.caption_event_id)
       .received_after(event).exists?
   end
 

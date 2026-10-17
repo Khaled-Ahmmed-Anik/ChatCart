@@ -246,7 +246,8 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     assert_includes reply, "Here’s your order summary:"
     assert_includes reply, "2 × Fresh Musk"
-    assert_includes reply, "Total: ৳1500"
+    assert_includes reply, "items subtotal is ৳1500"
+    assert_includes reply, "Delivery is not included"
     assert_includes reply, "Name: Khaled"
     assert_includes reply, "Phone: +8801712345678"
     assert_includes reply, "Address: Dhaka"

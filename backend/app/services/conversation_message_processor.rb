@@ -643,6 +643,8 @@ class ConversationMessageProcessor
   end
 
   def apply_correction
+    return update_quantity(content) if content.match?(Constants::Conversation::QUANTITY_CORRECTION)
+
     return update_product_from_content if product_correction_request?
     return update_variant_from_content if variant_correction_request?
     return apply_ai_correction if ai_change_intent?
@@ -1074,7 +1076,7 @@ class ConversationMessageProcessor
   end
 
   def parse_quantity(value)
-    normalized = value.to_s.downcase
+    normalized = value.to_s.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
       .gsub(/\b(first|second|third|last|previous|prothom|ditiyo|tritiyo)\s+one\b/, "")
       .gsub(/\b\d+(?:\.\d+)?\s*ml\b/, "")
 

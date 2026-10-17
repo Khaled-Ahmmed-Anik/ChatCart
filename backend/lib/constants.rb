@@ -1,5 +1,11 @@
 module Constants
+  module Knowledge
+    QUESTION_WORDS = %w[what are is the a an do does you your our please tell me about how much can i we have].freeze
+  end
+
   module PhotoRecognition
+    CAPTION_WINDOW = 3.seconds
+    PHOTO_REFERENCE = /\b(?:this|that|photo|picture|image|eta|eita)\b|এইটা|এইটার|এটা|ছবি/i
     MAX_CUSTOMER_IMAGES = 3
     MAX_PRODUCTS = 20
     MAX_REFERENCE_IMAGES = 24
@@ -54,7 +60,7 @@ module Constants
       "address" => /\A(?:change|update|edit)\s+(?:my\s+|the\s+)?address[?.! ]*\z|\Aaddress\s+change\s+korbo[?.! ]*\z/i,
       "customer_name" => /\A(?:change|update|edit)\s+(?:my\s+)?name[?.! ]*\z|\A(?:name|naam)\s+change\s+korbo[?.! ]*\z/i
     }.freeze
-    QUANTITY_CORRECTION = /\A(?:actually[\s,]*)?(?:\d+|one|two|three|ekta|duita|একটা|দুইটা)\s+(?:ta\s+)?(?:koren|korun|করেন|করুন|hobe|হবে)[?.! ]*\z/i
+    QUANTITY_CORRECTION = /\A(?:actually[\s,]*)?(?:(?:পরিমাণ|quantity)\s+)?(?:[0-9০-৯]+\s*(?:টা|ta|bottles?)?|one|two|three|ekta|duita|একটা|দুইটা)\s+(?:ta\s+)?(?:koren|korun|করেন|করুন|hobe|হবে)[?.! ]*\z/i
     GREETING_ONLY = /\A(?:hi|hello|hey|assalamu?\s*alaikum|assalamu?laikum|assalamulaikum|salam|হ্যালো|আসসালামু আলাইকুম)(?:\s+(?:there|bhai|apu|sir|madam))?[!. ]*\z/i
     THANKS_ONLY = /\A(?:thanks(?: a lot)?|thank you(?: very much)?|dhonnobad|onek dhonnobad|ধন্যবাদ|অনেক ধন্যবাদ)[!. ]*\z/i
     CUSTOMER_NAME_PREFIX = /\A(?:(?:hi|hello|hey|হ্যালো)(?:\s+there)?[,!. ]+)?(?:my name is|i am|i'm|amar naam|amar nam|name|naam|আমার নাম)\s*[:=-]?\s*(.+?)[.! ]*\z/i

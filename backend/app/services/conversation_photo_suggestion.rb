@@ -39,7 +39,7 @@ class ConversationPhotoSuggestion
     product = conversation.business.products.available_for_sale.find_by(id: offer["product_id"])
     return Result.new(product: nil, reply_key: "unavailable") unless product && product.total_available_stock.positive?
 
-    details = ConversationPhotoOrderDetails.new(product: product, caption: source.payload.dig("message", "text"))
+    details = ConversationPhotoOrderDetails.new(product: product, caption: source.photo_caption)
     return Result.new(reply_key: "caption_clarification") if details.ambiguous?
     if pending_order && (!pending_order.collecting_product? || pending_order.product_id || pending_order.pending_order_items.exists?)
       locked = pending_order.confirmed? || pending_order.submitted_to_woocommerce? || pending_order.cancelled?
@@ -55,7 +55,7 @@ class ConversationPhotoSuggestion
 
   def match_reply(product:, event:)
     text = reply_text("match", product: product.name)
-    details = ConversationPhotoOrderDetails.new(product: product, caption: event.payload.dig("message", "text"))
+    details = ConversationPhotoOrderDetails.new(product: product, caption: event.photo_caption)
     summary = details.summary(locale: locale)
     return text unless summary
 

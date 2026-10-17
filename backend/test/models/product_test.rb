@@ -1,6 +1,19 @@
 require "test_helper"
 
 class ProductTest < ActiveSupport::TestCase
+  test "archived products cannot be reactivated by saving visibility" do
+    product = create_product(stock_quantity: 5)
+    product.archive!
+    product.update!(active: true)
+    assert_not product.reload.active?
+    assert_not product.available_for_quantity?(1)
+  end
+
+  test "legacy active archived rows are not available inventory" do
+    product = create_product(stock_quantity: 5)
+    product.update_columns(archived_at: Time.current)
+    assert_not product.available_for_quantity?(1)
+  end
   test "active scope returns only active products" do
     active_product = create_product(name: "Active Product", active: true)
     create_product(name: "Inactive Product", active: false)

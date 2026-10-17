@@ -1,6 +1,7 @@
 import { GraphQLClient, type Variables } from "graphql-request";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { apiEndpoint } from "./apiBaseUrl";
+import { requestFetch } from "./requestFetch";
 
 export async function graphqlRequest<TResult, TVariables extends Variables>(
   document: TypedDocumentNode<TResult, TVariables>,
@@ -8,6 +9,7 @@ export async function graphqlRequest<TResult, TVariables extends Variables>(
 ): Promise<TResult> {
   const token = localStorage.getItem("chatcart_session_token");
   const client = new GraphQLClient(apiEndpoint("/graphql"), {
+    fetch: requestFetch,
     headers: token ? { Authorization: `Bearer ${token}` } : {}
   });
 

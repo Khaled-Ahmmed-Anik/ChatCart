@@ -13,6 +13,7 @@ class Product < ApplicationRecord
   accepts_nested_attributes_for :combo_items, allow_destroy: true
 
   after_commit :refresh_business_knowledge
+  before_validation :disable_archived_product
   before_validation :normalize_image_urls, if: :will_save_change_to_image_urls?
   validates :image_urls, product_image_urls: true, if: :will_save_change_to_image_urls?
 
@@ -27,6 +28,8 @@ class Product < ApplicationRecord
   validates :stock_strategy, inclusion: { in: %w[independent component_derived manual] }
 
   def available_for_quantity?(requested_quantity)
+    return false if archived?
+
     return product_variants.available.any? { |variant| variant.available_for_quantity?(requested_quantity) } if product_variants.any?
 
     requested_quantity.to_i.positive? && active? && stock_quantity >= requested_quantity.to_i
@@ -52,6 +55,10 @@ class Product < ApplicationRecord
 
   def archived?
     archived_at.present?
+  end
+
+  def disable_archived_product
+    self.active = false if archived?
   end
 
   def archive!

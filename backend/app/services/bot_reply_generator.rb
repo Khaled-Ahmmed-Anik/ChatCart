@@ -348,7 +348,7 @@ class BotReplyGenerator
     [
       "Here’s your order summary:",
       *cart_lines,
-      "• Total: #{formatted_price(pending_order.total_price)}",
+      "• #{cart_translation('subtotal', amount: formatted_price(pending_order.total_price))}",
       ("• Name: #{pending_order.customer_name}" if pending_order.customer_name.present?),
       ("• Phone: #{pending_order.phone}" if pending_order.phone.present?),
       ("• Address: #{pending_order.address}" if pending_order.address.present?),

@@ -13,6 +13,8 @@ class BusinessKnowledgeRetriever
   def initialize(business:, query:, source_types: nil, limit: DEFAULT_LIMIT)
     @business = business
     @query = query.to_s.squish
+    words = @query.downcase.scan(/[\p{L}\p{M}\p{N}]+/u)
+    @query = words.reject { |word| Constants::Knowledge::QUESTION_WORDS.include?(word) }.join(" ") unless @query.match?(/["-]|\bOR\b/)
     @source_types = Array(source_types).presence
     @limit = limit.to_i.clamp(1, MAXIMUM_LIMIT)
   end
