@@ -6,6 +6,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import App from "./app/App";
 import "./styles/app.css";
 import "./styles/foundation.css";
+import "./styles/home.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } }

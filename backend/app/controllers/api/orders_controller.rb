@@ -1,10 +1,17 @@
 module Api
   class OrdersController < BaseController
+    MAX_LIST_LIMIT = 50
     before_action -> { require_roles!(:owner, :admin, :sales_agent, :fulfilment_agent) }, only: %i[update submit_delivery]
     before_action :set_order, only: %i[show update submit_delivery]
 
     def index
-      orders = filtered_orders.includes(:order_items).recent_first
+      orders = filtered_orders.includes(:order_items, :conversation).recent_first
+      if params.key?(:limit)
+        unless params[:limit].is_a?(String) && params[:limit].match?(/\A[1-9]\d*\z/)
+          return render json: { error: I18n.t("orders.invalid_list_limit") }, status: :bad_request
+        end
+        orders = orders.limit([ params[:limit].to_i, MAX_LIST_LIMIT ].min)
+      end
       render json: orders.map { |order| serialize(order) }
     end
 
