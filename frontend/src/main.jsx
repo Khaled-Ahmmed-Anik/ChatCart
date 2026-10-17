@@ -7,6 +7,7 @@ import App from "./app/App";
 import "./styles/app.css";
 import "./styles/foundation.css";
 import "./styles/home.css";
+import "./styles/inbox.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } }
