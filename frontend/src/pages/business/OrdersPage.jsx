@@ -9,7 +9,7 @@ import { formatCurrency } from "../../lib/formatCurrency";
 export function OrdersPage() {
   const query = useQuery({ queryKey: ["orders"], queryFn: () => apiRequest("/api/orders") });
   if (query.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState error={query.error} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const columns = [
     { key: "number", label: "Order", render: row => <div><strong>{row.number}</strong><small>{new Date(row.confirmed_at).toLocaleString()}</small></div> },
     { key: "customer", label: "Customer", render: row => <div>{row.customer_name}<small>{row.phone}</small></div> },

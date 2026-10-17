@@ -43,7 +43,7 @@ export function BusinessesPage() {
   });
 
   if (query.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState error={query.error} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
 
   const columns = [
     { key: "name", label: "Business", render: (row) => <div><strong>{row.name}</strong><small>{row.slug}</small></div> },
