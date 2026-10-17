@@ -13,7 +13,9 @@ module Api
     end
 
     def show
-      render json: summary(@conversation).merge(
+      pending_order = @conversation.pending_order
+      render json: summary(@conversation, pending_order: pending_order).merge(
+        inbox_context: ConversationInboxContext.new(conversation: @conversation, pending_order: pending_order).call,
         messages: @conversation.messages.order(:created_at, :id).as_json(
           only: %i[id sender_type content metadata created_at]
         )
@@ -112,13 +114,14 @@ module Api
       @conversation = current_business.conversations.find(params[:id])
     end
 
-    def summary(conversation)
+    def summary(conversation, pending_order: conversation.pending_order)
       handover = conversation.conversation_state.to_h["handover_summary"]
       quality = ConversationQualityEvaluator.new(conversation: conversation).call
       {
         id: conversation.id,
         channel: conversation.channel,
-        customer_name: customer_name(conversation),
+        customer_name: customer_name(conversation, pending_order),
+        customer_phone: pending_order&.phone,
         external_customer_id: conversation.external_customer_id,
         status: conversation.status,
         last_message_at: conversation.last_message_at,
@@ -131,9 +134,9 @@ module Api
       }
     end
 
-    def customer_name(conversation)
+    def customer_name(conversation, pending_order)
       conversation.conversation_state.to_h.dig("customer_profile", "name").presence ||
-        conversation.pending_order&.customer_name.presence
+        pending_order&.customer_name.presence
     end
 
     def update_conversation_state!(key, value)
