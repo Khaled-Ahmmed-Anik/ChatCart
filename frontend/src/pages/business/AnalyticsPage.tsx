@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { DashboardAnalyticsDocument } from "../../graphql/generated/graphql";
 import { graphqlRequest } from "../../lib/graphqlClient";
+import { formatCurrency } from "../../lib/formatCurrency";
 
 type BreakdownData = Record<string, string | number>;
 type JsonObject = Record<string, unknown>;
@@ -47,11 +48,11 @@ export function AnalyticsPage() {
     ["Conversations", data.conversations],
     ["Confirmed orders", data.confirmedOrders],
     ["Chat → order", `${data.conversationToOrderRate}%`],
-    ["Revenue", `${data.revenue} BDT`],
+    ["Revenue", formatCurrency(data.revenue, query.data!.currentBusiness.currency)],
     ["Unique customers", data.uniqueCustomers],
     ["Repeat customers", data.repeatCustomers],
     ["Repeat rate", `${data.repeatCustomerRate}%`],
-    ["Average order", `${data.averageOrderValue} BDT`],
+    ["Average order", formatCurrency(data.averageOrderValue, query.data!.currentBusiness.currency)],
     ["Takeovers", handoverPerformance.total ?? 0],
     ["Waiting for seller", handoverPerformance.waiting_now ?? 0],
     ["Chat quality", qualitySummary.average_score ?? "—"],

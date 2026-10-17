@@ -18,6 +18,9 @@ query DashboardContext {
 }
 
 query DashboardAnalytics {
+  currentBusiness {
+    currency
+  }
   analytics {
     conversations
     uniqueCustomers
