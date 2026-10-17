@@ -29,6 +29,35 @@ The separate `foundation.css` is the shared migration layer; feature-specific st
 5. Orders fulfilment controls with explicit mappings to current order/delivery states.
 6. Platform review/health/access tools only after their authorization and real telemetry exist.
 
+## Home (WC-069)
+
+The business landing page now prioritizes chats needing seller attention, orders in confirmed
+or revision-pending states, and access to shop settings. Setup completion is not inferred from
+missing or empty fields. Settings remains a useful link, not a fabricated completion score.
+
+Four headline metrics use the existing all-time analytics snapshot. Labels explicitly distinguish
+order value from collected payments. Current order counts, conversion and product rankings include
+cancelled order records; this PR explains those existing semantics rather than changing calculations.
+The existing retention, takeover, quality, review and checkout reports remain in Detailed analytics.
+No Today/7-day/30-day controls are exposed without backend date filtering.
+
+Recent orders use `GET /api/orders?limit=5`. This optional positive-integer limit is capped at
+`Api::OrdersController::MAX_LIST_LIMIT`; omitting it preserves the existing Orders-page response.
+The query preloads items and conversations, retains tenant isolation and deterministic newest-first
+ordering, and does not change CSV export. No database migrations or environment changes are needed.
+
+Analytics, Inbox status and recent orders fail independently. Requests are read-only; errors offer
+explicit retry. Inbox shares the shell's existing conversation cache. Existing monetary formatting
+and per-order currency are reused. The page does not claim courier bookings, packing counts,
+live assistant health, date-filtered performance or automatic setup verification.
+
+Home validation: frontend lint, TypeScript, 12 unit tests and production build passed. Commerce
+regressions passed (16 tests / 81 assertions), including tenant isolation, tie-break ordering,
+unchanged unlimited listing, invalid/structured limit rejection and maximum-limit enforcement.
+Desktop/mobile browser checks exercised populated Home, expandable diagnostics, empty orders,
+independent analytics/order failures, read-only recovery and overflow. They used local API fixtures,
+not production data. No browser runtime exceptions occurred.
+
 ## Safety decisions
 
 - Do not queue order confirmations, outbound messages or courier bookings for automatic offline replay.
