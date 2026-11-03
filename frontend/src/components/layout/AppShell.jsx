@@ -6,11 +6,9 @@ import { apiRequest } from "../../lib/apiClient";
 import { graphqlRequest } from "../../lib/graphqlClient";
 import { DashboardContextDocument } from "../../graphql/generated/graphql";
 import { pollInterval } from "../../lib/polling";
-
-const businessNavigation = [
-  ["/app", "Overview", true], ["/app/orders", "Orders"], ["/app/conversations", "Conversations"],
-  ["/app/products", "Products"], ["/app/knowledge", "Knowledge"], ["/app/settings", "Business setup"]
-];
+import { workspaceNavigation } from "../../lib/navigation";
+import { Brand } from "../ui/Brand";
+import { Icon } from "../ui/Icon";
 
 function playHandoverSound() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -77,23 +75,24 @@ export function AppShell() {
     playHandoverSound();
   }
 
-  const navigation = auth.actorType === "platform_administrator" ? [["/admin/businesses", "Businesses"]] : businessNavigation;
+  const navigation = workspaceNavigation(auth.actorType);
   const actor = contextQuery.data?.viewer || auth.actor;
   const business = contextQuery.data?.currentBusiness || auth.business;
 
   return <div className="app-layout">
+    <a className="skip-link" href="#workspace-content">Skip to content</a>
     <aside className="sidebar">
-      <div className="brand"><span>CC</span><div>ChatCart<small>Commerce console</small></div></div>
-      <nav>{navigation.map(([to, label, end]) => <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? "active" : ""}>
-        <span>{label}</span>
+      <Brand subtitle={auth.actorType === "platform_administrator" ? "Platform admin" : "Commerce workspace"} />
+      <nav aria-label="Workspace">{navigation.map(({ to, label, end, icon }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? "active" : ""}>
+        <span className="nav-label"><Icon name={icon} /><span>{label}</span></span>
         {to === "/app/conversations" && handovers.length > 0 && <strong className="nav-alert-count">{handovers.length}</strong>}
       </NavLink>)}</nav>
       {auth.actorType === "business_user" && <button type="button" className={`alert-toggle ${alertsEnabled ? "enabled" : ""}`} onClick={enableAlerts}>
-        {alertsEnabled ? "🔔 Takeover alerts on" : "🔕 Enable takeover alerts"}
+        <Icon name="bell" size={18} />{alertsEnabled ? "Takeover alerts on" : "Enable takeover alerts"}
       </button>}
       <div className="account"><strong>{actor?.name}</strong><small>{business?.name || "Platform administrator"}</small></div>
-      <button type="button" className="button ghost" onClick={logout}>Sign out</button>
+      <button type="button" className="button ghost sign-out" onClick={logout}><Icon name="logout" size={18} />Sign out</button>
     </aside>
-    <main className="main-content"><Outlet /></main>
+    <main id="workspace-content" className="main-content" tabIndex={-1}><Outlet /></main>
   </div>;
 }

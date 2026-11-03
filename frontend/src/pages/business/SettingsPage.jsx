@@ -49,7 +49,7 @@ export function SettingsPage() {
   });
   if ([business, policy, delivery, channels].some((query) => query.isLoading)) return <LoadingState />;
   const error = [business, policy, delivery, channels].find((query) => query.isError)?.error;
-  if (error) return <ErrorState error={error} />;
+  if (error) return <ErrorState error={error} onRetry={() => { [business, policy, delivery, channels].forEach((query) => query.refetch()); }} />;
 
   function connect(event) {
     event.preventDefault();

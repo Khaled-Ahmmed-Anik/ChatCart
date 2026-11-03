@@ -44,7 +44,7 @@ export function ProductsPage() {
   const previewImport=useMutation({mutationFn:async(url:string)=>{const result=await graphqlRequest(PreviewDashboardProductImportDocument,{url});const payload=result.previewProductImport;if(!payload?.draft)throw new Error(payload?.errors.join(", ")||"Import failed");return {id:payload.draft.id,extractedData:payload.draft.extractedData,errors:payload.errors};},onSuccess:setImportDraft});
   const approveImport=useMutation({mutationFn:async(draftId:string)=>{const result=await graphqlRequest(ApproveDashboardProductImportDocument,{draftId});const payload=result.approveProductImport;if(!payload?.product||payload.errors.length)throw new Error(payload?.errors.join(", ")||"Approval failed");return payload.product;},onSuccess:()=>{client.invalidateQueries({queryKey:["products"]});setImportOpen(false);setImportDraft(null);}});
   if (query.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState error={query.error} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
 
   const edit = (product: Product) => { setEditing(product); setImageUrls(product.imageUrls); setVariants(product.variants); setComboItems(product.comboItems.map(item=>({id:item.id,componentProductId:item.componentProduct.id,quantity:item.quantity,selectionGroup:item.selectionGroup||undefined,required:item.required,position:item.position}))); setOpen(true); };
   const updateVariant = (index: number, values: Partial<VariantDraft>) => setVariants(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));

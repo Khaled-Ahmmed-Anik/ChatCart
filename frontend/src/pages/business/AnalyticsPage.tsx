@@ -34,7 +34,7 @@ export function AnalyticsPage() {
     queryFn: () => graphqlRequest(DashboardAnalyticsDocument)
   });
   if (query.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState error={query.error} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
 
   const data = query.data!.analytics;
   const handoverData = asObject(data.handovers);

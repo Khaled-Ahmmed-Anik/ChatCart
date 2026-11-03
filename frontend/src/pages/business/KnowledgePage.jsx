@@ -98,7 +98,7 @@ export function KnowledgePage() {
   });
 
   if (documents.isLoading || status.isLoading) return <LoadingState />;
-  if (documents.error || status.error) return <ErrorState error={documents.error || status.error} />;
+  if (documents.error || status.error) return <ErrorState error={documents.error || status.error} onRetry={() => { documents.refetch(); status.refetch(); }} />;
   const manualDocuments = documents.data.filter((document) => document.source_type === "manual");
 
   function deleteDocument(document) {

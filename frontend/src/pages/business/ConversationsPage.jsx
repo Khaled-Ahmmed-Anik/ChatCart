@@ -46,7 +46,7 @@ export function ConversationsPage() {
   useEffect(() => { if (selected?.messages?.length) messagesEndRef.current?.scrollIntoView({ block: "end" }); }, [selected?.messages?.length, selectedId]);
 
   if (list.isLoading) return <LoadingState />;
-  if (list.isError) return <ErrorState error={list.error} />;
+  if (list.isError) return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
 
   function reply(event) {
     event.preventDefault();
