@@ -16,6 +16,7 @@ export function LoadingState() {
     <span>{slow ? "Still loading. The server may be waking up; this can take a little longer." : "Loading…"}</span>
   </div>;
 }
+/** @param {{ title?: string, description?: import("react").ReactNode, actions?: import("react").ReactNode }} props */
 export function EmptyState({ title="Nothing here yet", description, actions }) {
   return <div className="state"><strong>{title}</strong>{description && <p>{description}</p>}{actions && <div className="actions">{actions}</div>}</div>;
 }

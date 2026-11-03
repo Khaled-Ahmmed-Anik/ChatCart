@@ -57,6 +57,42 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal "text/csv", response.media_type
   end
 
+  test "recent orders limit preserves tenant isolation and deterministic ordering" do
+    older = create_order(@business, number: "ORD-OLDER")
+    newer = create_order(@business, number: "ORD-NEWER")
+    older.update!(confirmed_at: newer.confirmed_at)
+    create_order(@other_business, number: "ORD-OTHER")
+
+    get api_orders_path, params: { limit: 1 }, headers: authorization(@token)
+
+    assert_response :success
+    assert_equal [ newer.id ], response.parsed_body.map { |order| order.fetch("id") }
+    assert_equal "facebook", response.parsed_body.first.fetch("channel")
+    assert_equal 1, response.parsed_body.first.fetch("items").size
+
+    get api_orders_path, headers: authorization(@token)
+    assert_equal [ newer.id, older.id ], response.parsed_body.map { |order| order.fetch("id") }
+  end
+
+  test "recent orders limit rejects invalid values" do
+    [ "0", "-1", "abc", "1.5", "", [ "5" ], { "nested" => "5" } ].each do |limit|
+      get api_orders_path, params: { limit: limit }, headers: authorization(@token)
+      assert_response :bad_request
+      assert_equal I18n.t("orders.invalid_list_limit"), response.parsed_body.fetch("error")
+    end
+  end
+
+  test "recent orders limit is capped" do
+    (Api::OrdersController::MAX_LIST_LIMIT + 1).times do |index|
+      create_order(@business, number: "ORD-LIMIT-#{index}")
+    end
+
+    get api_orders_path, params: { limit: 1000 }, headers: authorization(@token)
+
+    assert_response :success
+    assert_equal Api::OrdersController::MAX_LIST_LIMIT, response.parsed_body.size
+  end
+
   test "order export preserves multiple variants Unicode and quoted customer fields" do
     order = create_order(@business, number: "ORD-CSV-QA")
     order.update!(customer_name: 'SQA "Buyer"', address: "SQA TEST, ঢাকা", subtotal: 450, total: 450)
