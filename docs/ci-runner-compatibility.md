@@ -14,6 +14,26 @@ Gemfile.lock, Docker image, database, deployment settings or application behavio
 Keep Release aligned with the Ruby CI jobs so the same setup failure cannot recur
 when creating a versioned release.
 
+## Security scan follow-up
+
+Once Ruby setup succeeded, the advisory scan ran and found newly reported issues
+in seven locked gems. Keep the scan enabled and use conservative patch updates:
+
+| Gem | Before | Patched |
+| --- | --- | --- |
+| crass | 1.0.7 | 1.0.8 |
+| graphql | 2.6.11 | 2.6.14 |
+| loofah | 2.25.2 | 2.25.3 |
+| net-ssh | 7.3.2 | 7.3.8 |
+| nokogiri | 1.19.4 | 1.19.7 |
+| rack | 3.2.7 | 3.2.8 |
+| rails-html-sanitizer | 1.7.1 | 1.7.2 |
+
+The dependency follow-up changes `Gemfile.lock`, unlike the runner-only fix.
+Ruby 3.4.7, Rails 8.1.4, JSON constraints, unrelated gem versions and existing
+Linux/macOS platform entries remain unchanged. Run the advisory scan and full
+backend regression suite on the updated lockfile, then verify hosted CI again.
+
 ## Verification
 
 Confirm on GitHub that Ruby installation and all subsequent CI checks pass for
