@@ -19,7 +19,7 @@ The separate `foundation.css` is the shared migration layer; feature-specific st
 
 ## Next slices
 
-1. Home action cards and Inbox list/search, retaining review and takeover behaviour.
+1. Home action cards (WC-069) and Inbox list/search (WC-070), retaining review and takeover behaviour.
 2. Inbox Order / Customer / Review tabs and mobile equivalents. Editable drafts and confirmed
    revisions require backend validation, concurrency protection, versioned summaries and reconfirmation.
 3. Product catalogue/form redesign, preserving all combo/variant/stock modes. File upload, variant
@@ -83,3 +83,42 @@ Run frontend lint, TypeScript, unit tests and production build. Inspect login an
 shells at desktop and mobile widths. Check all existing links, keyboard focus, password visibility,
 error feedback and the absence of fabricated data. Test takeover/notifications separately against a
 local fixture or authorized environment; styling must not change the send/resume APIs.
+
+## Inbox (WC-070)
+
+- Search the loaded business conversations by name, captured phone, external customer ID or channel.
+- All / Needs you / Assistant filters preserve closed conversations under All. Assistant is a
+  conversation state, not a claim about channel connectivity or provider health.
+- Desktop list/transcript/context layout; mobile switches from list to chat with a Chats back button.
+- Order / Customer / Review tabs have keyboard navigation and distinguish private review from buyer replies.
+- The transcript opens at the latest message. Polling does not move the reader away from older messages;
+  Jump to latest restores following. Header/composer remain outside the message scroll container.
+- Reply and review drafts are isolated per conversation while the Inbox page is mounted. They are
+  not persisted to browser storage and are discarded on page reload/navigation away from Inbox.
+- Reply failure keeps the draft, does not automatically retry, and requires a successful manual
+  conversation refresh before enabling another mutation in that chat. A saved reply is not labelled delivered.
+- Owner/admin/sales-agent actions remain server-authorized. Other business roles see read-only controls.
+- Existing seller sends only enqueue Messenger delivery. Other channels explicitly explain the
+  unsupported dashboard-send path; no fake send or silent local-only reply is offered.
+
+`GET /api/conversations/:id` now adds `inbox_context` with captured customer fields, the current
+draft or durable order snapshot, and at most five recorded orders from that business/conversation.
+Durable orders use historical order-item prices; draft subtotal uses current catalogue prices and
+does not invent delivery fees or a final payable total. History counts are conversation-specific,
+not cross-channel customer identity matching. List summaries additionally expose captured phone
+for search. Arbitrary conversation state is not added to the response.
+
+Read-only context is assembled in `ConversationInboxContext`. No schema, environment or production
+data changes are required. Deploy backend and frontend together (or backend first); an older backend
+shows unavailable context rather than inventing an empty order. No order editing/reconfirmation,
+customer mutation, private customer notes, blocking, attachment gallery or delivery receipts are
+implemented by this slice. Existing quality diagnostics and handover context remain available.
+Failed-request handling covers the dashboard API request, not asynchronous Meta delivery failures.
+The existing send API has no idempotency contract, so refresh-and-inspect reduces duplicate risk
+but is not an exactly-once delivery guarantee.
+
+Inbox validation: frontend lint, TypeScript, 15 unit tests and production build; Ruby lint;
+22 Inbox/commerce tests with 107 assertions. Local fixture browser checks at 1700px and 390px cover
+search/filtering, tabs, per-chat reply/review drafts, failed sends without automatic retry, manual
+refresh, takeover/resume, scroll anchoring, read-only roles, channel gating and detail-query recovery.
+No production messages or orders were created by these checks.
