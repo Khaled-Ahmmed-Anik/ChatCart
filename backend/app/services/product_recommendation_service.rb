@@ -72,14 +72,8 @@ class ProductRecommendationService
     text = normalize_digits(message.downcase)
     return [ nil, nil, false ] if unlimited_budget?
 
-    numbers = text.scan(/\d+(?:\.\d+)?/).map(&:to_d)
-    if text.match?(/(?:-|–|to|theke|থেকে)/) && numbers.length >= 2
-      return [ numbers.first, numbers.second, true ]
-    end
-    return [ numbers.first, nil, true ] if numbers.any? && text.match?(/\b(above|over|minimum|min|beshi)\b|বেশি|উপরে/)
-    if numbers.any? && text.match?(/\b(under|below|within|max|budget|moddhe|less than)\b|মধ্যে|নিচে|বাজেট/)
-      return [ nil, numbers.first, true ]
-    end
+    budget = CatalogueBudgetParser.call(message)
+    return [ budget["minimum_price"], budget["maximum_price"], true ] if budget.any?
 
     remembered_minimum = preferences["minimum_price"].presence&.to_d
     remembered_maximum = preferences["maximum_price"].presence&.to_d
@@ -188,7 +182,16 @@ class ProductRecommendationService
     matches_format?(product) &&
       !product.id.in?(Array(preferences["rejected_product_ids"]).map(&:to_i)) &&
       avoids_excluded_families?(product) &&
-      acceptable_projection?(product) && acceptable_attributes?(product)
+      acceptable_projection?(product) && acceptable_attributes?(product) && compatible_attributes?(product)
+  end
+
+  def compatible_attributes?(product)
+    preferences["attributes"].to_h.all? do |key, values|
+      next true unless key.to_s.in?(Constants::Catalogue::COMPATIBILITY_ATTRIBUTE_KEYS)
+
+      wanted = Array(values).map { |value| value.to_s.downcase }
+      wanted.empty? || (Array(product.product_attributes.to_h[key]).map { |value| value.to_s.downcase } & wanted).any?
+    end
   end
 
   def acceptable_attributes?(product)
