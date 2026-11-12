@@ -15,7 +15,7 @@ class ProcessMessengerEventJob < ApplicationJob
 
     SendMessengerReplyJob.perform_later(result.fetch(:delivery)) if result[:delivery]
     log_processed(result.fetch(:webhook_event), result)
-    remember_customer_name(result.fetch(:result).conversation, webhook_event.business)
+    remember_customer_name(result.fetch(:result).conversation, webhook_event)
   rescue StandardError => error
     webhook_event.update!(status: "failed", last_error: error.message) if webhook_event&.persisted?
     MessengerSafeLogger.error(
@@ -99,14 +99,13 @@ class ProcessMessengerEventJob < ApplicationJob
     )
   end
 
-  def remember_customer_name(conversation, business)
+  def remember_customer_name(conversation, webhook_event)
     state = conversation.conversation_state.to_h
     return if state.dig("customer_profile", "name").present?
 
     name = MessengerCustomerProfile.new(
       sender_id: conversation.external_customer_id,
-      page_access_token: business.channel_connections.active.find_by(channel: "facebook")&.access_token ||
-        ENV["MESSENGER_PAGE_ACCESS_TOKEN"]
+      page_access_token: MessengerPageConnection.for_event(webhook_event)&.access_token
     ).name
     return if name.blank?
 

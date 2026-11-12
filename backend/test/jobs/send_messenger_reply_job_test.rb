@@ -5,6 +5,7 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
   setup do
     @previous_token = ENV["MESSENGER_PAGE_ACCESS_TOKEN"]
     ENV["MESSENGER_PAGE_ACCESS_TOKEN"] = "token-123"
+    Business.default.channel_connections.create!(channel: "facebook", external_account_id: "page-1", status: "active", access_token: "page-token")
   end
 
   teardown do
@@ -73,6 +74,15 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
     assert_equal 0, delivery.attempts
   end
 
+  test "does not fall back to the global token for an unconfigured page" do
+    delivery = create_delivery
+    delivery.messenger_webhook_event.update!(payload: { chatcart_page_id: "unknown-page" })
+    with_http_post_stub(->(*) { flunk("No request should use the global token") }) do
+      SendMessengerReplyJob.perform_now(delivery)
+    end
+    assert_equal "skipped", delivery.reload.status
+  end
+
   private
 
   def create_delivery
@@ -82,7 +92,7 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
       event_type: "customer_text",
       external_event_id: SecureRandom.uuid,
       sender_id: "fb-user-123",
-      payload: { message: { text: "Hi" } },
+      payload: { chatcart_page_id: "page-1", message: { text: "Hi" } },
       status: "processed",
       processed_at: Time.current
     )

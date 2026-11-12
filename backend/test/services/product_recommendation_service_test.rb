@@ -1,6 +1,16 @@
 require "test_helper"
 
 class ProductRecommendationServiceTest < ActiveSupport::TestCase
+  test "budget fallback never relaxes verified compatibility requirements" do
+    business = Business.create!(name: "Electronics", slug: "electronics-compatibility", category: "electronics")
+    business.products.create!(name: "Android Tracker", price: 500, stock_quantity: 5, product_attributes: { compatibility: [ "Android" ] })
+    business.products.create!(name: "Apple Tracker", price: 2500, stock_quantity: 5, product_attributes: { compatibility: [ "iOS" ] })
+    result = ProductRecommendationService.new(business: business, message: "iOS under 1000").call
+    assert_equal [ "Apple Tracker" ], result.offers.map { |offer| offer.product.name }
+    assert_not result.exact_match
+    result = ProductRecommendationService.new(business: business, message: "under 1000", preferences: { "attributes" => { "compatibility" => [ "unsupported device" ] } }).call
+    assert_empty result.offers
+  end
   test "clothing recommendation never treats the largest affordable size as preferred" do
     business = Business.create!(name: "Fit Shop", slug: "fit-shop", category: "clothing")
     product = business.products.create!(name: "Shirt", price: 600, stock_quantity: 0)

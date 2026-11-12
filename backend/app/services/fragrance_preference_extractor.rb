@@ -99,13 +99,7 @@ class FragrancePreferenceExtractor
   end
 
   def detected_budget
-    text = message.tr("০১২৩৪৫৬৭৮৯", "0123456789")
-    numbers = text.scan(/\d+(?:\.\d+)?/).map(&:to_d)
-    return { "minimum_price" => numbers.first, "maximum_price" => numbers.second } if numbers.length >= 2 && text.match?(/-|–| to | theke |থেকে/)
-    return { "maximum_price" => numbers.first } if numbers.any? && text.match?(/under|below|within|budget|max|moddhe|less than|মধ্যে|নিচে|বাজেট/)
-    return { "minimum_price" => numbers.first } if numbers.any? && text.match?(/above|over|minimum|min|beshi|বেশি|উপরে/)
-
-    {}
+    CatalogueBudgetParser.call(message)
   end
 
   def unlimited_budget?

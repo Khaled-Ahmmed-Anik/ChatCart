@@ -9,6 +9,7 @@ module Webhooks
     setup do
       @previous_app_secret = ENV["MESSENGER_APP_SECRET"]
       ENV["MESSENGER_APP_SECRET"] = APP_SECRET
+      @connection = Business.default.channel_connections.create!(channel: "facebook", external_account_id: "page-1", status: "active", access_token: "test-token")
     end
 
     teardown do
@@ -68,6 +69,7 @@ module Webhooks
         object: "page",
         entry: [
           {
+            id: "page-1",
             messaging: [
               messaging_event(sender_id: "fb-user-1", text: "Hello", message_id: "mid-1"),
               { delivery: { mids: [ "sent-1" ] } },
@@ -75,6 +77,7 @@ module Webhooks
             ]
           },
           {
+            id: "page-1",
             messaging: [
               messaging_event(sender_id: "fb-user-2", text: "Hi", message_id: "mid-2"),
               { sender: { id: "page-1" }, message: { mid: "echo-1", is_echo: true, text: "Reply" } },
@@ -117,6 +120,7 @@ module Webhooks
         object: "page",
         entry: [
           {
+            id: "page-1",
             messaging: [
               { sender: {}, message: {} },
               { sender: { id: "fb-user-1" }, postback: { payload: "CONFIRM_ORDER" } },
@@ -143,6 +147,7 @@ module Webhooks
     end
 
     test "create acknowledges but does not record or enqueue events for an inactive business" do
+      @connection.destroy!
       business = Business.create!(name: "Disabled Shop", slug: "disabled-shop", status: "disabled")
       business.channel_connections.create!(
         channel: "facebook", external_account_id: "page-1", status: "active", access_token: "secret"
@@ -201,6 +206,25 @@ module Webhooks
       assert_equal "received", MessengerWebhookEvent.find_by!(external_event_id: "photo-mid").status
       assert_no_enqueued_jobs { post_signed_payload(payload) }
       assert_equal "duplicate", JSON.parse(response.body)["status"]
+    end
+
+    test "unknown disconnected and mismatched pages never route to the default business" do
+      payload = messenger_payload(sender_id: "customer", text: "hello", message_id: "unrouted")
+      payload[:entry][0][:id] = "unknown-page"
+      assert_no_difference -> { MessengerWebhookEvent.count } do
+        assert_no_enqueued_jobs { post_signed_payload(payload) }
+      end
+      payload[:entry][0][:id] = "page-1"
+      payload[:entry][0][:messaging][0][:recipient][:id] = "other-page"
+      assert_no_difference -> { MessengerWebhookEvent.count } do
+        assert_no_enqueued_jobs { post_signed_payload(payload) }
+      end
+      @connection.update!(status: "disconnected")
+      payload[:entry][0][:messaging][0][:recipient][:id] = "page-1"
+      assert_no_difference -> { MessengerWebhookEvent.count } do
+        assert_no_enqueued_jobs { post_signed_payload(payload) }
+      end
+      assert_response :ok
     end
 
     private

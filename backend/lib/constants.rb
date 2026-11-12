@@ -1,4 +1,8 @@
 module Constants
+  module Catalogue
+    COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
+  end
+
   module Knowledge
     QUESTION_WORDS = %w[what are is the a an do does you your our please tell me about how much can i we have].freeze
   end

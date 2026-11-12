@@ -24,11 +24,14 @@ module Webhooks
 
     def record_messaging_event(entry_id, event)
       event_type = MessengerEventClassifier.new(event).type
-      business = ChannelConnection.active.find_by(channel: "facebook", external_account_id: entry_id)&.business ||
-        Business.default
-      return { type: event_type, status: "ignored" } unless business.active?
+      connection = ChannelConnection.active.find_by(channel: "facebook", external_account_id: entry_id)
+      business = connection&.business
+      return { type: event_type, status: "ignored" } unless business&.active?
+      return { type: event_type, status: "ignored" } if event.dig("recipient", "id").present? &&
+        event.dig("recipient", "id").to_s != entry_id && event_type != :message_echo
 
-      result = MessengerWebhookEventRecorder.new(payload: event, event_type: event_type, business: business).record
+      routed_payload = event.to_unsafe_h.merge("chatcart_page_id" => entry_id)
+      result = MessengerWebhookEventRecorder.new(payload: routed_payload, event_type: event_type, business: business).record
 
       if result.created && event_type == :customer_text
         delay = MessengerPhotoTurn.caption_candidate?(event.dig("message", "text")) ? Constants::PhotoRecognition::CAPTION_WINDOW : messenger_message_debounce

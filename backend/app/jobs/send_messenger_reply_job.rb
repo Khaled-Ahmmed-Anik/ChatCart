@@ -43,8 +43,7 @@ class SendMessengerReplyJob < ApplicationJob
   end
 
   def page_access_token_for(delivery)
-    business = delivery.messenger_webhook_event.business
-    business.channel_connections.active.find_by(channel: "facebook")&.access_token || ENV["MESSENGER_PAGE_ACCESS_TOKEN"]
+    MessengerPageConnection.for_event(delivery.messenger_webhook_event)&.access_token
   end
 
   def persist_result(delivery, result)
