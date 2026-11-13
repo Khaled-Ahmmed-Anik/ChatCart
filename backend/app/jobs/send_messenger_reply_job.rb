@@ -21,6 +21,9 @@ class SendMessengerReplyJob < ApplicationJob
 
   def perform(delivery)
     return if delivery.status == "delivered"
+    if delivery.messenger_webhook_event.business.reload.blocks_automated_reply?(delivery.message)
+      return delivery.update!(status: "skipped", last_error: "business_automation_paused")
+    end
     return skip_inactive_business(delivery) unless delivery.messenger_webhook_event.business.active?
 
     delivery.increment!(:attempts)

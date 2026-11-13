@@ -83,6 +83,15 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
     assert_equal "skipped", delivery.reload.status
   end
 
+  test "seller replies still send while business AI is paused" do
+    delivery = create_delivery
+    delivery.message.update!(sender_type: :seller)
+    delivery.messenger_webhook_event.business.update!(automation_paused: true)
+    response = fake_response(success: true, code: 200, body: '{"message_id":"seller-sent"}')
+    with_http_post_stub(->(*) { response }) { SendMessengerReplyJob.perform_now(delivery) }
+    assert_equal "delivered", delivery.reload.status
+  end
+
   private
 
   def create_delivery

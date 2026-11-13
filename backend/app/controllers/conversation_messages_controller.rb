@@ -44,6 +44,8 @@ class ConversationMessagesController < ApplicationController
   end
 
   def serialize_pending_order(pending_order)
+    return unless pending_order
+
     {
       id: pending_order.id,
       status: pending_order.status,

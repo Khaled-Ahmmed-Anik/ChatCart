@@ -31,6 +31,36 @@ class Business < ApplicationRecord
     status == "active"
   end
 
+  def automation_paused?
+    settings.to_h[Constants::Automation::PAUSED] == true
+  end
+
+  def automation_paused=(paused)
+    values = settings.to_h.merge(Constants::Automation::PAUSED => paused)
+    if paused && !automation_paused?
+      values[Constants::Automation::PAUSED_AT] = Time.current.iso8601(6)
+    elsif !paused && automation_paused?
+      values[Constants::Automation::RESUMED_AT] = Time.current.iso8601(6)
+    end
+    self.settings = values
+  end
+
+  def blocks_automated_reply?(message)
+    return false unless message.bot?
+    return true if automation_paused?
+
+    paused_at = settings.to_h[Constants::Automation::PAUSED_AT]
+    paused_at.present? && (message.created_at <= Time.iso8601(paused_at) ||
+      message.metadata.to_h[Constants::Automation::EPOCH] != paused_at)
+  end
+
+  def suppresses_incoming_automation?(received_at)
+    return true if automation_paused?
+
+    resumed_at = settings.to_h[Constants::Automation::RESUMED_AT]
+    resumed_at.present? && received_at < Time.iso8601(resumed_at)
+  end
+
   private
 
   def revoke_user_sessions_when_deactivated

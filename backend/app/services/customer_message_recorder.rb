@@ -4,12 +4,13 @@ class CustomerMessageRecorder
     keyword_init: true
   )
 
-  def initialize(channel:, external_customer_id:, content:, metadata: {}, business: Business.default)
+  def initialize(channel:, external_customer_id:, content:, metadata: {}, business: Business.default, received_at: Time.current)
     @channel = channel
     @external_customer_id = external_customer_id
     @content = content
     @metadata = metadata
     @business = business
+    @received_at = received_at
   end
 
   def record
@@ -29,13 +30,19 @@ class CustomerMessageRecorder
         content: content,
         metadata: metadata
       )
+      business.reload
+      @automation_epoch = business.settings.to_h[Constants::Automation::PAUSED_AT]
+      if business.suppresses_incoming_automation?(@received_at)
+        outcome = :awaiting_human
+        next
+      end
       if feedback_rating.present?
         record_customer_feedback!(conversation, feedback_rating)
         outcome = :feedback_recorded
         bot_reply = conversation.messages.create!(
           sender_type: :bot,
           content: feedback_rating == "helpful" ? "Thank you—glad I could help! 😊" : "Thank you for telling us. We’ll use this to improve the experience.",
-          metadata: { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+          metadata: bot_reply_metadata
         )
         next
       end
@@ -182,7 +189,8 @@ class CustomerMessageRecorder
   end
 
   def bot_reply_metadata
-    metadata = { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION }
+    metadata = { "conversation_engine_version" => Constants::Conversation::ENGINE_VERSION,
+      Constants::Automation::EPOCH => @automation_epoch }
     metadata["ai_assistant"] = @ai_reply_metadata if @ai_reply_metadata.present?
     metadata
   end

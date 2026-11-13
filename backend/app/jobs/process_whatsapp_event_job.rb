@@ -45,15 +45,16 @@ class ProcessWhatsappEventJob < ApplicationJob
       events = pending_events(webhook_event).lock.to_a
       return if events.empty?
 
+      business = webhook_event.business.reload
+      manual, automatic = events.partition { |event| business.suppresses_incoming_automation?(event.created_at) }
+      if manual.any? && automatic.any?
+        record_customer_events(manual, webhook_event)
+        manual.each { |event| event.update!(status: "processed", processed_at: Time.current, last_error: nil) }
+        events = automatic
+      end
       events.each { |event| event.update!(status: "processing", last_error: nil) }
       last_event = events.last
-      result = CustomerMessageRecorder.new(
-        business: webhook_event.business,
-        channel: "whatsapp",
-        external_customer_id: webhook_event.sender_id,
-        content: combined_text(events),
-        metadata: combined_metadata(events)
-      ).record
+      result = record_customer_events(events, webhook_event)
       if result.bot_reply
         delivery = WhatsappDelivery.create!(
           whatsapp_webhook_event: last_event,
@@ -66,6 +67,13 @@ class ProcessWhatsappEventJob < ApplicationJob
     end
 
     { result: result, delivery: delivery }
+  end
+
+  def record_customer_events(events, webhook_event)
+    CustomerMessageRecorder.new(
+      business: webhook_event.business, channel: "whatsapp", external_customer_id: webhook_event.sender_id,
+      content: combined_text(events), received_at: events.last.created_at, metadata: combined_metadata(events)
+    ).record
   end
 
   def pending_events(webhook_event)
