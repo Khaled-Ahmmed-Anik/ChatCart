@@ -1,0 +1,4 @@
+bn:
+  automation:
+    invalid_value: "অটোমেশন বিরতির মান true অথবা false হতে হবে।"
+    resume_business_first: "প্রথমে দোকানের সেটিংস থেকে অটোমেশন চালু করুন।"

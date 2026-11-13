@@ -56,15 +56,16 @@ class ProcessMessengerEventJob < ApplicationJob
       end
       next if events.empty?
 
+      business = webhook_event.business.reload
+      manual, automatic = events.partition { |event| business.suppresses_incoming_automation?(event.created_at) }
+      if manual.any? && automatic.any?
+        record_customer_events(manual, webhook_event)
+        manual.each { |event| event.update!(status: "processed", processed_at: Time.current, last_error: nil) }
+        events = automatic
+      end
       events.each { |event| event.update!(status: "processing", last_error: nil) }
       processed_event = events.last
-      result = CustomerMessageRecorder.new(
-        business: webhook_event.business,
-        channel: "facebook",
-        external_customer_id: webhook_event.sender_id,
-        content: combined_text(events),
-        metadata: combined_metadata(events)
-      ).record
+      result = record_customer_events(events, webhook_event)
       if result.bot_reply
         delivery = MessengerDelivery.create!(
           messenger_webhook_event: processed_event,
@@ -76,6 +77,17 @@ class ProcessMessengerEventJob < ApplicationJob
     end
 
     { result: result, delivery: delivery, webhook_event: processed_event, photo_events: photo_events.uniq(&:id) }
+  end
+
+  def record_customer_events(events, webhook_event)
+    CustomerMessageRecorder.new(
+      business: webhook_event.business,
+      channel: "facebook",
+      external_customer_id: webhook_event.sender_id,
+      content: combined_text(events),
+      received_at: events.last.created_at,
+      metadata: combined_metadata(events)
+    ).record
   end
 
   def pending_customer_events(webhook_event)

@@ -9,6 +9,7 @@ import { pollInterval } from "../../lib/polling";
 import { workspaceNavigation } from "../../lib/navigation";
 import { Brand } from "../ui/Brand";
 import { Icon } from "../ui/Icon";
+import { automationMessages } from "../../locales/automation";
 
 function playHandoverSound() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -33,6 +34,10 @@ export function AppShell() {
   const { auth, logout } = useAuth();
   const [alertsEnabled, setAlertsEnabled] = useState(() => localStorage.getItem("chatcart_handover_alerts") === "enabled");
   const knownHandovers = useRef(null);
+  const businessQuery = useQuery({
+    queryKey: ["business"], queryFn: () => apiRequest("/api/business"),
+    enabled: auth.actorType === "business_user", refetchInterval: pollInterval, refetchIntervalInBackground: false
+  });
   const contextQuery = useQuery({
     queryKey: ["dashboard-context"],
     queryFn: () => graphqlRequest(DashboardContextDocument),
@@ -93,6 +98,9 @@ export function AppShell() {
       <div className="account"><strong>{actor?.name}</strong><small>{business?.name || "Platform administrator"}</small></div>
       <button type="button" className="button ghost sign-out" onClick={logout}><Icon name="logout" size={18} />Sign out</button>
     </aside>
-    <main id="workspace-content" className="main-content" tabIndex={-1}><Outlet /></main>
+    <main id="workspace-content" className="main-content" tabIndex={-1}>
+      {businessQuery.data?.automation_paused && <aside className="inbox-takeover" role="status">{automationMessages(businessQuery.data.default_language).paused}</aside>}
+      <Outlet />
+    </main>
   </div>;
 }

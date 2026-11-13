@@ -11,7 +11,10 @@ class SendWhatsappReplyJob < ApplicationJob
 
   def perform(delivery)
     return if delivery.status.in?(%w[sent delivered read])
-    return skip_inactive_business(delivery) unless delivery.whatsapp_webhook_event.business.active?
+    return skip_inactive_business(delivery) unless delivery.whatsapp_webhook_event.business.reload.active?
+    if delivery.whatsapp_webhook_event.business.reload.blocks_automated_reply?(delivery.message)
+      return delivery.update!(status: "skipped", last_error: "business_automation_paused")
+    end
 
     delivery.increment!(:attempts)
     result = WhatsappReplySender.new(

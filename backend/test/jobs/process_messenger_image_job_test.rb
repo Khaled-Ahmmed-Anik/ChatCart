@@ -237,6 +237,17 @@ class ProcessMessengerImageJobTest < ActiveJob::TestCase
     assert_nil @event.messenger_delivery.message.metadata["suggested_product_id"]
   end
 
+  test "business manual mode records photos without recognition or bot replies" do
+    @business.update!(automation_paused: true)
+    @recognizer.define_singleton_method(:recognize) { raise "Vision must not run" }
+    run_job
+    assert_equal "processed", @event.reload.status
+    assert_nil @event.messenger_delivery
+    conversation = @business.conversations.find_by!(external_customer_id: @event.sender_id)
+    assert_equal 1, conversation.messages.customer.count
+    assert_empty conversation.messages.bot
+  end
+
   private
 
   def create_customer_event(**attributes)

@@ -14,7 +14,8 @@ class ProcessMessengerImageJob < ApplicationJob
     claim_time = event.updated_at
     urls = customer_image_urls(event)
     existing_conversation = event.business.conversations.find_by(channel: "facebook", external_customer_id: event.sender_id)
-    if event.business.active? && !existing_conversation&.handed_over?
+    @automation_epoch = event.business.settings.to_h[Constants::Automation::PAUSED_AT]
+    if event.business.active? && !event.business.suppresses_incoming_automation?(event.created_at) && !existing_conversation&.handed_over?
       product = CustomerPhotoRecognizer.new(business: event.business, urls: urls).recognize
     end
     delivery = record_result(event, claim_time, urls, product)
@@ -65,7 +66,7 @@ class ProcessMessengerImageJob < ApplicationJob
           created_at: event.created_at,
           metadata: { "photo_count" => urls.size, "messenger_message_id" => event.external_event_id })
         conversation.update!(last_message_at: [ conversation.last_message_at, event.created_at ].compact.max)
-        unless conversation.handed_over? || newer_customer_turn
+        unless event.business.suppresses_incoming_automation?(event.created_at) || conversation.handed_over? || newer_customer_turn
           delivery = create_delivery(event, conversation, product)
         end
       end
@@ -80,7 +81,7 @@ class ProcessMessengerImageJob < ApplicationJob
     suggestion = ConversationPhotoSuggestion.new(conversation)
     reply = conversation.messages.create!(sender_type: :bot,
       content: product ? suggestion.match_reply(product: product, event: event) : suggestion.reply_text("fallback"),
-      metadata: { "photo_recognition" => true, "suggested_product_id" => product&.id })
+      metadata: { "photo_recognition" => true, "suggested_product_id" => product&.id, Constants::Automation::EPOCH => @automation_epoch })
     suggestion.offer!(product: product, reply: reply, event: event)
     MessengerDelivery.create!(messenger_webhook_event: event, message: reply, recipient_id: event.sender_id)
   end

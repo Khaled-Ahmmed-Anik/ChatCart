@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { customerName, HANDOVER_REASONS, formatMessageTime } from "../../lib/inbox";
+import { automationMessages } from "../../locales/automation";
 
 const NEAR_BOTTOM_PX = 80;
 
@@ -9,7 +10,7 @@ export function ConversationThread({ conversation, canManage, draft, onDraft, on
   const messages = conversation.messages || [];
   const lastId = messages.at(-1)?.id;
   const handedOver = conversation.status === "handed_over";
-  const canSend = canManage && handedOver && conversation.channel === "facebook";
+  const canSend = canManage && (handedOver || conversation.automation_paused) && conversation.channel === "facebook";
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -20,9 +21,10 @@ export function ConversationThread({ conversation, canManage, draft, onDraft, on
     <header className="inbox-thread-header">
       <button type="button" className="button secondary small inbox-back" onClick={onBack}>← Chats</button>
       <div className="inbox-identity"><h2>{customerName(conversation)}</h2><small>{conversation.channel} · ID {conversation.external_customer_id}</small></div>
-      {canManage && <button type="button" className="button secondary small" disabled={busy || actionError} onClick={() => onAction(handedOver ? "resume" : "handover")}>{handedOver ? "Hand back to assistant" : "Take over"}</button>}
+      {canManage && !conversation.automation_paused && <button type="button" className="button secondary small" disabled={busy || actionError} onClick={() => onAction(handedOver ? "resume" : "handover")}>{handedOver ? "Hand back to assistant" : "Take over"}</button>}
     </header>
-    {handedOver && <aside className="inbox-takeover" role="status"><strong>{canManage ? "You can reply. The assistant is paused in this chat." : "A seller is needed. The assistant is paused in this chat."}</strong>
+    {conversation.automation_paused && <aside className="inbox-takeover" role="status">{automationMessages().paused}</aside>}
+    {handedOver && !conversation.automation_paused && <aside className="inbox-takeover" role="status"><strong>{canManage ? "You can reply. The assistant is paused in this chat." : "A seller is needed. The assistant is paused in this chat."}</strong>
       <span>{HANDOVER_REASONS[conversation.handover_reason] || "Seller response needed"}</span>
       <small>Automation resumes only when this conversation is handed back.</small>
       {(conversation.handover_summary?.active_order || conversation.handover_summary?.recent_topics?.length) && <details>

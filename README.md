@@ -69,6 +69,7 @@ Messenger and WhatsApp Cloud API are implemented customer channels. Instagram is
 Detailed implementation documentation:
 
 - [Authentication and access lifecycle](docs/authentication-and-access.md) — sessions, revocation, account controls, and business suspension/disable behavior.
+- [Business-wide manual mode](docs/business-manual-mode.md) — pause AI for existing and new chats while keeping staff replies available, with safe queue and resume behavior.
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
 - [Interactive architecture diagrams](docs/architecture-diagrams.md) — production topology, conversation/order lifecycle, and intent/context resolution.

@@ -32,6 +32,7 @@ module Api
 
     def resume
       return if performed?
+      return render json: { error: I18n.t("automation.resume_business_first") }, status: :unprocessable_entity if current_business.automation_paused?
 
       update_handover_timing!("resolved_at")
       @conversation.active!
@@ -41,7 +42,7 @@ module Api
     def reply
       return if performed?
 
-      return render json: { error: "Conversation must be handed over" }, status: :unprocessable_entity unless @conversation.handed_over?
+      return render json: { error: "Conversation must be handed over" }, status: :unprocessable_entity unless @conversation.handed_over? || current_business.automation_paused?
 
       message = @conversation.messages.create!(sender_type: :seller, content: params.require(:content))
       update_handover_timing!("first_seller_response_at")
@@ -126,7 +127,8 @@ module Api
         status: conversation.status,
         last_message_at: conversation.last_message_at,
         message_count: conversation.messages.size,
-        needs_attention: conversation.handed_over?,
+        needs_attention: conversation.handed_over? || current_business.automation_paused?,
+        automation_paused: current_business.automation_paused?,
         handover_reason: handover&.dig("reason"),
         handover_started_at: handover&.dig("created_at"),
         handover_summary: handover,

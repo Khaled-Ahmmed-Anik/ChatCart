@@ -1,4 +1,11 @@
 module Constants
+  module Automation
+    PAUSED = "automation_paused"
+    PAUSED_AT = "automation_paused_at"
+    RESUMED_AT = "automation_resumed_at"
+    EPOCH = "automation_epoch"
+  end
+
   module Catalogue
     COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
   end

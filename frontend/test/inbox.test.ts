@@ -13,6 +13,8 @@ test("search handles names phone formatting IDs and Bengali text", () => {
 test("filters keep closed conversations out of Assistant and classify handovers", () => {
   assert.equal(matchesConversation(active, "", "assistant"), true);
   assert.equal(matchesConversation(active, "", "needs_you"), false);
+  assert.equal(matchesConversation({ ...active, automation_paused: true, needs_attention: true }, "", "assistant"), false);
+  assert.equal(matchesConversation({ ...active, automation_paused: true, needs_attention: true }, "", "needs_you"), true);
   assert.equal(matchesConversation({ ...active, status: "closed" }, "", "assistant"), false);
   assert.equal(matchesConversation({ ...active, status: "closed" }, "", "all"), true);
   assert.equal(needsAttention({ ...active, status: "handed_over" }), true);

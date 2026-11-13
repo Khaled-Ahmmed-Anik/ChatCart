@@ -1,0 +1,4 @@
+en:
+  automation:
+    invalid_value: "Automation paused must be true or false."
+    resume_business_first: "Resume business automation in Shop settings first."
