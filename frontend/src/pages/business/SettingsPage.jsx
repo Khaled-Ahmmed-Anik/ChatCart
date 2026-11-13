@@ -3,6 +3,9 @@ import { apiRequest } from "../../lib/apiClient";
 import { ErrorState, LoadingState } from "../../components/ui/Feedback";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
+import { useAuth } from "../../auth/useAuth";
+import { automationMessages } from "../../locales/automation";
+import { useState } from "react";
 
 function SettingsForm({ title, data, path, root, fields }) {
   const mutation = useMutation({
@@ -37,6 +40,17 @@ function SettingsForm({ title, data, path, root, fields }) {
 
 export function SettingsPage() {
   const client = useQueryClient();
+  const { auth } = useAuth();
+  const [confirmResume, setConfirmResume] = useState(false);
+  const automation = useMutation({
+    mutationFn: (paused) => apiRequest("/api/business", { method: "PATCH", body: JSON.stringify({ business: { automation_paused: paused } }) }),
+    onSuccess: (data) => {
+      setConfirmResume(false);
+      client.setQueryData(["business"], data);
+      client.invalidateQueries({ queryKey: ["conversations"] });
+      client.invalidateQueries({ queryKey: ["conversation"] });
+    }
+  });
   const business = useQuery({ queryKey: ["business"], queryFn: () => apiRequest("/api/business") });
   const policy = useQuery({ queryKey: ["policy"], queryFn: () => apiRequest("/api/business_policy") });
   const delivery = useQuery({ queryKey: ["delivery"], queryFn: () => apiRequest("/api/delivery_integration") });
@@ -50,6 +64,9 @@ export function SettingsPage() {
   if ([business, policy, delivery, channels].some((query) => query.isLoading)) return <LoadingState />;
   const error = [business, policy, delivery, channels].find((query) => query.isError)?.error;
   if (error) return <ErrorState error={error} onRetry={() => { [business, policy, delivery, channels].forEach((query) => query.refetch()); }} />;
+  const labels = automationMessages(business.data.default_language);
+  const paused = business.data.automation_paused;
+  const canControlAutomation = ["owner", "admin"].includes(auth.actor?.role);
 
   function connect(event) {
     event.preventDefault();
@@ -71,6 +88,20 @@ export function SettingsPage() {
 
   return <>
     <PageHeader title="Business setup" description="Control the facts, policies and integrations used by your sales assistant." />
+    <Panel title={labels.title}>
+      <p role="status">{paused ? labels.paused : labels.active}</p>
+      <p>{labels.help}</p>
+      {canControlAutomation && <button type="button" disabled={automation.isPending} onClick={() => {
+        if (paused) setConfirmResume(true);
+        else automation.mutate(true);
+      }}>{automation.isPending ? labels.saving : paused ? labels.resume : labels.pause}</button>}
+      {canControlAutomation && paused && confirmResume && <div role="alert">
+        <p>{labels.confirmResume}</p>
+        <button type="button" disabled={automation.isPending} onClick={() => automation.mutate(false)}>{labels.confirm}</button>
+        <button type="button" disabled={automation.isPending} onClick={() => setConfirmResume(false)}>{labels.cancel}</button>
+      </div>}
+      {automation.error && <p className="form-error" role="alert">{automation.error.message}</p>}
+    </Panel>
     <div className="content-grid settings-grid">
       <SettingsForm title="Business profile" data={business.data} path="/api/business" root="business" fields={businessFields} />
       <SettingsForm title="Sales information" data={policy.data} path="/api/business_policy" root="business_policy" fields={policyFields} />

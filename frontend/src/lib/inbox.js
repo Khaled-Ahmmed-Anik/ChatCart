@@ -27,7 +27,7 @@ export function needsAttention(conversation) {
 
 export function matchesConversation(conversation, search = "", filter = "all") {
   if (filter === "needs_you" && !needsAttention(conversation)) return false;
-  if (filter === "assistant" && conversation.status !== "active") return false;
+  if (filter === "assistant" && (conversation.status !== "active" || needsAttention(conversation))) return false;
   const normalize = (value) => String(value).normalize("NFKC").toLowerCase().replace(/[\s()+-]/g, "");
   const text = [customerName(conversation), conversation.customer_phone || "", conversation.external_customer_id, conversation.channel].join(" ");
   return normalize(text).includes(normalize(search));
