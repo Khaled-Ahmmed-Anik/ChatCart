@@ -6,6 +6,22 @@ on:
     branches: [ main ]
 
 jobs:
+  oracle_configuration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4.7"
+      - name: Test configuration-only migration preflight
+        run: ruby backend/test/oracle_migration_preflight_test.rb
+      - name: Validate Oracle Compose template without real credentials
+        working-directory: deploy/oracle
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          rm .env
+
   # Ruby 3.4.7 has prebuilt binaries for 24.04, but not the newer ubuntu-latest image.
   scan_ruby:
     runs-on: ubuntu-24.04
