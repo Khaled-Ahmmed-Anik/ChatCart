@@ -179,7 +179,7 @@ class ProductRecommendationService
   end
 
   def eligible_product?(product)
-    matches_format?(product) &&
+    (Array(preferences["categories"]).empty? || Array(preferences["categories"]).include?(product.category)) && matches_format?(product) &&
       !product.id.in?(Array(preferences["rejected_product_ids"]).map(&:to_i)) &&
       avoids_excluded_families?(product) &&
       acceptable_projection?(product) && acceptable_attributes?(product) && compatible_attributes?(product)
@@ -223,6 +223,7 @@ class ProductRecommendationService
   end
 
   def clarification_question(budget_detected)
+    return if Array(preferences["categories"]).any?
     return if budget_detected
     return if preferences["price_direction"].present? || preferences["projection_preference"].present?
     profile = CataloguePreferenceExtractor.new(message, business: business)

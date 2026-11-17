@@ -48,6 +48,7 @@ class ConversationMessageProcessor
       return pending_order
     end
     return pending_order if accept_variant_bundle_offer
+    return pending_order if handle_category_discovery
     return pending_order if apply_action_plan
     if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(ConversationActionPlanner::ORDERING_CUE) && matching_product.blank?
       collect_quantity
@@ -93,6 +94,21 @@ class ConversationMessageProcessor
   private
 
   attr_reader :message, :pending_order, :content, :interpretation
+
+  def handle_category_discovery
+    return false if catalogue_preferences.fragrance? || product_resolution.matched?
+    return false if content.match?(/\b(?:not|no|without|avoid)\b|\b(?:na|chai na)\s*\z/i)
+
+    state = pending_order.conversation.conversation_state.to_h
+    categories = CatalogueCategoryResolver.call(business: pending_order.conversation.business, text: content,
+      previous_categories: Array(state.dig("shopping_preferences", "categories")))
+    return false if categories.empty?
+
+    enter_product_discovery!
+    remember_recommendation_preferences!
+    @outcome = :product_recommendation_requested
+    true
+  end
 
   def select_photo_product
     product = catalog.available_for_sale.find_by(id: @photo_product.id)

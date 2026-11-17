@@ -7,6 +7,7 @@ module Constants
   end
 
   module Catalogue
+    MINIMUM_CATEGORY_TYPO_LENGTH = 5
     COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
   end
 

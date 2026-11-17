@@ -18,6 +18,9 @@ class CataloguePreferenceExtractor
     return common if fragrance?
 
     common.except!("scent_families", "avoid_scent_families", "performance", "projection_preference", "maximum_projection", "format")
+    categories = CatalogueCategoryResolver.call(business: business, text: message,
+      previous_categories: Array(existing.to_h["categories"]))
+    common["categories"] = categories if categories.any?
     attributes = common["attributes"].to_h.dup
     excluded = common["excluded_attributes"].to_h.dup
     available_attributes.each do |key, values|
