@@ -72,7 +72,7 @@ module Constants
   end
 
   module Conversation
-    HUMAN_REQUEST = /\b(?:human(?: agent)?|real person|real seller|live agent|customer representative)\b|\b(?:talk|speak|connect|kotha)\b.*\b(?:someone|person|seller|owner|manager|agent|manush)\b|\b(?:seller|owner|manager|manush)\b.*\b(?:talk|speak|connect|kotha)\b|মানুষের সাথে|সেলারের সাথে/i
+    HUMAN_REQUEST = /\A(?:human(?: agent)?|real person|real seller|live agent|customer representative)[!.? ]*\z|\b(?:need|want|prefer|talk|speak|connect)\b.*\b(?:human(?: agent)?|real person|real seller|live agent|customer representative)\b|\b(?:talk|speak|connect|kotha)\b.*\b(?:someone|person|seller|owner|manager|agent|manush)\b|\b(?:seller|owner|manager|manush)\b.*\b(?:talk|speak|connect|kotha)\b|মানুষের সাথে|সেলারের সাথে/i
     LANGUAGE_REQUEST = /\b(?:continue|speak|reply|answer|bolen|bolun)\b.*\b(?:english|banglish|bangla|bengali)\b|\b(?:english|banglish|bangla|bengali)\s+(?:e|te|please|bolen)\b/i
     BANGLISH_CUES = /\b(?:koto|koyta|ache|ase|achen|kemon|korbo|koren|korun|dekhan|pabo|lagbe|bolen|amar|apni|sathe|thakbe|nibo|chai|duita|ekta|moddhe|pore|chole|hobe)\b/i
     PRODUCT_FACT_QUESTION = /\A(?:please\s+)?(?:what|which|how|does|do|is|will|can|tell|describe|compare)\b|\b(?:what is|how much|difference|battery|warranty|compatib\w*|included|cable|keychain|capacity|support|fit|koto|koyta|koy|ache|ase|hobe|cholbe|chole|bolen|thakbe)\b|কত|কোন|আছে|বলেন/i

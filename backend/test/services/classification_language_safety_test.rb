@@ -41,6 +41,12 @@ class ClassificationLanguageSafetyTest < ActiveSupport::TestCase
     refute_includes result.bot_reply.content, "bottle"
   end
 
+  test "asking whether the assistant is human is identity not takeover" do
+    result = record("Are you human?")
+    assert_equal "bot_identity", result.interpretation.intent
+    refute_predicate result.conversation.reload, :handed_over?
+  end
+
   test "Banglish factual follow ups retain the single offered product" do
     @business.products.first.update!(description: "Charging Cable: Confirm whether included in your package. Actual speed depends on the device and protocol.")
     record("Charger lagbe")

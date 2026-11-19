@@ -36,11 +36,11 @@ class ConversationMessageProcessor
       return pending_order
     end
     reference = CatalogueConversationReference.new(conversation: pending_order.conversation, text: content)
-    if comparison_request? && reference.offered_products.size >= 2
+    if comparison_request? && reference.offered_products.any?
       @outcome = :product_comparison_requested
       return pending_order
     end
-    position = Constants::Catalogue::OPTION_POSITIONS.find { |word, _| content.match?(/\b#{word}\b/i) }&.last
+    position = reference.option_position
     if position && reference.offered_products.any? && position >= reference.offered_products.size
       @outcome = :offered_reference_clarification
       return pending_order
@@ -67,7 +67,7 @@ class ConversationMessageProcessor
         :product_comparison_requested
       elsif product_variants_request?
         :product_variants_requested
-      elsif price_question? && !content.match?(/battery|warranty|cable|compatib|colou?r|design/i)
+      elsif price_question? && !Constants::Catalogue::QUESTION_TOPICS.values.any? { |topic| content.match?(topic.fetch(:question)) }
         :price_inquiry
       elsif stock_question?
         :stock_inquiry

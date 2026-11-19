@@ -2,7 +2,7 @@ en:
   chat_language:
     en:
       browsing: "Of course—feel free to explore. I won’t confirm an order unless you explicitly ask. What else would you like to know?"
-      saved_unconfirmed: "Your selection is saved, but not confirmed. You can continue, change it, or keep browsing."
+      saved_unconfirmed: "Your selection is saved, but it isn’t confirmed yet. You can continue, change it, or keep browsing."
       product_follow_up: "What else would you like to know about this product, or would you like to order it?"
       offered_reference: "I only showed these options: %{products}. Which one do you mean?"
       acknowledged: "Of course—I’ll continue in English."

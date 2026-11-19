@@ -696,7 +696,7 @@ class BotReplyGenerator
     products = CatalogueConversationReference.new(conversation: pending_order.conversation,
       text: customer_message&.content.to_s).offered_products if products.size < 2
     if products.size < 2
-      examples = catalog.available_for_sale.limit(2).pluck(:name).join(", ")
+      examples = products.any? ? products.map(&:name).join(", ") : catalog.available_for_sale.limit(2).pluck(:name).join(", ")
       return I18n.t("catalogue_answers.#{banglish? ? 'banglish' : 'en'}.choose_compare", products: examples)
     end
     unless CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
