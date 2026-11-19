@@ -32,7 +32,8 @@ class ConversationMessageProcessor
       return pending_order
     end
     if ConversationTurnRequest.new(content).information_only? && inquiry_reference.present? &&
-        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty?
+        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty? &&
+        !content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
       remember_referenced_product!
       @outcome = if price_question?
         :price_inquiry
