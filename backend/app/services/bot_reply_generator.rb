@@ -472,8 +472,32 @@ class BotReplyGenerator
     "#{prefix}Please send a complete Bangladesh phone number, for example 01712345678."
   end
 
+  def category_products_reply
+    conversation = pending_order.conversation
+    preferences = conversation.conversation_state.to_h["shopping_preferences"].to_h
+    result = ProductRecommendationService.new(business: conversation.business,
+      message: customer_message&.content, preferences: preferences).call
+    language = repair_language
+    language = "banglish" if customer_message&.content.to_s.match?(/\b(?:ase|ache|chai|lagbe|kono|nibo)\b/i)
+    prefix = "category_discovery.#{language}"
+    return I18n.t("#{prefix}.unavailable", locale: :en) if result.offers.empty?
+
+    GuidedSalesConversation.new(conversation).remember_recommendations!(
+      result.offers.map { |offer| offer.product.id }, offers: result.offers.map { |offer| recommendation_snapshot(offer) }
+    )
+    remember_options!(:products, result.offers.map(&:product).uniq)
+    lines = result.offers.map do |offer|
+      summary = offer.product.short_description.to_s.squish.truncate(120)
+      [ "• #{offer.label} — #{formatted_price(offer.price)}", summary.presence ].compact.join("\n")
+    end
+    intro_key = result.budget_detected && !result.exact_match ? "outside_budget" : "intro"
+    [ I18n.t("#{prefix}.#{intro_key}", locale: :en), lines.join("\n\n"),
+      I18n.t("#{prefix}.follow_up", locale: :en) ].join("\n\n")
+  end
+
   def product_recommendation_reply
     conversation_state = pending_order.conversation.conversation_state.to_h
+    return category_products_reply if Array(conversation_state.dig("shopping_preferences", "categories")).any?
     guided_context = conversation_state.dig("guided_sales", "context").to_h
     preferences = conversation_state["shopping_preferences"].to_h.merge(
       "rejected_product_ids" => guided_context["rejected_product_ids"],
