@@ -64,8 +64,8 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     GuidedSalesConversation.new(order.conversation).remember_recommendations!([ product.id ], offers: [ { product_id: product.id, variant_id: middle.id, price: "480" } ])
     message = order.conversation.messages.create!(sender_type: :customer, content: "bigger size ache ei budget e?")
     reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: :product_variants_requested).content
-    assert_includes reply, "30 ML at ৳850"
-    assert_includes reply, "৳350 above your ৳500 budget"
+    assert_includes reply, "30 ML, dam ৳850"
+    assert_includes reply, "৳500 budget-er cheye ৳350 beshi"
     assert_not_includes reply, "which product"
     assert_nil order.reload.product
   end
