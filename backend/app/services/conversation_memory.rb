@@ -36,7 +36,7 @@ class ConversationMemory
     }.compact
 
     state["intent_history"] = history.last(MAX_INTENT_HISTORY)
-    state["last_referenced_product"] = pending_order.product.name if pending_order.product.present?
+    state["last_referenced_product"] ||= pending_order.product.name if pending_order.product.present?
     state["known_customer"] = {
       "name" => pending_order.customer_name,
       "has_phone" => pending_order.phone.present?,

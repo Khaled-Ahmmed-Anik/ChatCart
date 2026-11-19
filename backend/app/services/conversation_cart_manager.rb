@@ -24,7 +24,8 @@ class ConversationCartManager
     addition = text.match?(/\b(?:add|include|adding)\b|\b(?:aro|r o)\b.*\b(?:product|item)\b/) && !text.match?(/\b(?:not|don t|do not)\b/)
     awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
     named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY)
-    command = addition || awaiting_addition || named_quantity || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
+    item_update = matches.any? && text.match?(Constants::Conversation::CART_ITEM_UPDATE) && !addition
+    command = addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
     explicit_list = matches.any? && message.content.match?(/\+|\b(?:and|ar|ebong)\b/i) && text.match?(/\d/)
@@ -48,8 +49,10 @@ class ConversationCartManager
       store_repair(plans, replace_cart: explicit_list && !command, unknown: true)
       return clarification(translation("unknown"))
     end
-    return remove(matches) if text.match?(/\A(?:remove|delete|drop)\b|\b(?:bad den|bad din)\z/)
-    return update_item(matches.first) if (named_quantity || text.match?(/\A(?:change|update)\b/)) && matches.one?
+    if text.match?(/\A(?:remove|delete|drop)\b|\b(?:bad den|bad din)\b/)
+      return remove(text.match?(/\b(?:keep|thak)\b/) ? matches.first(1) : matches)
+    end
+    return update_item(matches.first) if item_update || named_quantity
     if order.product.present? && (order.quantity.blank? || !order.variant_selected_if_required?) &&
         matches.any? { |match| match[:product].id != order.product_id }
       return clarification("Let’s finish the option and quantity for #{order.product.name} first, then add the next item.")
@@ -73,8 +76,9 @@ class ConversationCartManager
   def build_plans(matches)
     matches.each_with_index.map do |match, index|
       segment = text[match[:start]...matches[index + 1]&.fetch(:start)]
-      prefix = text[0...match[:start]][/(?:\A|\s)(\d+)\s*\z/, 1]
-      plan_for(match[:product], segment, prefix_quantity: prefix&.to_i)
+      words = Constants::Conversation::NUMBER_WORDS.keys.map { |word| Regexp.escape(word) }.join("|")
+      prefix = text[0...match[:start]][/(?:\A|\s)((?:\d+\s*(?:ta|pieces?|pcs?)?|#{words}))\s*\z/, 1]
+      plan_for(match[:product], segment, prefix_quantity: ConversationQuantityParser.call(prefix))
     end
   end
 
@@ -141,7 +145,8 @@ class ConversationCartManager
   end
 
   def product_mentions
-    matches = order.conversation.business.products.available_for_sale.flat_map do |product|
+    products = order.conversation.business.products.available_for_sale.to_a
+    matches = products.flat_map do |product|
       names = product.searchable_names.flat_map { |name| [ name, name.sub(/\Athe\s+/i, "") ] }.uniq
       names.filter_map do |name|
         label = ConversationTextNormalizer.call(name)
@@ -150,7 +155,26 @@ class ConversationCartManager
           { product: product, start: match.begin(1), finish: match.end(1) }
         end
       end
-    end.flatten.sort_by { |match| [ match[:start], -(match[:finish] - match[:start]) ] }
+    end.flatten
+    products.each do |product|
+      codes = ConversationTextNormalizer.call(product.name).scan(/\b[a-z]+\d+[a-z0-9]*\b/)
+      codes.each do |code|
+        next if products.count { |other| ConversationTextNormalizer.call(other.name).split.include?(code) } != 1
+        brand = Regexp.escape(ConversationTextNormalizer.call(product.name).split.first)
+        if (match = text.match(/\b(?:#{brand}\s+)?#{Regexp.escape(code)}\b/))
+          matches << { product: product, start: match.begin(0), finish: match.end(0) }
+        end
+      end
+    end
+    if matches.empty? && text.match?(/\A(?:remove|delete|drop|make|change|update)|\b(?:bad den|koren|kore den)\b/)
+      order.line_items.map(&:product).uniq.group_by(&:category).each do |category, items|
+        next if category.blank? || items.size != 1
+        if (match = text.match(/\b#{Regexp.escape(category.downcase)}\b/))
+          matches << { product: items.first, start: match.begin(0), finish: match.end(0) }
+        end
+      end
+    end
+    matches.sort_by! { |match| [ match[:start], -(match[:finish] - match[:start]) ] }
     matches.reject! do |match|
       same_span = matches.select { |other| other[:start] == match[:start] && other[:finish] == match[:finish] }
       same_span.map { |other| other[:product].id }.uniq.size > 1

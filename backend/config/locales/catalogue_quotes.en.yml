@@ -1,0 +1,14 @@
+en:
+  catalogue_quotes:
+    en:
+      remembered_device: "You told me your device is %{device}."
+      unknown_device: "Which device model do you use?"
+      subtotal:
+        one: "%{count} × %{product}, starting at %{unit} each: subtotal %{total}. Delivery is not included; the selected option may change the price. This is a quote, not a confirmed order."
+        other: "%{count} × %{product}, starting at %{unit} each: subtotal %{total}. Delivery is not included; the selected option may change the price. This is a quote, not a confirmed order."
+    banglish:
+      remembered_device: "Apni bolechilen apnar device %{device}."
+      unknown_device: "Apnar device-er model-ta bolben?"
+      subtotal:
+        one: "%{count} × %{product}, protita %{unit} theke: subtotal %{total}. Delivery jog hoyni; option onujayi dam bodlate pare. Eta sudhu quote, confirmed order na."
+        other: "%{count} × %{product}, protita %{unit} theke: subtotal %{total}. Delivery jog hoyni; option onujayi dam bodlate pare. Eta sudhu quote, confirmed order na."

@@ -31,6 +31,16 @@ class ConversationMessageProcessor
       @outcome = :confirmation_deferred
       return pending_order
     end
+    if content.match?(Constants::Catalogue::DEVICE_RECALL)
+      @outcome = :device_preference_requested
+      return pending_order
+    end
+    if content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && pending_order.line_items.empty? &&
+        !content.match?(Constants::Conversation::CART_MUTATION_CUE) &&
+        CataloguePriceQuote.new(conversation: pending_order.conversation, text: content).content.present?
+      @outcome = :catalogue_quote_requested
+      return pending_order
+    end
     if ConversationTurnRequest.new(content).information_only? && inquiry_reference.present? &&
         requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty? &&
         !content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
