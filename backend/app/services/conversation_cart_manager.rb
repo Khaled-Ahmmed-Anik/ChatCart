@@ -8,6 +8,7 @@ class ConversationCartManager
   end
 
   def call
+    return if ConversationTurnRequest.new(message.content).information_only?
     if (correction = text.match(Constants::Conversation::CART_SHORT_CORRECTION))
       products = order.line_items.map(&:product).uniq.select do |product|
         ConversationTextNormalizer.call(product.name).split.include?(correction[1])
