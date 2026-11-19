@@ -33,7 +33,12 @@ No migrations, production data changes, new credentials or feature flags are nee
    offered products and grounded starting-price differences. SIM-card and battery
    duration questions are not payment/delivery policy keywords. Existing perfume
    replies remain on their original path.
-4. Per-line cart updates, totals, browsing and preference continuity.
+4. Per-line cart updates, totals, browsing and preference continuity. Explicit
+   English/Banglish quantities before names or unique model codes stay attached to
+   their item; category references edit only a uniquely identifiable saved line.
+   Hypothetical starting-price totals are quotes, not draft mutations. Device/use
+   preferences and explicit budget updates survive side questions and category
+   switches; device recall reads this state rather than asking again.
 5. Classifier/handover safety, language continuity and sector-neutral text.
 
 Missing seller policies, unverified hardware specifications and available design
