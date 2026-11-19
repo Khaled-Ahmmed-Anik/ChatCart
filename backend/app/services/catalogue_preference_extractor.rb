@@ -21,6 +21,10 @@ class CataloguePreferenceExtractor
     categories = CatalogueCategoryResolver.call(business: business, text: message,
       previous_categories: Array(existing.to_h["categories"]))
     common["categories"] = categories if categories.any?
+    rejected = CatalogueCategoryResolver.rejected_categories(business: business, text: message)
+    excluded_categories = (Array(existing.to_h["excluded_categories"]) + rejected) - categories
+    common["excluded_categories"] = excluded_categories if excluded_categories.any?
+    common["categories"] = Array(common["categories"]) - rejected if rejected.any?
     attributes = common["attributes"].to_h.dup
     excluded = common["excluded_attributes"].to_h.dup
     available_attributes.each do |key, values|

@@ -672,6 +672,8 @@ class BotReplyGenerator
 
   def product_comparison_reply
     products = products_mentioned_in_message
+    products = CatalogueConversationReference.new(conversation: pending_order.conversation,
+      text: customer_message&.content.to_s).offered_products if products.size < 2
     return "Tell me the two product names you want to compare, for example: “The Office vs Bleu Inspired”." if products.size < 2
 
     lines = products.first(3).map do |product|
@@ -926,13 +928,11 @@ class BotReplyGenerator
     return inquiry_product if inquiry_product.present?
     return pending_order.product if pending_order.product.present?
 
-    remembered_name = pending_order.conversation.conversation_state.to_h["last_referenced_product"]
-    catalog.find_by(name: remembered_name) if remembered_name.present?
+    CatalogueConversationReference.new(conversation: pending_order.conversation, text: customer_message&.content.to_s).product
   end
 
   def mentioned_product
-    content = customer_message&.content.to_s.downcase
-    catalog.includes(:product_variants).find_each.find { |product| content.include?(product.name.downcase) }
+    CatalogueConversationReference.new(conversation: pending_order.conversation, text: customer_message&.content.to_s).product
   end
 
   def catalog
