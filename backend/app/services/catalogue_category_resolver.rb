@@ -7,7 +7,8 @@ class CatalogueCategoryResolver
       normalized.match?(/(?:\A|\s)#{Regexp.escape(label)}(?:\z|\s)/) &&
         !normalized.match?(/\b(?:not|no|without|avoid|bad)\s+(?:a\s+)?#{Regexp.escape(label)}\b|\b#{Regexp.escape(label)}\s+(?:na|not|no)\b/)
     end
-    if normalized.match?(Constants::Catalogue::ACCESSORY_WORDS)
+    if normalized.match?(Constants::Catalogue::ACCESSORY_WORDS) &&
+        !normalized.match?(/\b(?:not|no|without|avoid)\s+(?:protective\s+)?(?:case|cover|accessor(?:y|ies))\b|\bcover\s+chai\s+na\b/)
       accessories = categories.select { |category| category.match?(/accessor|case|cover/i) }
       matches = accessories if accessories.one?
     end

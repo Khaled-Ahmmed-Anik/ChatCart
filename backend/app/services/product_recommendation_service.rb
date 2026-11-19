@@ -1,7 +1,10 @@
 class ProductRecommendationService
   Offer = Data.define(:product, :variant, :price, :stock_quantity) do
     def label
-      variant ? "#{product.name} #{variant.display_name}" : product.name
+      return product.name unless variant
+      return variant.display_name if variant.display_name.downcase.start_with?(product.name.downcase)
+
+      "#{product.name} #{variant.display_name}"
     end
   end
   Result = Data.define(

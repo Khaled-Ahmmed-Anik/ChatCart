@@ -1,0 +1,38 @@
+en:
+  chat_language:
+    en:
+      browsing: "Of course—feel free to explore. I won’t confirm an order unless you explicitly ask. What else would you like to know?"
+      saved_unconfirmed: "Your selection is saved, but not confirmed. You can continue, change it, or keep browsing."
+      product_follow_up: "What else would you like to know about this product, or would you like to order it?"
+      offered_reference: "I only showed these options: %{products}. Which one do you mean?"
+      acknowledged: "Of course—I’ll continue in English."
+      quantity: "%{product} is %{price} each. How many would you like?"
+      price: "%{product} is %{price} each."
+      bottle_price: "%{product} is %{price} per bottle."
+      unit:
+        one: "item"
+        other: "items"
+    banglish:
+      browsing: "Ji, nischinte dekhun. Apni na bolle order confirm korbo na. Ar ki jante chan?"
+      saved_unconfirmed: "Apnar selection save ache, confirm hoyni. Continue, change, ba aro browse korte paren."
+      product_follow_up: "Ei product niye ar ki jante chan, naki order korte chan?"
+      offered_reference: "Ei option-guloi dekhano hoyeche: %{products}. Konta bujhiyechen?"
+      acknowledged: "Ji, ekhon Banglish-e kotha bolbo."
+      quantity: "%{product} protita %{price}. Koyta niben?"
+      price: "%{product} protita %{price}."
+      bottle_price: "%{product} protita bottle %{price}."
+      unit:
+        one: "item"
+        other: "items"
+    bn:
+      browsing: "জি, নিশ্চিন্তে দেখুন। আপনি না বললে অর্ডার নিশ্চিত করব না। আর কী জানতে চান?"
+      saved_unconfirmed: "আপনার পছন্দ সংরক্ষিত আছে, নিশ্চিত হয়নি। চালিয়ে যেতে, বদলাতে বা আরও দেখতে পারেন।"
+      product_follow_up: "এই পণ্য সম্পর্কে আর কী জানতে চান, নাকি অর্ডার করতে চান?"
+      offered_reference: "শুধু এই বিকল্পগুলো দেখানো হয়েছে: %{products}। কোনটি বোঝাচ্ছেন?"
+      acknowledged: "জি, এখন বাংলায় কথা বলব।"
+      quantity: "%{product} প্রতিটি %{price}। কয়টি নেবেন?"
+      price: "%{product} প্রতিটি %{price}।"
+      bottle_price: "%{product} প্রতি বোতল %{price}।"
+      unit:
+        one: "টি পণ্য"
+        other: "টি পণ্য"

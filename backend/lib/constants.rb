@@ -13,9 +13,11 @@ module Constants
       battery: { question: /\bbattery|\bhours?\b|ghonta|khon chole|দিন চলে/i, evidence: /battery|playback|hours?|mah|CR2032|months?/i },
       noise: { question: /\b(?:anc|enc|noise|call quality|microphone)\b/i, evidence: /\b(?:anc|enc|noise|microphone|call)\b/i },
       cable: { question: /\bcable\b/i, evidence: /\bcable\b/i },
+      charging: { question: /\b(?:watts?|charge|charging speed|fast charging)\b/i, evidence: /speed|protocol|watt|depends? on|charging/i },
       warranty: { question: /\b(?:warranty|guarantee)\b/i, evidence: /\b(?:warranty|guarantee)\b/i },
+      authenticity: { question: /\b(?:genuine|authentic|original Apple)\b/i, evidence: /\b(?:genuine|authentic|original Apple)\b/i },
       compatibility: { question: /compatib|\b(?:safe|fit|Android|iPhone|iOS|cholbe|work with)\b/i, evidence: /compatib|Android|iOS|iPhone|Samsung|protocol|physical fit/i },
-      package: { question: /included|include|package|\b(?:straps?|koyta|inside|vitore|keychain)\b/i, evidence: /included|include|package|straps?|keychain|contents|accessor/i },
+      package: { question: /included|include|package|\b(?:straps?|koyta|inside|vitore|keychain|sathe|thakbe)\b/i, evidence: /included|include|package|straps?|keychain|contents|accessor/i },
       connectivity: { question: /\b(?:sim|bluetooth|phone|independent|calling|call)\b/i, evidence: /Bluetooth|SIM|call|connected|phone/i },
       tracking: { question: /\b(?:gps|live|tracker|pet|car|ecosystem|network|simultaneous|pair)\b/i, evidence: /GPS|real.time|network|ecosystem|one .*time|guaranteed|participating|SIM/i },
       waterproof: { question: /waterproof|\bswim/i, evidence: /waterproof|swim|water.resistan/i },
@@ -23,7 +25,7 @@ module Constants
       designs: { question: /\b(?:designs?|colou?rs?)\b/i, evidence: /design|colou?r/i }
     }.freeze
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
-    PRODUCT_REFERENCE = /\b(?:this|that|it|these|those|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
+    PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
     OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
     MINIMUM_CATEGORY_TYPO_LENGTH = 5
     COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
@@ -70,10 +72,13 @@ module Constants
   end
 
   module Conversation
-    PRODUCT_FACT_QUESTION = /\b(?:what|which|how|does|do|is|will|can|tell|describe|compare|difference|battery|warranty|compatib\w*|included|cable|keychain|capacity|support|fit|koto|koyta|koy|ache|ase|hobe|cholbe|chole|bolen|thakbe)\b|কত|কোন|আছে|বলেন/i
-    EXPLICIT_PURCHASE_ACTION = /\b(?:buy|take|send|give|add|remove|change|update|nibo|den|dao|din|koren|korun)\b|নিবো|দেন|করেন/i
+    HUMAN_REQUEST = /\b(?:human(?: agent)?|real person|real seller|live agent|customer representative)\b|\b(?:talk|speak|connect|kotha)\b.*\b(?:someone|person|seller|owner|manager|agent|manush)\b|\b(?:seller|owner|manager|manush)\b.*\b(?:talk|speak|connect|kotha)\b|মানুষের সাথে|সেলারের সাথে/i
+    LANGUAGE_REQUEST = /\b(?:continue|speak|reply|answer|bolen|bolun)\b.*\b(?:english|banglish|bangla|bengali)\b|\b(?:english|banglish|bangla|bengali)\s+(?:e|te|please|bolen)\b/i
+    BANGLISH_CUES = /\b(?:koto|koyta|ache|ase|achen|kemon|korbo|koren|korun|dekhan|pabo|lagbe|bolen|amar|apni|sathe|thakbe|nibo|chai|duita|ekta|moddhe|pore|chole|hobe)\b/i
+    PRODUCT_FACT_QUESTION = /\A(?:please\s+)?(?:what|which|how|does|do|is|will|can|tell|describe|compare)\b|\b(?:what is|how much|difference|battery|warranty|compatib\w*|included|cable|keychain|capacity|support|fit|koto|koyta|koy|ache|ase|hobe|cholbe|chole|bolen|thakbe)\b|কত|কোন|আছে|বলেন/i
+    EXPLICIT_PURCHASE_ACTION = /\b(?:buy|take|send|give|add|remove|change|update|nibo|den|dao)\b|নিবো|দেন/i
     EXPLICIT_QUANTITY_UNITS = /\b(?:\d+|one|two|three|ekta|duita)\s*(?:pieces?|pcs?|bottles?|units?|ta)\b/i
-    BROWSING_ONLY = /\b(?:just browsing|only browsing|browsing only|only wanted information|just looking|do not (?:place|create|confirm)|not ordering|not an order|order (?:ekhon na|na)|sudhu (?:dekhchi|information)|pore decide)\b/i
+    BROWSING_ONLY = /\b(?:just browsing|only browsing|browsing only|only wanted information|just looking|do not (?:place|create|confirm)|not ordering|not an order|order (?:ekhon na|na)|sudhu (?:dekhchi|information)|pore decide|pause rakhen|pore kinbo|buy later)\b/i
     LARGER_OPTION_QUESTION = /\b(?:bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/i
     CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i

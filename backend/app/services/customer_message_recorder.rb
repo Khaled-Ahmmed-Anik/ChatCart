@@ -51,6 +51,7 @@ class CustomerMessageRecorder
         next
       end
       current_order = conversation.pending_order
+      ConversationLanguagePreference.remember!(conversation, content)
       CatalogueCustomerPreferences.remember!(conversation, content) unless
         CataloguePreferenceExtractor.new(content, business: business).fragrance?
       photo_suggestion = ConversationPhotoSuggestion.new(conversation)

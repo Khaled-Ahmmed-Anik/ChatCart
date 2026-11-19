@@ -27,7 +27,8 @@ class ConversationEscalationPolicy
   attr_reader :conversation, :interpretation, :outcome
 
   def explicit_human_request?
-    interpretation&.intents&.include?("human_agent") || outcome == :human_agent
+    (interpretation&.intents&.include?("human_agent") || outcome == :human_agent) &&
+      conversation.messages.customer.order(id: :desc).pick(:content).to_s.match?(Constants::Conversation::HUMAN_REQUEST)
   end
 
   def repeated_problem?

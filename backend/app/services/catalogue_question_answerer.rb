@@ -10,6 +10,12 @@ class CatalogueQuestionAnswerer
 
     answers = topics.map do |topic, definition|
       evidence = evidence_lines.select { |line| line.match?(definition.fetch(:evidence)) }
+      if topic == :designs
+        evidence = product.available_variants.map do |variant|
+          translation("available_variant", name: variant.display_name,
+            price: ActiveSupport::NumberHelper.number_to_delimited(variant.price), count: variant.stock_quantity)
+        end
+      end
       if evidence.empty? || topic == :cable && evidence.all? { |line| line.match?(/confirm|check|verify/i) }
         translation("unknown", topic: translation("topics.#{topic}"))
       else

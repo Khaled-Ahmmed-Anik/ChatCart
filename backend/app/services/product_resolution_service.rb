@@ -50,7 +50,9 @@ class ProductResolutionService
   end
 
   def accessory_request?
-    query.match?(Constants::Catalogue::ACCESSORY_WORDS)
+    query.match?(Constants::Catalogue::ACCESSORY_WORDS) &&
+      !query.match?(/\b(?:not|no|without|avoid)\s+(?:protective\s+)?(?:case|cover|accessor(?:y|ies))\b|\bcover\s+chai\s+na\b/) &&
+      business.products.available_for_sale.any? { |product| accessory?(product) }
   end
 
   def accessory?(product)

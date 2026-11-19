@@ -26,6 +26,10 @@ class BotReplyGenerator
 
   def outcome_reply
     case outcome
+    when :offered_reference_clarification
+      options = CatalogueConversationReference.new(conversation: pending_order.conversation,
+        text: customer_message&.content.to_s).offered_products.map(&:name).join(", ")
+      I18n.t("chat_language.#{repair_language}.offered_reference", products: options)
     when :unsupported_support_requested
       repair_translation(:support)
     when :greeting
@@ -41,7 +45,7 @@ class BotReplyGenerator
     when :bot_identity
       "I’m ChatCart’s automated shopping assistant. I can help with products, orders, delivery questions, and connect you with the seller when needed."
     when :language_preference
-      "Of course—I can continue in English, বাংলা, or Banglish."
+      I18n.t("chat_language.#{repair_language}.acknowledged")
     when :complaint
       "I’m sorry you’ve had a frustrating experience. Please briefly describe the issue, and I’ll help route it to the seller."
     when :human_agent
@@ -173,7 +177,8 @@ class BotReplyGenerator
     when :confirmation_unclear
       "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
     when :confirmation_deferred
-      "No problem—your order is saved, but it isn’t confirmed yet. Send “confirm” whenever you’re ready, or say “change the order” to update it."
+      key = pending_order.product.present? || pending_order.line_items.any? ? "saved_unconfirmed" : "browsing"
+      I18n.t("chat_language.#{repair_language}.#{key}")
     when :order_paused
       banglish? ? "Thik ache#{address_suffix}—eta ekhon pause rakhlam. Jokhon ichchhe notun kichu dekhte ba order korte bolben." :
         "No problem#{address_suffix}—I’ve paused that for now. Tell me whenever you want to explore something else or continue."
@@ -293,7 +298,8 @@ class BotReplyGenerator
   end
 
   def repair_language
-    language = interpretation&.language.presence || pending_order.conversation.conversation_state.to_h["preferred_language"]
+    language = ConversationLanguagePreference.choose(customer_message&.content.to_s,
+      pending_order.conversation.conversation_state.to_h, interpretation: interpretation)
     return "bn" if language.in?(%w[bangla bengali bn]) || customer_message&.content.to_s.match?(/[\u0980-\u09FF]/)
     return "banglish" if language == "banglish"
 
@@ -307,9 +313,9 @@ class BotReplyGenerator
   end
 
   def quantity_prompt
-    selection = [ pending_order.product.name, pending_order.product_variant&.display_name ].compact.join(" ")
-    unit = "each"
-    "#{selection} is #{formatted_price(pending_order.unit_price)} #{unit}. How many would you like?"
+    selection = pending_order.product_variant&.display_name.presence || pending_order.product.name
+    selection = "#{pending_order.product.name} #{selection}" unless selection.downcase.start_with?(pending_order.product.name.downcase)
+    I18n.t("chat_language.#{repair_language}.quantity", product: selection, price: formatted_price(pending_order.unit_price))
   end
 
   def variant_selection_prompt
@@ -452,7 +458,10 @@ class BotReplyGenerator
       component_names = product.combo_items.includes(:component_product).map { |item| "#{item.quantity} × #{item.component_product.name}" }
       lines << "Includes: #{component_names.to_sentence}." if component_names.any?
     end
-    lines << "Would you like a size recommendation or would you like to order it?" if @include_follow_up
+    if @include_follow_up
+      fragrance = CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
+      lines << (fragrance ? "Would you like a size recommendation or would you like to order it?" : I18n.t("chat_language.#{repair_language}.product_follow_up"))
+    end
     lines.join("\n")
   end
 
@@ -609,9 +618,7 @@ class BotReplyGenerator
   end
 
   def banglish?
-    return true if interpretation&.language == "banglish"
-
-    pending_order.conversation.conversation_state.to_h["preferred_language"] == "banglish"
+    repair_language == "banglish"
   end
 
   def recommendation_snapshot(offer)
@@ -860,7 +867,8 @@ class BotReplyGenerator
         selected = requested.present? ? [ requested ] : variants
         selected.map { |variant| "#{variant.display_name}: #{formatted_price(variant.price)}" }.to_sentence
       else
-        "#{product.name} is #{formatted_price(product.price)} per bottle."
+        key = CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance? ? "bottle_price" : "price"
+        I18n.t("chat_language.#{repair_language}.#{key}", product: product.name, price: formatted_price(product.price))
       end
     elsif product.total_available_stock.positive?
       "Yes, #{product.name} is available—we have #{product.total_available_stock} in stock across its options."
@@ -977,7 +985,7 @@ class BotReplyGenerator
   end
 
   def bottle_word(quantity)
-    quantity == 1 ? "bottle" : "bottles"
+    I18n.t("chat_language.#{repair_language}.unit", count: quantity)
   end
 
   def selected_stock

@@ -77,10 +77,13 @@ class CompactIntentClassifier
 
   def classify
     return empty_result if checkout_value?
+    rule = deterministic_intent
+    return classified_result(rule, 1.0, 0.0) if rule
 
     ranked = self.class.examples.map do |intent, examples|
       next if intent == "greeting" && !message.content.to_s.strip.match?(Constants::Conversation::GREETING_ONLY)
       next if intent == "thanks" && !message.content.to_s.strip.match?(Constants::Conversation::THANKS_ONLY)
+      next if intent == "human_agent" && !normalized.match?(Constants::Conversation::HUMAN_REQUEST)
       [ intent, examples.map { |example| similarity(normalized, normalize(example)) }.max ]
     end.compact.sort_by { |_intent, score| -score }
     intent, score = ranked.first
@@ -94,14 +97,31 @@ class CompactIntentClassifier
         candidate_intent: intent, runner_up_intent: runner_up_intent)
     end
 
+    classified_result(intent, adjusted, runner_up, runner_up_intent: runner_up_intent)
+  end
+
+  private
+
+  def deterministic_intent
+    return "language_preference" if ConversationLanguagePreference.explicit(message.content)
+    return "bot_identity" if normalized.match?(/\bare you\b.*\b(?:human|person|bot)\b/)
+    return "human_agent" if normalized.match?(Constants::Conversation::HUMAN_REQUEST)
+    return "list_products" if normalized.match?(/\bwhat do you sell\b/)
+    if ConversationTurnRequest.new(message.content).information_only? &&
+        Constants::Catalogue::QUESTION_TOPICS.values.any? { |definition| normalized.match?(definition.fetch(:question)) }
+      return "compare_products" if normalized.match?(/\b(?:compare|difference|better)\b/)
+      return "product_details"
+    end
+    nil
+  end
+
+  def classified_result(intent, adjusted, runner_up, runner_up_intent: nil)
     Result.new(interpretation: AiIntentClassifier::Result.new(
       intent: intent, secondary_intents: [], confidence: adjusted, entities: {}.with_indifferent_access,
       language: detected_language, sentiment: "neutral", needs_clarification: false, possible_intents: []
     ), score: adjusted, runner_up_score: runner_up, source: "local",
       candidate_intent: intent, runner_up_intent: runner_up_intent)
   end
-
-  private
 
   attr_reader :message, :pending_order
   def normalized = @normalized ||= normalize(message.content)
@@ -158,8 +178,6 @@ class CompactIntentClassifier
   end
 
   def detected_language
-    return "bengali" if message.content.match?(/\p{Bengali}/)
-    return "banglish" if normalized.match?(/\b(koto|ache|achen|kemon|korbo|koren|dekhan|pabo|lagbe|bolen|amar|apni)\b/)
-    "english"
+    ConversationLanguagePreference.detect(message.content) || "english"
   end
 end

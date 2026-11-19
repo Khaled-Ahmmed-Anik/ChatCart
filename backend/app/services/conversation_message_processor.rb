@@ -35,10 +35,28 @@ class ConversationMessageProcessor
       @outcome = :device_preference_requested
       return pending_order
     end
-    if content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && pending_order.line_items.empty? &&
+    reference = CatalogueConversationReference.new(conversation: pending_order.conversation, text: content)
+    if comparison_request? && reference.offered_products.size >= 2
+      @outcome = :product_comparison_requested
+      return pending_order
+    end
+    position = Constants::Catalogue::OPTION_POSITIONS.find { |word, _| content.match?(/\b#{word}\b/i) }&.last
+    if position && reference.offered_products.any? && position >= reference.offered_products.size
+      @outcome = :offered_reference_clarification
+      return pending_order
+    end
+    quote_request = content.match?(Constants::Conversation::CART_TOTAL_REQUEST) ||
+      (price_question? && parse_quantity(content).to_i > 1 && !content.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS))
+    if quote_request && pending_order.line_items.empty? &&
         !content.match?(Constants::Conversation::CART_MUTATION_CUE) &&
         CataloguePriceQuote.new(conversation: pending_order.conversation, text: content).content.present?
       @outcome = :catalogue_quote_requested
+      return pending_order
+    end
+    if content.match?(/\b(?:not that one|oita na)\b/i) &&
+        Constants::Catalogue::OPTION_POSITIONS.keys.any? { |word| content.match?(/\b#{word}\b/i) } && inquiry_reference.present?
+      remember_referenced_product!
+      @outcome = :product_details_requested
       return pending_order
     end
     if ConversationTurnRequest.new(content).information_only? && inquiry_reference.present? &&
@@ -49,7 +67,7 @@ class ConversationMessageProcessor
         :product_comparison_requested
       elsif product_variants_request?
         :product_variants_requested
-      elsif price_question? && !content.match?(/battery|warranty|cable|compatib/i)
+      elsif price_question? && !content.match?(/battery|warranty|cable|compatib|colou?r|design/i)
         :price_inquiry
       elsif stock_question?
         :stock_inquiry
@@ -571,7 +589,11 @@ class ConversationMessageProcessor
   end
 
   def handle_conversational_intent
-    @outcome = if pause_active_order_request?
+    @outcome = if content.match?(Constants::Catalogue::PRODUCT_REFERENCE) &&
+        ConversationTurnRequest.new(content).information_only? && inquiry_reference.present?
+      remember_referenced_product!
+      :product_details_requested
+    elsif pause_active_order_request?
       pause_active_order
     elsif explanation_request?
       :previous_question_explained
@@ -1226,7 +1248,7 @@ class ConversationMessageProcessor
   end
 
   def price_question?
-    content.downcase.match?(/\b(price|cost)\b|how much/)
+    content.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:price_inquiry]) || content.downcase.include?("how much")
   end
 
   def currency_question?
@@ -1456,7 +1478,7 @@ class ConversationMessageProcessor
   end
 
   def comparison_request?
-    content.downcase.match?(/\b(compare|comparison|difference|different|versus|vs\.?|better)\b/)
+    content.downcase.match?(/\b(compare|comparison|difference|versus|vs\.?|better)\b/)
   end
 
   def recommendation_refinement_request?
@@ -1515,9 +1537,7 @@ class ConversationMessageProcessor
   end
 
   def human_agent_request?
-    confident_ai_intent?(%w[human_agent]) || content.downcase.match?(
-      /\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b.*\b(talk|speak|connect|chai|kotha|কথা)\b|\b(talk|speak|connect|kotha|কথা)\b.*\b(human|person|agent|seller|owner|manager|manush|মানুষ|সেলার)\b/
-    )
+    content.match?(Constants::Conversation::HUMAN_REQUEST)
   end
 
   def remembered_value(field)
@@ -1606,7 +1626,8 @@ class ConversationMessageProcessor
     return true if Constants::Conversation::NON_NAME_REPLIES.include?(normalized)
     return true unless value.to_s.match?(/\A[\p{L}\p{M} .'-]{2,80}\z/u)
     return true if value.to_s.match?(Constants::Conversation::NON_NAME_SENTENCE)
-    return true if value.to_s.match?(Constants::Conversation::NON_NAME_CONVERSATION)
+    name_without_trailing_initial = value.to_s.sub(/\s+[A-Z]\z/, "")
+    return true if name_without_trailing_initial.match?(Constants::Conversation::NON_NAME_CONVERSATION)
     return true if value.to_s.split.size > 5
 
     value.to_s.downcase.match?(/\A(that|it|this)\s+(works|is fine|is good)(\s+for\s+me)?[?!. ]*\z/)
