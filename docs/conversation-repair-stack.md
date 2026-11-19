@@ -1,0 +1,30 @@
+# Conversation reliability repair stack
+
+The November 2026 Modz Tech replay uncovered unsafe draft quantities, missed
+cancellations, accessory confusion, repeated discovery replies, and lost context.
+The repair is delivered in five ordered PRs. The large catalogue snapshot and
+generated customer transcripts are local QA artifacts, not repository fixtures.
+
+## 1. Order-action safety
+
+`ConversationQuantityParser` is shared by the processor, action planner and
+AI-entity validator. Product/model names and specification units are not evidence
+of quantity. Explicit quantities remain supported in English, Banglish and Bengali.
+Factual questions cannot add cart items; browsing/negated-confirmation requests do
+not confirm. Cancellation is handled before checkout-stage field collection for
+unconfirmed orders, without unlocking already submitted orders. Explicit quantity
+corrections work with punctuation and do not rely on the classifier to invent a
+replacement value.
+
+The regression suite exercises actual saved draft state, not only reply wording.
+No migrations, production data changes, new credentials or feature flags are needed.
+
+## Subsequent units
+
+2. Tenant-scoped product/accessory matching and recent-offer references.
+3. Grounded factual and multi-intent answers before discovery templates.
+4. Per-line cart updates, totals, browsing and preference continuity.
+5. Classifier/handover safety, language continuity and sector-neutral text.
+
+Missing seller policies, unverified hardware specifications and available design
+variants must be supplied by the owner. The bot must not manufacture them.
