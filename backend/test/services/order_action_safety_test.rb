@@ -14,13 +14,13 @@ class OrderActionSafetyTest < ActiveSupport::TestCase
     assert_equal @product, @order.reload.product
     assert_nil @order.quantity
     assert_predicate @order, :collecting_quantity?
-    assert_equal 2, ConversationQuantityParser.call("2 ta Hoco EQ34 Plus", products: [@product])
-    assert_nil ConversationQuantityParser.call("Hoco EQ34 Plus", products: [@product])
+    assert_equal 2, ConversationQuantityParser.call("2 ta Hoco EQ34 Plus", products: [ @product ])
+    assert_nil ConversationQuantityParser.call("Hoco EQ34 Plus", products: [ @product ])
     assert_nil ConversationQuantityParser.call("45W, 7 hours, 1000 taka")
   end
 
   test "factual questions cannot begin checkout or add cart items" do
-    ["Tell me specifically about Hoco EQ34 Plus battery.", "Does Hoco EQ34 Plus include a cable?"].each do |text|
+    [ "Tell me specifically about Hoco EQ34 Plus battery.", "Does Hoco EQ34 Plus include a cable?" ].each do |text|
       process(text)
       assert_nil @order.reload.product_id
       assert_nil @order.quantity
@@ -30,7 +30,7 @@ class OrderActionSafetyTest < ActiveSupport::TestCase
 
   test "cancel works across all unconfirmed checkout stages" do
     %w[collecting_product collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation].each do |stage|
-      ["cancel", "Cancel this test order.", "Puro test order cancel koren."].each do |text|
+      [ "cancel", "Cancel this test order.", "Puro test order cancel koren." ].each do |text|
         @order.update!(status: stage)
         assert_equal :cancelled, process(text).outcome, "#{stage}: #{text}"
         assert_predicate @order.reload, :cancelled?
