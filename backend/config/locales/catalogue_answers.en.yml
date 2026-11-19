@@ -1,0 +1,37 @@
+en:
+  catalogue_answers:
+    en:
+      intro: "%{product} — from %{price}. Catalogue information:"
+      unknown: "%{topic} is not verified in this catalogue. The seller needs to confirm it; I cannot promise it."
+      compatibility_check: "Exact device/model compatibility and supported performance need verification before purchase."
+      compare: "Here is the catalogue comparison:"
+      choose_compare: "Which two products would you like to compare? You can use these names: %{products}."
+      difference: "The starting-price difference is %{amount}. Features not documented for either product remain unverified."
+      topics: &topics
+        battery: "Battery details"
+        noise: "Noise cancellation and call features"
+        cable: "Cable inclusion"
+        warranty: "Warranty"
+        compatibility: "Compatibility"
+        package: "Package contents"
+        connectivity: "Connectivity"
+        tracking: "Tracking capabilities"
+        waterproof: "Water resistance"
+        medical: "Medical accuracy"
+        designs: "Available designs"
+    banglish:
+      intro: "%{product} — %{price} theke. Catalogue-e deya information:"
+      unknown: "%{topic} catalogue-e verified nei. Seller-ke confirm korte hobe; ami promise korte parchi na."
+      compatibility_check: "Apnar exact device/model-e compatibility ar performance kenar age confirm korte hobe."
+      compare: "Catalogue-er information diye comparison:"
+      choose_compare: "Kon duita product compare korben? Ei nam-gulo use korte paren: %{products}."
+      difference: "Starting price-er difference %{amount}. Document kora nei emon feature verified dhora jabe na."
+      topics: *topics
+    bn:
+      intro: "%{product} — %{price} থেকে। ক্যাটালগের তথ্য:"
+      unknown: "%{topic} ক্যাটালগে যাচাই করা নেই। বিক্রেতাকে নিশ্চিত করতে হবে; আমি প্রতিশ্রুতি দিতে পারছি না।"
+      compatibility_check: "কেনার আগে আপনার নির্দিষ্ট ডিভাইসে সামঞ্জস্য ও কার্যক্ষমতা নিশ্চিত করতে হবে।"
+      compare: "ক্যাটালগের তথ্য অনুযায়ী তুলনা:"
+      choose_compare: "কোন দুটি পণ্যের তুলনা চান? এই নামগুলো ব্যবহার করতে পারেন: %{products}।"
+      difference: "শুরুর দামের পার্থক্য %{amount}। উল্লেখ নেই এমন বৈশিষ্ট্য যাচাই করা ধরে নেওয়া যাবে না।"
+      topics: *topics

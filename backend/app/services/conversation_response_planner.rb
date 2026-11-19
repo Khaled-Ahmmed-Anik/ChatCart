@@ -90,6 +90,11 @@ class ConversationResponsePlanner
         include_follow_up: false
       ).content
     end + [ base_reply ]
+    if customer_message.content.match?(/\bwarranty\b/i) && outcome == :return_policy_requested
+      locale = preferred_language(conversation.conversation_state.to_h) == "banglish" ? "banglish" : "en"
+      replies << I18n.t("catalogue_answers.#{locale}.unknown",
+        topic: I18n.t("catalogue_answers.#{locale}.topics.warranty"))
+    end
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
   end
 
