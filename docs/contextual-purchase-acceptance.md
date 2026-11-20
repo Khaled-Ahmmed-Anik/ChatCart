@@ -30,3 +30,14 @@ Regression tests exercise the production retry sequence through the real recorde
 each phrase independently, classifier disagreement, ambiguity, variant preservation,
 stock/tenant isolation, context-free evaluation and final-confirmation safety.
 There are no migrations, new environment variables or production-data edits.
+
+## Validation
+
+The combined local non-image service suite passes 430 tests and 2,293 assertions.
+The existing 100-conversation / 1,000-turn replay completes with zero exceptions
+and the same 43 diagnostic flags as merged main: no new flagged turns. These flags
+are unchanged repeated correct replies or clarification for unavailable comparison
+and ordinal choices, not a calibrated error rate. The exact new production
+selection sequence is covered separately by the real-pipeline regression tests.
+External AI and external sends were disabled, and replay records were rolled back.
+Hosted CI supplies the full suite, including the image tests requiring libvips.

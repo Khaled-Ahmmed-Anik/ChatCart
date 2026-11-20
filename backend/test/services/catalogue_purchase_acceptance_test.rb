@@ -74,6 +74,14 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
     assert_nil result.pending_order.quantity
   end
 
+  test "category choice cannot pick arbitrarily between two offered chargers" do
+    @business.products.create!(name: "Other USB-C Charger", category: "charger", price: 999, stock_quantity: 3)
+    record("charger ase?")
+    result = record("charger ta")
+    assert_equal :offered_reference_clarification, result.outcome
+    assert_nil result.pending_order.reload.product_id
+  end
+
   test "factual and negative references cannot become purchases" do
     [ "etai nibo na", "ei product er dam koto?", "charger ase?" ].each_with_index do |text, index|
       @customer = "not-buying-#{index}"
@@ -142,6 +150,23 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
     assert_equal variant.id, result.pending_order.reload.product_variant_id
     assert_predicate result.pending_order, :collecting_quantity?
     assert_nil result.pending_order.quantity
+  end
+
+  test "purchase acceptance does not rewrite terminal orders or saved cart lines" do
+    result = record("charger ase?")
+    order = result.pending_order
+    %i[confirmed submitted_to_woocommerce cancelled].each do |status|
+      order.update!(product: @charger, quantity: 1, status: status)
+      message = result.conversation.messages.create!(sender_type: :customer, content: "etai nibo")
+      assert_nil CataloguePurchaseAcceptance.new(message: message, pending_order: order).call
+      assert_equal status.to_s, order.reload.status
+      assert_equal 1, order.quantity
+    end
+    order.update!(product: nil, quantity: nil, status: :collecting_product)
+    order.pending_order_items.create!(product: @buds, quantity: 2)
+    message = result.conversation.messages.create!(sender_type: :customer, content: "etai nibo")
+    assert_nil CataloguePurchaseAcceptance.new(message: message, pending_order: order).call
+    assert_equal [ @buds.id ], order.reload.pending_order_items.pluck(:product_id)
   end
 
   private
