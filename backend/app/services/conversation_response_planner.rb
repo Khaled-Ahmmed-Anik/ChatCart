@@ -1,7 +1,7 @@
 class ConversationResponsePlanner
   Plan = Data.define(
     :content, :language, :tone, :address_preference, :pending_question, :interrupted,
-    :goal, :actions, :facts, :confidence, :needs_clarification, :handover_required
+    :goal, :actions, :facts, :confidence, :needs_clarification, :handover_required, :question_contract
   ) do
     def to_h
       {
@@ -16,7 +16,8 @@ class ConversationResponsePlanner
         facts: facts,
         confidence: confidence,
         needs_clarification: needs_clarification,
-        handover_required: handover_required
+        handover_required: handover_required,
+        question_contract: question_contract
       }.compact
     end
   end
@@ -47,7 +48,8 @@ class ConversationResponsePlanner
       facts: approved_facts,
       confidence: interpretation&.confidence || 1.0,
       needs_clarification: outcome == :clarification_needed || interpretation&.needs_clarification == true,
-      handover_required: outcome == :human_handover_started
+      handover_required: outcome == :human_handover_started,
+      question_contract: ConversationQuestionState.new(conversation).contract(order: pending_order, outcome: outcome)
     )
   end
 
@@ -212,14 +214,7 @@ class ConversationResponsePlanner
 
   def pending_question
     return if order_context_paused?
-    {
-      "collecting_product" => "product",
-      "collecting_quantity" => "quantity",
-      "collecting_name" => "customer_name",
-      "collecting_phone" => "phone",
-      "collecting_address" => "address",
-      "awaiting_confirmation" => "confirmation"
-    }[pending_order.status]
+    ConversationQuestionState.checkout_contract(pending_order)["field"]
   end
 
   def response_goal

@@ -514,7 +514,9 @@ class BotReplyGenerator
     end
     intro_key = result.budget_detected && !result.exact_match ? "outside_budget" : "intro"
     preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"].to_h
-    follow_up = I18n.t("#{prefix}.follow_up", locale: :en) unless preferences["device"].present? || preferences["use_case"].present?
+    kind = ConversationQuestionState.new(conversation).discovery_kind
+    question_key = kind == "discovery_use" ? "follow_up" : (kind == "product_acceptance" ? "accept_product" : "choose_product")
+    follow_up = I18n.t("#{prefix}.#{question_key}", locale: :en)
     [ I18n.t("#{prefix}.#{intro_key}", locale: :en), lines.join("\n\n"), follow_up ].compact.join("\n\n")
   end
 

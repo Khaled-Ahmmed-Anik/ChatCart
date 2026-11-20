@@ -135,6 +135,8 @@ class CustomerMessageRecorder
         content: final_reply_content(message, pending_order, outcome, interpretation, response_plan),
         metadata: bot_reply_metadata
       )
+      ConversationQuestionState.new(conversation).record!(message: bot_reply, order: pending_order,
+        contract: response_plan.question_contract)
     end
 
     Result.new(

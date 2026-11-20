@@ -45,6 +45,9 @@ class CataloguePurchaseAcceptance
   end
 
   def purchase_question?
+    typed = ConversationQuestionState.new(order.conversation).purchase_offer?(message: message, order: order)
+    return typed unless typed.nil?
+
     previous = order.conversation.messages.bot.where("id < ?", message.id).order(id: :desc).pick(:content)
     previous.to_s.match?(Constants::Catalogue::PURCHASE_OFFER_QUESTION)
   end
