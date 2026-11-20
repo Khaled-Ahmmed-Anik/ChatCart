@@ -4,7 +4,12 @@ class CatalogueCategoryResolver
     categories = business.products.available_for_sale.where.not(category: [ nil, "" ]).distinct.pluck(:category)
     matches = categories.select do |category|
       label = normalize(category)
-      normalized.match?(/(?:\A|\s)#{Regexp.escape(label)}(?:\z|\s)/)
+      normalized.match?(/(?:\A|\s)#{Regexp.escape(label)}(?:\z|\s)/) &&
+        !normalized.match?(/\b(?:not|no|without|avoid|bad)\s+(?:a\s+)?#{Regexp.escape(label)}\b|\b#{Regexp.escape(label)}\s+(?:na|not|no)\b/)
+    end
+    if normalized.match?(Constants::Catalogue::ACCESSORY_WORDS)
+      accessories = categories.select { |category| category.match?(/accessor|case|cover/i) }
+      matches = accessories if accessories.one?
     end
     if matches.any?
       return matches.reject do |category|
@@ -21,6 +26,14 @@ class CatalogueCategoryResolver
 
   def self.normalize(text)
     ConversationTextNormalizer.call(text).split.map(&:singularize).join(" ")
+  end
+
+  def self.rejected_categories(business:, text:)
+    normalized = normalize(text)
+    business.products.available_for_sale.where.not(category: [ nil, "" ]).distinct.pluck(:category).select do |category|
+      label = Regexp.escape(normalize(category))
+      normalized.match?(/\b(?:not|no|without|avoid|bad)\s+(?:a\s+)?#{label}\b|\b#{label}\s+(?:na|not|no)\b/)
+    end
   end
 
   def self.one_edit_apart?(left, right)

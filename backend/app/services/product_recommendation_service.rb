@@ -179,6 +179,8 @@ class ProductRecommendationService
   end
 
   def eligible_product?(product)
+    return false if Array(preferences["excluded_categories"]).include?(product.category)
+
     (Array(preferences["categories"]).empty? || Array(preferences["categories"]).include?(product.category)) && matches_format?(product) &&
       !product.id.in?(Array(preferences["rejected_product_ids"]).map(&:to_i)) &&
       avoids_excluded_families?(product) &&

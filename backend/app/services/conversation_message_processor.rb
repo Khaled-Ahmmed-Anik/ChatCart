@@ -31,8 +31,9 @@ class ConversationMessageProcessor
       @outcome = :confirmation_deferred
       return pending_order
     end
-    if ConversationTurnRequest.new(content).information_only? && product_resolution.matched? &&
-        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty?
+    if ConversationTurnRequest.new(content).information_only? && inquiry_reference.present? &&
+        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty? &&
+        !content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
       remember_referenced_product!
       @outcome = if price_question?
         :price_inquiry
@@ -311,12 +312,16 @@ class ConversationMessageProcessor
   end
 
   def remember_referenced_product!
-    product = product_resolution.product if product_resolution.matched?
+    product = inquiry_reference
     return if product.blank?
 
     conversation = pending_order.conversation
     state = conversation.conversation_state.to_h
     conversation.update!(conversation_state: state.merge("last_referenced_product" => product.name))
+  end
+
+  def inquiry_reference
+    @inquiry_reference ||= CatalogueConversationReference.new(conversation: pending_order.conversation, text: content).product
   end
 
   def mapped_secondary_outcomes

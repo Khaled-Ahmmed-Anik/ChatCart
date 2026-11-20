@@ -7,6 +7,9 @@ module Constants
   end
 
   module Catalogue
+    ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
+    PRODUCT_REFERENCE = /\b(?:this|that|it|these|those|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
+    OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
     MINIMUM_CATEGORY_TYPO_LENGTH = 5
     COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
   end

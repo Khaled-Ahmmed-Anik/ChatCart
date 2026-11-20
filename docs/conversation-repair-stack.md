@@ -21,7 +21,11 @@ No migrations, production data changes, new credentials or feature flags are nee
 
 ## Subsequent units
 
-2. Tenant-scoped product/accessory matching and recent-offer references.
+2. Tenant-scoped product/accessory matching and recent-offer references. Accessory
+   qualifiers exclude the overlapping base device; explicit rejections are hard
+   category filters even for nearest-budget suggestions. Ordinal questions use the
+   actual ordered offer list without selecting a draft product. The same reference
+   resolver is used for inquiry state and visible replies, with business-scoped IDs.
 3. Grounded factual and multi-intent answers before discovery templates.
 4. Per-line cart updates, totals, browsing and preference continuity.
 5. Classifier/handover safety, language continuity and sector-neutral text.

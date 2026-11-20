@@ -41,9 +41,26 @@ class ProductResolutionService
   def candidates
     business.products.available_for_sale.includes(:product_variants).filter_map do |product|
       next unless product.total_available_stock.positive?
+      next if accessory_request? && !accessory?(product)
+      next if rejected_product?(product)
 
       name, candidate_score = product.searchable_names.map { |search_name| [ search_name, score(search_name) ] }.max_by(&:last)
       Candidate.new(product: product, score: candidate_score, matched_name: name) if candidate_score.positive?
+    end
+  end
+
+  def accessory_request?
+    query.match?(Constants::Catalogue::ACCESSORY_WORDS)
+  end
+
+  def accessory?(product)
+    "#{product.name} #{product.category}".match?(Constants::Catalogue::ACCESSORY_WORDS)
+  end
+
+  def rejected_product?(product)
+    product.searchable_names.any? do |name|
+      label = Regexp.escape(normalize(name))
+      query.match?(/\b(?:not|no)\s+#{label}\b|\b#{label}\s+(?:na|not|no)\b/)
     end
   end
 
