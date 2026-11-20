@@ -52,6 +52,18 @@ class CustomerMessageRecorder
       end
       current_order = conversation.pending_order
       ConversationLanguagePreference.remember!(conversation, content)
+      media_reply = ConversationProductMedia.new(conversation: conversation, message: message).call
+      if media_reply
+        pending_order = current_order
+        outcome = media_reply.outcome
+        record_outcome(message, outcome)
+        if media_reply.product
+          conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("last_referenced_product" => media_reply.product.name))
+        end
+        bot_reply = conversation.messages.create!(sender_type: :bot, content: media_reply.content,
+          metadata: bot_reply_metadata.merge("attachments" => media_reply.attachments))
+        next
+      end
       CatalogueCustomerPreferences.remember!(conversation, content) unless
         CataloguePreferenceExtractor.new(content, business: business).fragrance?
       photo_suggestion = ConversationPhotoSuggestion.new(conversation)

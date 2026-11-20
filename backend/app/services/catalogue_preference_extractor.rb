@@ -48,6 +48,7 @@ class CataloguePreferenceExtractor
   def available_attributes
     @available_attributes ||= products.each_with_object({}) do |product, attributes|
       product.product_attributes.to_h.each do |key, values|
+        next if key.in?([ Constants::ProductMedia::KEY, Constants::ProductMedia::LINKS_KEY ])
         next unless values.is_a?(String) || values.is_a?(Array)
 
         attributes[key] = (Array(attributes[key]) + Array(values).select { |value| value.is_a?(String) }).uniq

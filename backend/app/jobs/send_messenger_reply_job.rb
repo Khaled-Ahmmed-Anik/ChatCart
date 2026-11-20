@@ -20,29 +20,54 @@ class SendMessengerReplyJob < ApplicationJob
   end
 
   def perform(delivery)
-    return if delivery.status == "delivered"
-    return skip_inactive_business(delivery) unless delivery.messenger_webhook_event.business.reload.active?
-    if delivery.messenger_webhook_event.business.reload.blocks_automated_reply?(delivery.message)
-      return delivery.update!(status: "skipped", last_error: "business_automation_paused")
-    end
-
-    delivery.increment!(:attempts)
-    result = MessengerReplySender.new(
-      recipient_id: delivery.recipient_id,
-      content: delivery.message.content,
-      page_access_token: page_access_token_for(delivery)
-    ).deliver
-
-    persist_result(delivery, result)
-    log_result(delivery)
-
-    raise TemporaryDeliveryError, result.error || "Messenger temporary failure" if result.retryable
+    result = delivery.with_lock { deliver_parts(delivery) }
+    raise TemporaryDeliveryError, result.error || "Messenger temporary failure" if result&.retryable
   end
 
   private
 
+  def deliver_parts(delivery)
+    return if delivery.status == "delivered"
+    return skip_inactive_business(delivery) unless delivery.messenger_webhook_event.business.reload.active?
+    if delivery.messenger_webhook_event.business.reload.blocks_automated_reply?(delivery.message)
+      delivery.update!(status: "skipped", last_error: "business_automation_paused")
+      return
+    end
+
+    delivery.increment!(:attempts)
+    message = delivery.message
+    attachments = Array(message.metadata["attachments"]).first(Constants::ProductMedia::MAX_ATTACHMENTS)
+    parts = [ nil, *attachments ]
+    cursor = message.metadata.fetch("messenger_parts_sent", 0).to_i
+    result = nil
+    parts.each_with_index do |attachment, index|
+      next if index < cursor
+      if delivery.messenger_webhook_event.business.reload.blocks_automated_reply?(message)
+        delivery.update!(status: "skipped", last_error: "business_automation_paused")
+        return
+      end
+
+      arguments = { recipient_id: delivery.recipient_id, content: message.content, page_access_token: page_access_token_for(delivery) }
+      arguments[:attachment] = attachment if attachment
+      result = MessengerReplySender.new(**arguments).deliver
+      break unless result.delivered
+
+      message.update!(metadata: message.metadata.merge("messenger_parts_sent" => index + 1))
+    end
+    if result.nil?
+      delivery.update!(status: "delivered", delivered_at: Time.current, last_error: nil)
+      return
+    end
+
+    persist_result(delivery, result)
+    log_result(delivery)
+
+    result
+  end
+
   def skip_inactive_business(delivery)
     delivery.update!(status: "skipped", last_error: "business_inactive")
+    nil
   end
 
   def page_access_token_for(delivery)

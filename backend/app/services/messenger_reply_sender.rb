@@ -5,10 +5,11 @@ class MessengerReplySender
   RETRYABLE_STATUS_CODES = [ 408, 429 ].freeze
   Result = Struct.new(:delivered, :skipped, :retryable, :status, :response_body, :error, keyword_init: true)
 
-  def initialize(recipient_id:, content:, page_access_token: ENV["MESSENGER_PAGE_ACCESS_TOKEN"])
+  def initialize(recipient_id:, content:, page_access_token: ENV["MESSENGER_PAGE_ACCESS_TOKEN"], attachment: nil)
     @recipient_id = recipient_id
     @content = content
     @page_access_token = page_access_token
+    @attachment = attachment
   end
 
   def deliver
@@ -62,9 +63,17 @@ class MessengerReplySender
   end
 
   def request_payload
+    message = if @attachment
+      type, url = @attachment.values_at("type", "url")
+      raise ArgumentError, "Invalid catalogue attachment" unless type.in?(Constants::ProductMedia::KINDS) && ProductImageUrlsValidator.valid_url?(url)
+
+      { attachment: { type: type, payload: { url: url } } }
+    else
+      { text: content }
+    end
     {
       recipient: { id: recipient_id },
-      message: { text: content },
+      message: message,
       messaging_type: "RESPONSE"
     }
   end
