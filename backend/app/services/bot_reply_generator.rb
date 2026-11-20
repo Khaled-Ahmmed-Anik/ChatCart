@@ -124,7 +124,7 @@ class BotReplyGenerator
     when :delivery_price_objection
       delivery_price_objection_reply
     when :price_objection
-      "I understand—you’d like a more affordable option.\n\n#{product_recommendation_reply}"
+      "#{I18n.t("category_discovery.#{repair_language}.lower_price")}\n\n#{product_recommendation_reply}"
     when :return_requested
       after_sales_reply("return")
     when :return_policy_requested
@@ -197,7 +197,7 @@ class BotReplyGenerator
     when :confirmed
       "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly. Was this chat helpful? Reply “helpful” or “not helpful”."
     when :cancelled
-      "Your order has been cancelled. If you change your mind, just send “new order”."
+      I18n.t("chat_language.#{repair_language}.cancelled")
     end
   end
 
@@ -507,14 +507,18 @@ class BotReplyGenerator
     language = repair_language
     language = "banglish" if customer_message&.content.to_s.match?(/\b(?:ase|ache|chai|lagbe|kono|nibo)\b/i)
     prefix = "category_discovery.#{language}"
-    return I18n.t("#{prefix}.unavailable", locale: :en) if result.offers.empty?
+    if result.offers.empty?
+      key = preferences["price_direction"] == "lower" ? "lower_unavailable" : "unavailable"
+      return I18n.t("#{prefix}.#{key}", locale: :en)
+    end
 
     GuidedSalesConversation.new(conversation).remember_recommendations!(
       result.offers.map { |offer| offer.product.id }, offers: result.offers.map { |offer| recommendation_snapshot(offer) }
     )
     remember_options!(:products, result.offers.map(&:product).uniq)
     lines = result.offers.map do |offer|
-      summary = offer.product.short_description.to_s.squish.truncate(120)
+      summary = offer.product.short_description.to_s.squish.split(/(?<=[.!?])\s+/).first.to_s
+      summary = nil if summary.length > Constants::Catalogue::MAXIMUM_RECOMMENDATION_SUMMARY_LENGTH
       [ "• #{offer.label} — #{formatted_price(offer.price)}", summary.presence ].compact.join("\n")
     end
     intro_key = result.budget_detected && !result.exact_match ? "outside_budget" : "intro"

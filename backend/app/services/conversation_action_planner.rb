@@ -9,7 +9,7 @@ class ConversationActionPlanner
   INFORMATIONAL_PATTERNS = {
     return_policy_requested: /\breturn policy\b|রিটার্ন পলিসি/i,
     delivery_area_requested: /\b(?:deliver to|delivery areas?|shipping areas?)\b|\b(?:Sylhet|Dhaka|Chattogram)\s+delivery\s+hobe\b/i,
-    delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho)|how much.*(?:delivery|shipping)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
+    delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho|included|free)|how much.*(?:delivery|shipping)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
     delivery_time_requested: /\b(delivery|shipping)\s*(time|when|kobe)|(?:delivery|shipping|parcel).*?(?:koto din|koy din|how many days)|ডেলিভারি.*কত\s*দিন|কবে\s*(পাব|আসবে)/i,
     cash_on_delivery_requested: /\b(cod|cash on delivery|cash e|cash-e)\b|ক্যাশ\s*(অন\s*ডেলিভারি)?/i,
     payment_methods_requested: /\b(payment|pay)\s*(method|option|kivabe|how)|bkash|nagad|(?:credit|debit)\s+card/i,

@@ -52,8 +52,9 @@ class ConversationMessageProcessor
       return pending_order
     end
     return pending_order if accept_variant_bundle_offer
-    return pending_order if handle_category_discovery
     return pending_order if apply_action_plan
+    return pending_order if select_explicit_purchase
+    return pending_order if handle_category_discovery
     if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(ConversationActionPlanner::ORDERING_CUE) && matching_product.blank?
       collect_quantity
       return pending_order
@@ -113,6 +114,7 @@ class ConversationMessageProcessor
       else
         select_product_record(decision.product, collect_details: false)
       end
+      collect_quantity if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
     elsif decision.product
       conversation = pending_order.conversation
       conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("last_referenced_product" => decision.product.name))
@@ -120,8 +122,21 @@ class ConversationMessageProcessor
     true
   end
 
+  def select_explicit_purchase
+    return false unless pending_order.collecting_product? && content.match?(Constants::Conversation::EXPLICIT_PURCHASE_ACTION)
+
+    plan = ConversationActionPlanner.new(message: message, business: pending_order.conversation.business).call
+    product = plan.product
+    return false unless product && plan.ordering_cue
+
+    select_product_record(product)
+    true
+  end
+
   def handle_category_discovery
     return false if catalogue_preferences.fragrance? || product_resolution.matched?
+    return false if pending_order.product.present? && parsed_quantity.present? && content.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
+    return false if content.match?(Constants::Catalogue::LOWER_PRICE_REQUEST)
     return false if content.match?(/\b(?:not|no|without|avoid)\b|\b(?:na|chai na)\s*\z/i)
 
     state = pending_order.conversation.conversation_state.to_h
@@ -611,6 +626,10 @@ class ConversationMessageProcessor
       :trial_requested
     elsif delivery_price_objection?
       :delivery_price_objection
+    elsif content.match?(Constants::Catalogue::LOWER_PRICE_REQUEST)
+      remember_recommendation_preferences!
+      prepare_lower_priced_recommendations!
+      :product_recommendation_requested
     elsif price_objection?
       prepare_lower_priced_recommendations!
       :price_objection
@@ -1268,11 +1287,15 @@ class ConversationMessageProcessor
   end
 
   def prepare_lower_priced_recommendations!
-    baseline = pending_order.unit_price if pending_order.product.present?
+    reference = pending_order.product || inquiry_reference
+    offered = CatalogueConversationReference.new(conversation: pending_order.conversation, text: content).offered_products
+    reference ||= offered.first if offered.one?
+    baseline = pending_order.product.present? ? pending_order.unit_price : reference&.starting_price
     enter_product_discovery!
     conversation = pending_order.conversation
     state = conversation.conversation_state.to_h
     preferences = state["shopping_preferences"].to_h.merge("price_direction" => "lower")
+    preferences["categories"] = [ reference.category ] if reference&.category.present?
     preferences["previous_recommendations"] = [ { "price" => baseline.to_s } ] if baseline.present?
     state["shopping_preferences"] = preferences
     conversation.update!(conversation_state: state)

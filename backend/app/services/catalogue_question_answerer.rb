@@ -49,7 +49,10 @@ class CatalogueQuestionAnswerer
   end
 
   def topics
-    @topics ||= Constants::Catalogue::QUESTION_TOPICS.select { |_topic, definition| text.match?(definition.fetch(:question)) }
+    @topics ||= Constants::Catalogue::QUESTION_TOPICS.select { |_topic, definition| text.match?(definition.fetch(:question)) }.tap do |selected|
+      selected.delete(:package) if selected.key?(:cable) && !text.match?(/\b(?:package|box|contents|else)\b/i)
+      selected.delete(:package) if ConversationActionPlanner.policy_information_outcomes(text).include?(:delivery_charge_requested)
+    end
   end
 
   def evidence_lines

@@ -1,6 +1,8 @@
 en:
   category_discovery:
     en:
+      lower_price: "Let me check for a lower-priced option in the same category."
+      lower_unavailable: "I could not find a lower-priced option matching those requirements. Would you like to change the budget or requirements?"
       accept_product: "Would you like to order this product?"
       choose_product: "Which of these products would you like?"
       intro: "Here are the available matching options:"
@@ -8,6 +10,8 @@ en:
       follow_up: "What will you use it with or for? I can help narrow down the right option."
       unavailable: "There are no available options in that category right now. Would you like a different category?"
     banglish:
+      lower_price: "Ji, eki category-te aro kom damer option ache kina dekhi."
+      lower_unavailable: "Ei requirement-er sathe matching aro kom damer option pelam na. Budget ba requirement change korte chan?"
       accept_product: "Ei product-ta nite chan?"
       choose_product: "Ei product-gulor moddhe konta niben?"
       intro: "Ji, ei dhoroner option ache:"
@@ -15,6 +19,8 @@ en:
       follow_up: "Kon kajer jonno ba kon device-er sathe use korben? Bolle upojukto option bachhte help korte parbo."
       unavailable: "Ei category-te ekhon available option nei. Onno category dekhte chan?"
     bn:
+      lower_price: "জি, একই ধরনের আরও কম দামের পণ্য আছে কি না দেখি।"
+      lower_unavailable: "এই চাহিদা অনুযায়ী আরও কম দামের পণ্য পেলাম না। বাজেট বা চাহিদা বদলাতে চান?"
       accept_product: "এই পণ্যটি নিতে চান?"
       choose_product: "এই পণ্যগুলোর মধ্যে কোনটি নেবেন?"
       intro: "জি, এই ধরনের পণ্য আছে:"
