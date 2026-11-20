@@ -35,7 +35,11 @@ class ConversationMessageProcessor
         requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty? &&
         !content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
       remember_referenced_product!
-      @outcome = if price_question?
+      @outcome = if comparison_request?
+        :product_comparison_requested
+      elsif product_variants_request?
+        :product_variants_requested
+      elsif price_question? && !content.match?(/battery|warranty|cable|compatib/i)
         :price_inquiry
       elsif stock_question?
         :stock_inquiry

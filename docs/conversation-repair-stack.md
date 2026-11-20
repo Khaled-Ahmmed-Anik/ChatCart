@@ -26,7 +26,13 @@ No migrations, production data changes, new credentials or feature flags are nee
    category filters even for nearest-budget suggestions. Ordinal questions use the
    actual ordered offer list without selecting a draft product. The same reference
    resolver is used for inquiry state and visible replies, with business-scoped IDs.
-3. Grounded factual and multi-intent answers before discovery templates.
+3. Grounded factual and multi-intent answers before discovery templates. Electronic
+   product questions extract relevant configured description lines, retain negative
+   limitations, and explicitly mark unknown warranty/package facts. They never
+   infer exact-device compatibility from generic support. Comparisons use the
+   offered products and grounded starting-price differences. SIM-card and battery
+   duration questions are not payment/delivery policy keywords. Existing perfume
+   replies remain on their original path.
 4. Per-line cart updates, totals, browsing and preference continuity.
 5. Classifier/handover safety, language continuity and sector-neutral text.
 

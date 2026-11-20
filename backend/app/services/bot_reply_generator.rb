@@ -411,6 +411,12 @@ class BotReplyGenerator
     product = contextual_product
     return product_selection_prompt if product.blank?
 
+    unless CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
+      answer = CatalogueQuestionAnswerer.new(product: product, text: customer_message&.content.to_s,
+        language: banglish? ? "banglish" : "english").content
+      return answer if answer.present?
+    end
+
     return product_performance_reply(product) if performance_question?
 
     attributes = product.product_attributes.to_h
@@ -674,7 +680,20 @@ class BotReplyGenerator
     products = products_mentioned_in_message
     products = CatalogueConversationReference.new(conversation: pending_order.conversation,
       text: customer_message&.content.to_s).offered_products if products.size < 2
-    return "Tell me the two product names you want to compare, for example: “The Office vs Bleu Inspired”." if products.size < 2
+    if products.size < 2
+      examples = catalog.available_for_sale.limit(2).pluck(:name).join(", ")
+      return I18n.t("catalogue_answers.#{banglish? ? 'banglish' : 'en'}.choose_compare", products: examples)
+    end
+    unless CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
+      prefix = "catalogue_answers.#{banglish? ? 'banglish' : 'en'}"
+      answers = products.first(2).map do |product|
+        CatalogueQuestionAnswerer.new(product: product, text: customer_message&.content.to_s,
+          language: banglish? ? "banglish" : "english").content || "#{product.name} — #{formatted_price(product.starting_price)}"
+      end
+      difference = (products[0].starting_price - products[1].starting_price).abs
+      return [ I18n.t("#{prefix}.compare"), *answers,
+        I18n.t("#{prefix}.difference", amount: formatted_price(difference)) ].join("\n\n")
+    end
 
     lines = products.first(3).map do |product|
       attributes = product.product_attributes.to_h

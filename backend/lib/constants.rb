@@ -7,6 +7,20 @@ module Constants
   end
 
   module Catalogue
+    MAXIMUM_EVIDENCE_LINES = 4
+    QUESTION_TOPICS = {
+      battery: { question: /\bbattery|\bhours?\b|ghonta|khon chole|দিন চলে/i, evidence: /battery|playback|hours?|mah|CR2032|months?/i },
+      noise: { question: /\b(?:anc|enc|noise|call quality|microphone)\b/i, evidence: /\b(?:anc|enc|noise|microphone|call)\b/i },
+      cable: { question: /\bcable\b/i, evidence: /\bcable\b/i },
+      warranty: { question: /\b(?:warranty|guarantee)\b/i, evidence: /\b(?:warranty|guarantee)\b/i },
+      compatibility: { question: /compatib|\b(?:safe|fit|Android|iPhone|iOS|cholbe|work with)\b/i, evidence: /compatib|Android|iOS|iPhone|Samsung|protocol|physical fit/i },
+      package: { question: /included|include|package|\b(?:straps?|koyta|inside|vitore|keychain)\b/i, evidence: /included|include|package|straps?|keychain|contents|accessor/i },
+      connectivity: { question: /\b(?:sim|bluetooth|phone|independent|calling|call)\b/i, evidence: /Bluetooth|SIM|call|connected|phone/i },
+      tracking: { question: /\b(?:gps|live|tracker|pet|car|ecosystem|network|simultaneous|pair)\b/i, evidence: /GPS|real.time|network|ecosystem|one .*time|guaranteed|participating|SIM/i },
+      waterproof: { question: /waterproof|\bswim/i, evidence: /waterproof|swim|water.resistan/i },
+      medical: { question: /medical|diagnos|heart disease|heart condition/i, evidence: /medical|diagnos|wellness|health/i },
+      designs: { question: /\b(?:designs?|colou?rs?)\b/i, evidence: /design|colou?r/i }
+    }.freeze
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
     PRODUCT_REFERENCE = /\b(?:this|that|it|these|those|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
     OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
