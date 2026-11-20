@@ -76,6 +76,8 @@ module Constants
   end
 
   module Conversation
+    PURCHASE_DECLINED = /\b(?:nibo na|nite chai na|kinbo na|chai na|do not (?:want|buy|order|take)|don t (?:want|buy|order|take)|not buying|not ordering|will not (?:buy|take|order))\b|নিবো না|নেব না|কিনব না/i
+    CHECKOUT_PROGRESS_OUTCOMES = %i[product_selected variant_selected quantity_collected multiple_details_collected cart_updated].freeze
     REPLY_QUESTION_CUES = {
       "customer_name" => /\b(?:name|naam|nam)\b|নাম/i,
       "phone" => /\b(?:phone|mobile|number|contact)\b|ফোন|মোবাইল|নম্বর/i,

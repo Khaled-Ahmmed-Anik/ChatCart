@@ -105,6 +105,8 @@ class ConversationMessageProcessor
     @outcome = decision.outcome
     if decision.route == :cancel
       pending_order.cancelled!
+    elsif decision.route == :pause
+      @outcome = pause_active_order
     elsif decision.route == :select
       if pending_order.product_id == decision.product.id
         @outcome = :product_selected
