@@ -1,5 +1,5 @@
 class ConversationMessageProcessor
-  attr_reader :outcome, :secondary_outcomes
+  attr_reader :outcome, :secondary_outcomes, :decision
 
   def initialize(message:, pending_order:, interpretation: nil, photo_product: nil, photo_details: nil)
     @message = message
@@ -22,60 +22,8 @@ class ConversationMessageProcessor
       return pending_order
     end
 
-    if cancellation? && !pending_order.confirmed? && !pending_order.submitted_to_woocommerce?
-      pending_order.cancelled!
-      @outcome = :cancelled
-      return pending_order
-    end
-    if ConversationTurnRequest.new(content).browsing_only?
-      @outcome = :confirmation_deferred
-      return pending_order
-    end
-    if content.match?(Constants::Catalogue::DEVICE_RECALL)
-      @outcome = :device_preference_requested
-      return pending_order
-    end
-    reference = CatalogueConversationReference.new(conversation: pending_order.conversation, text: content)
-    if comparison_request? && reference.offered_products.any?
-      @outcome = :product_comparison_requested
-      return pending_order
-    end
-    position = reference.option_position
-    if position && reference.offered_products.any? && position >= reference.offered_products.size
-      @outcome = :offered_reference_clarification
-      return pending_order
-    end
-    quote_request = content.match?(Constants::Conversation::CART_TOTAL_REQUEST) ||
-      (price_question? && parse_quantity(content).to_i > 1 && !content.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS))
-    if quote_request && pending_order.line_items.empty? &&
-        !content.match?(Constants::Conversation::CART_MUTATION_CUE) &&
-        CataloguePriceQuote.new(conversation: pending_order.conversation, text: content).content.present?
-      @outcome = :catalogue_quote_requested
-      return pending_order
-    end
-    if content.match?(/\b(?:not that one|oita na)\b/i) &&
-        Constants::Catalogue::OPTION_POSITIONS.keys.any? { |word| content.match?(/\b#{word}\b/i) } && inquiry_reference.present?
-      remember_referenced_product!
-      @outcome = :product_details_requested
-      return pending_order
-    end
-    if ConversationTurnRequest.new(content).information_only? && inquiry_reference.present? &&
-        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty? &&
-        !content.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !content.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
-      remember_referenced_product!
-      @outcome = if comparison_request?
-        :product_comparison_requested
-      elsif product_variants_request?
-        :product_variants_requested
-      elsif price_question? && !Constants::Catalogue::QUESTION_TOPICS.values.any? { |topic| content.match?(topic.fetch(:question)) }
-        :price_inquiry
-      elsif stock_question?
-        :stock_inquiry
-      else
-        :product_details_requested
-      end
-      return pending_order
-    end
+    @decision = ConversationTurnDecision.new(message: message, pending_order: pending_order).call
+    return pending_order if apply_turn_decision
 
     if content.match?(Constants::Conversation::SUPPORT_ACCESS_REQUEST) || content.match?(Constants::Conversation::SUPPORT_TECHNICAL_REQUEST) ||
         ConversationRepairContext.new(conversation: pending_order.conversation, message: message).support_follow_up?
@@ -104,7 +52,6 @@ class ConversationMessageProcessor
       return pending_order
     end
     return pending_order if accept_variant_bundle_offer
-    return pending_order if accept_offered_product
     return pending_order if handle_category_discovery
     return pending_order if apply_action_plan
     if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(ConversationActionPlanner::ORDERING_CUE) && matching_product.blank?
@@ -152,18 +99,21 @@ class ConversationMessageProcessor
 
   attr_reader :message, :pending_order, :content, :interpretation
 
-  def accept_offered_product
-    acceptance = CataloguePurchaseAcceptance.new(message: message, pending_order: pending_order).call
-    return false unless acceptance
+  def apply_turn_decision
+    return false if decision.route == :commerce
 
-    if acceptance.product
-      if pending_order.product_id == acceptance.product.id
+    @outcome = decision.outcome
+    if decision.route == :cancel
+      pending_order.cancelled!
+    elsif decision.route == :select
+      if pending_order.product_id == decision.product.id
         @outcome = :product_selected
       else
-        select_product_record(acceptance.product, collect_details: false)
+        select_product_record(decision.product, collect_details: false)
       end
-    else
-      @outcome = :offered_reference_clarification
+    elsif decision.product
+      conversation = pending_order.conversation
+      conversation.update!(conversation_state: conversation.conversation_state.to_h.merge("last_referenced_product" => decision.product.name))
     end
     true
   end
@@ -1226,10 +1176,7 @@ class ConversationMessageProcessor
   end
 
   def product_variants_request?
-    normalized = content.downcase.squish
-    normalized.match?(/\b(size|sizes|variant|variants)\b.*\b(option|options|available|have|ache|ki|what|which)\b/) ||
-      normalized.match?(/\b(what|which|available|ki ki)\b.*\b(size|sizes|variant|variants)\b/) ||
-      normalized.match?(/\A(size|sizes|size options|variant|variants)[?!. ]*\z/)
+    ConversationTurnRequest.new(content).variants?
   end
 
   def product_variants_follow_up?
@@ -1265,7 +1212,7 @@ class ConversationMessageProcessor
   end
 
   def price_question?
-    content.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:price_inquiry]) || content.downcase.include?("how much")
+    ConversationTurnRequest.new(content).price?
   end
 
   def currency_question?
@@ -1495,7 +1442,7 @@ class ConversationMessageProcessor
   end
 
   def comparison_request?
-    content.downcase.match?(/\b(compare|comparison|difference|versus|vs\.?|better)\b/)
+    ConversationTurnRequest.new(content).comparison?
   end
 
   def recommendation_refinement_request?

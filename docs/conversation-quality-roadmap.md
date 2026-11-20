@@ -37,3 +37,14 @@ the prior conservative wording-based fallback until their next planned reply.
 Category discovery asks about use/device first, then explicitly asks product
 acceptance once that preference is known. Acknowledgement selects only the product;
 quantity, variants and final confirmation remain separate steps.
+
+## Routing authority
+
+WC-084 extracts a read-only `ConversationTurnDecision` with explicit precedence:
+cancellation, postponed purchase, recall/comparison/reference repair, read-only
+quotes/facts, contextual acceptance, then validated commerce handlers. The processor
+executes the selected route once; only it changes the draft. Existing cart, photo,
+checkout, inventory and final-confirmation guards remain authoritative. Shared
+question predicates prevent variants/price/comparison detection from drifting.
+Customer-message metadata records the selected route separately from the actual
+persisted outcome. Model classification is a suggestion, not an order transition.
