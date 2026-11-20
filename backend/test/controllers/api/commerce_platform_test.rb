@@ -25,6 +25,19 @@ class Api::CommercePlatformTest < ActionDispatch::IntegrationTest
     assert_equal [ own_product.id ], body.map { |product| product["id"] }
   end
 
+  test "catalogue knowledge diagnostics require owner access and stay tenant scoped" do
+    product = @business.products.create!(name: "Knowledge Product", price: 100, stock_quantity: 5)
+    get knowledge_status_api_product_path(product)
+    assert_response :unauthorized
+    get knowledge_status_api_product_path(product), headers: authorization(@other_token)
+    assert_response :not_found
+    get knowledge_status_api_product_path(product), headers: authorization(@token)
+    assert_response :success
+    assert_equal "seller_catalogue", response.parsed_body["source"]
+    assert_equal false, response.parsed_body["independently_verified"]
+    assert_includes response.parsed_body["missing_fields"], "description"
+  end
+
   test "confirmed conversational order becomes a durable dashboard order" do
     product = @business.products.create!(name: "Alpha Product", price: 100, stock_quantity: 5)
     conversation = @business.conversations.create!(channel: "facebook", external_customer_id: "buyer-1")
