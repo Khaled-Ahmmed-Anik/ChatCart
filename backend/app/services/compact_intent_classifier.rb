@@ -103,6 +103,8 @@ class CompactIntentClassifier
   private
 
   def deterministic_intent
+    acceptance = CataloguePurchaseAcceptance.new(message: message, pending_order: pending_order).call
+    return "select_product" if acceptance&.product
     return "language_preference" if ConversationLanguagePreference.explicit(message.content)
     return "bot_identity" if normalized.match?(/\bare you\b.*\b(?:human|person|bot)\b/)
     return "human_agent" if normalized.match?(Constants::Conversation::HUMAN_REQUEST)

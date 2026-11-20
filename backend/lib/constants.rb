@@ -27,6 +27,10 @@ module Constants
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
     PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
     OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
+    PURCHASE_REFERENCE_ACCEPTANCE = /\A(?:(?:eta|eita|etai|eitai|ei|ai|oita|oitai)(?:\s+product)?(?:\s+tai?)?(?:\s+i)?\s+(?:nibo|nite chai)|(?:i\s+)?(?:want|will take|would like)\s+(?:this|that)(?:\s+(?:one|product))?|(?:this|that)(?:\s+one)?\s+please)\z/i
+    PURCHASE_ACKNOWLEDGEMENT = /\A(?:g|ji|jee|yes|yeah|ha|haa|hya|হ্যাঁ|জি)\z/i
+    CATEGORY_PURCHASE_SUFFIX = /\s+(?:ta|ti)(?:\s+(?:nibo|nite chai|please))?\z/i
+    PURCHASE_OFFER_QUESTION = /\b(?:nite chan|niben|order korte chan|would you like to (?:buy|order|take)|do you want (?:this|that))\b|নিতে চান|নেবেন|অর্ডার করতে চান/i
     MINIMUM_CATEGORY_TYPO_LENGTH = 5
     COMPATIBILITY_ATTRIBUTE_KEYS = %w[compatibility connector connectors protocol protocols].freeze
   end
