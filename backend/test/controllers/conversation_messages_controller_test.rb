@@ -111,7 +111,7 @@ class ConversationMessagesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "collecting_name", response_body.dig("pending_order", "status")
     assert_equal 2, response_body.dig("pending_order", "quantity")
     assert_equal "1500.0", response_body.dig("pending_order", "total_price")
-    assert_equal "Perfect—2 bottles. What name should I put on the order?", response_body.dig("bot_reply", "content")
+    assert_equal "Perfect—2 items. What name should I put on the order?", response_body.dig("bot_reply", "content")
   end
 
   test "create returns confirmation reply after address is collected" do
