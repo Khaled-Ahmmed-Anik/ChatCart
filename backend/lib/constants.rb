@@ -7,6 +7,7 @@ module Constants
   end
 
   module Catalogue
+    DEVICE_RECALL = /\b(?:what was my device|my device model|device model.*(?:ki|bolchilam))\b/i
     MAXIMUM_EVIDENCE_LINES = 4
     QUESTION_TOPICS = {
       battery: { question: /\bbattery|\bhours?\b|ghonta|khon chole|দিন চলে/i, evidence: /battery|playback|hours?|mah|CR2032|months?/i },
@@ -78,7 +79,8 @@ module Constants
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i
     ENGINE_VERSION = "2026.10.7"
     CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)/i
-    CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|what is in (?:my |the )?cart)[?.! ]*\z/i
+    CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|ekhon cart e ki ki ache|what is in (?:my |the )?cart(?: now)?)[?.! ]*\z/i
+    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den)\b/i
     CART_MUTATION_CUE = /\b(?:add|remove|delete|drop|change|update|den|nibo|give|take)\b/i
     CART_NAMED_QUANTITY = /\b(?:one|two|three|ekta|duita|\d+)\s+(?:koren|korun|করেন|করুন)\z/i
     CART_DISCARD_UNKNOWN = /\b(?:bad|remove|ignore|drop)\b.*\b(?:shudhu|only)\b/i

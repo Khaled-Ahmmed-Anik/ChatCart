@@ -1,6 +1,6 @@
 class CatalogueBudgetParser
   NUMBER = /\d+(?:\.\d+)?/
-  MAXIMUM = /(?:\b(?:under|below|within|max|budget|less than)\b|বাজেট)\s*(?:is|of|:)?\s*(?:৳|tk\.?|bdt)?\s*(#{NUMBER})(?![\w.])/i
+  MAXIMUM = /(?:\b(?:under|below|within|max|budget|less than)\b|বাজেট)\s*(?:is|of|to|:)?\s*(?:৳|tk\.?|bdt)?\s*(#{NUMBER})(?![\w.])/i
   MINIMUM = /\b(?:above|over|minimum|min)\b\s*(?:৳|tk\.?|bdt)?\s*(#{NUMBER})(?![\w.])/i
   SUFFIX_MAXIMUM = /(?<![\w.])(#{NUMBER})\s*(?:৳|tk\.?|bdt|takar?|টাকার?)?\s*(?:er\s+)?(?:under\b|below\b|moddhe|মধ্যে|নিচে)/i
   RANGE = /(?<![\w.])(#{NUMBER})\s*(?:৳|tk|bdt|taka|টাকা)?\s*(?:-|–|\bto\b|\btheke\b|থেকে)\s*(#{NUMBER})(?![\w.])/i

@@ -88,6 +88,13 @@ class BotReplyGenerator
       order_details_reply
     when :cart_total_requested
       cart_translation("subtotal", amount: formatted_price(pending_order.total_price))
+    when :catalogue_quote_requested
+      CataloguePriceQuote.new(conversation: pending_order.conversation, text: customer_message.content)
+        .content(language: banglish? ? "banglish" : "english")
+    when :device_preference_requested
+      device = pending_order.conversation.conversation_state.to_h.dig("shopping_preferences", "device")
+      key = device.present? ? "remembered_device" : "unknown_device"
+      I18n.t("catalogue_quotes.#{banglish? ? 'banglish' : 'en'}.#{key}", device: device)
     when :order_history_requested
       order_history_reply
     when :resume_order_requested
@@ -497,8 +504,9 @@ class BotReplyGenerator
       [ "• #{offer.label} — #{formatted_price(offer.price)}", summary.presence ].compact.join("\n")
     end
     intro_key = result.budget_detected && !result.exact_match ? "outside_budget" : "intro"
-    [ I18n.t("#{prefix}.#{intro_key}", locale: :en), lines.join("\n\n"),
-      I18n.t("#{prefix}.follow_up", locale: :en) ].join("\n\n")
+    preferences = pending_order.conversation.conversation_state.to_h["shopping_preferences"].to_h
+    follow_up = I18n.t("#{prefix}.follow_up", locale: :en) unless preferences["device"].present? || preferences["use_case"].present?
+    [ I18n.t("#{prefix}.#{intro_key}", locale: :en), lines.join("\n\n"), follow_up ].compact.join("\n\n")
   end
 
   def product_recommendation_reply
