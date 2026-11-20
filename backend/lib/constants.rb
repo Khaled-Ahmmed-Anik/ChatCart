@@ -76,6 +76,16 @@ module Constants
   end
 
   module Conversation
+    QUESTION_HISTORY_LIMIT = 5
+    QUESTION_FIELDS = {
+      "collecting_product" => [ "product", "product_reference" ],
+      "collecting_variant" => [ "variant", "variant_reference" ],
+      "collecting_quantity" => [ "quantity", "positive_integer" ],
+      "collecting_name" => [ "customer_name", "name" ],
+      "collecting_phone" => [ "phone", "phone_number" ],
+      "collecting_address" => [ "address", "address" ],
+      "awaiting_confirmation" => [ "confirmation", "explicit_confirmation" ]
+    }.freeze
     HUMAN_REQUEST = /\A(?:human(?: agent)?|real person|real seller|live agent|customer representative)[!.? ]*\z|\b(?:need|want|prefer|talk|speak|connect)\b.*\b(?:human(?: agent)?|real person|real seller|live agent|customer representative)\b|\b(?:talk|speak|connect|kotha)\b.*\b(?:someone|person|seller|owner|manager|agent|manush)\b|\b(?:seller|owner|manager|manush)\b.*\b(?:talk|speak|connect|kotha)\b|মানুষের সাথে|সেলারের সাথে/i
     LANGUAGE_REQUEST = /\b(?:continue|speak|reply|answer|bolen|bolun)\b.*\b(?:english|banglish|bangla|bengali)\b|\b(?:english|banglish|bangla|bengali)\s+(?:e|te|please|bolen)\b/i
     BANGLISH_CUES = /\b(?:koto|koyta|ache|ase|achen|kemon|korbo|koren|korun|dekhan|pabo|lagbe|bolen|amar|apni|sathe|thakbe|nibo|chai|duita|ekta|moddhe|pore|chole|hobe)\b/i

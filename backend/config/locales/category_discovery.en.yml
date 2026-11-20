@@ -1,16 +1,22 @@
 en:
   category_discovery:
     en:
+      accept_product: "Would you like to order this product?"
+      choose_product: "Which of these products would you like?"
       intro: "Here are the available matching options:"
       outside_budget: "No matching option is available within that budget. These alternatives are outside your requested range:"
       follow_up: "What will you use it with or for? I can help narrow down the right option."
       unavailable: "There are no available options in that category right now. Would you like a different category?"
     banglish:
+      accept_product: "Ei product-ta nite chan?"
+      choose_product: "Ei product-gulor moddhe konta niben?"
       intro: "Ji, ei dhoroner option ache:"
       outside_budget: "Ei budget-er moddhe matching option nei. Nicher option-gulo apnar bola budget-er baire:"
       follow_up: "Kon kajer jonno ba kon device-er sathe use korben? Bolle upojukto option bachhte help korte parbo."
       unavailable: "Ei category-te ekhon available option nei. Onno category dekhte chan?"
     bn:
+      accept_product: "এই পণ্যটি নিতে চান?"
+      choose_product: "এই পণ্যগুলোর মধ্যে কোনটি নেবেন?"
       intro: "জি, এই ধরনের পণ্য আছে:"
       outside_budget: "এই বাজেটের মধ্যে উপযুক্ত পণ্য নেই। নিচের বিকল্পগুলো আপনার দেওয়া বাজেটের বাইরে:"
       follow_up: "কোন কাজে বা কোন ডিভাইসের সঙ্গে ব্যবহার করবেন? জানালে উপযুক্ত পণ্য বেছে নিতে সাহায্য করতে পারব।"

@@ -70,18 +70,7 @@ class ConversationTurnManager
   end
 
   def pending_question_for(order)
-    field = {
-      "collecting_product" => "product",
-      "collecting_variant" => "variant",
-      "collecting_quantity" => "quantity",
-      "collecting_name" => "customer_name",
-      "collecting_phone" => "phone",
-      "collecting_address" => "address",
-      "awaiting_confirmation" => "confirmation"
-    }[order.status]
-    return if field.blank?
-
-    { "field" => field, "product_id" => order.product_id, "variant_id" => order.product_variant_id }.compact
+    ConversationQuestionState.checkout_contract(order).slice("field", "product_id", "variant_id").presence
   end
 
   def paused_task(previous, order, outcome, interrupted)
