@@ -28,6 +28,29 @@ discarded, and the normal confirmation/inventory/cart-repair guards remain activ
 All new domain patterns live in `Constants`; user-facing unknown replies reuse i18n.
 No migration, environment change or new AI call is required.
 
+## WC-089: discovery and follow-up routing
+
+Production retesting exposed a second route to the same symptom: category
+discovery could supersede an explicit named purchase when catalogue resolution
+was inconclusive. Before entering discovery, the processor now reuses the action
+planner's explicit product match. Existing cart repair still runs first, so unknown
+additions and multi-product lists are not bypassed.
+
+A quantity with explicit units can accept a single current purchase offer, but
+not a device question or an ambiguous list. Previous-category acceptance (for
+example, `ager charger tai nibo`) is limited to matching offered products.
+`aro kom dam e ache?` requests lower-priced recommendations within the referenced
+category; comparison questions still retain their comparison route. Delivery
+inclusion is a delivery-policy question, not package contents. Cable questions
+avoid a redundant generic package-unknown block. Recommendation summaries omit
+overlong sentences rather than displaying clipped text; cancellation and
+affordability introductions use localized translation keys.
+
+Regression coverage includes standard variants, overlapping product aliases,
+explicit purchase plus battery/ANC questions, quantity acceptance, previous
+category references, delivery inclusion, and cheaper-category alternatives.
+These changes do not claim to fix hosting latency or arbitrary unseen phrasing.
+
 ## Validation
 
 Regression tests cover the exact English failure, its Banglish equivalent, the

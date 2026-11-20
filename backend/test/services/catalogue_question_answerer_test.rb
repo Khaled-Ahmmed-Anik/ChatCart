@@ -23,6 +23,7 @@ class CatalogueQuestionAnswererTest < ActiveSupport::TestCase
     reply = CatalogueQuestionAnswerer.new(product: @product, text: "Cable included and warranty?").content
     assert_includes reply, "Cable inclusion is not verified"
     assert_includes reply, "Warranty is not verified"
+    assert_not_includes reply, "Package contents is not verified"
   end
 
   test "cable performance evidence does not verify package inclusion" do

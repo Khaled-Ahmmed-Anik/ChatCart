@@ -61,6 +61,16 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
     assert_empty @business.orders
   end
 
+  test "quantity questions and corrections cannot accept a product offer" do
+    [ "Does it include 2 pieces?", "not 2 ta", "another 2 ta" ].each_with_index do |text, index|
+      @customer = "quantity-question-#{index}"
+      record("Samsung A54 er jonno charger lagbe")
+      result = record(text)
+      assert_nil result.pending_order.reload.product_id, text
+      assert_nil result.pending_order.quantity, text
+    end
+  end
+
   test "ambiguous purchase acceptance preserves the offer list and asks which product" do
     result = record("hi")
     offered = result.conversation.reload.conversation_state["last_offered_options"]
