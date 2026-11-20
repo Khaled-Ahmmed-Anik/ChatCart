@@ -39,4 +39,22 @@ class ConversationJourneyGatesTest < ActiveSupport::TestCase
       { say: "cancel", order: { status: "cancelled" } }
     ])
   end
+
+  test "negative English and Banglish purchase replies do not select an offered product" do
+    [ "etai nibo na", "I do not want to buy this", "ei charger nite chai na" ].each do |phrase|
+      assert_conversation_journey(business: @business, steps: [
+        { say: "charger ase?", order: { product_id: nil } },
+        { say: phrase, order: { product_id: nil, quantity: nil } }
+      ])
+    end
+  end
+
+  test "purchase with multiple catalogue questions answers them and retains checkout" do
+    @buds.update!(description: "Battery playback up to 7 hours. ANC is supported.")
+    assert_conversation_journey(business: @business, steps: [
+      { say: "Hoco EQ34 Plus nibo. Battery koto khon chole? ANC ache?", includes: [ "7 hours", "ANC" ],
+        order: { product_id: @buds.id, quantity: nil } },
+      { say: "2 pieces", order: { product_id: @buds.id, quantity: 2 } }
+    ])
+  end
 end
