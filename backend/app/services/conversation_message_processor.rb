@@ -104,6 +104,7 @@ class ConversationMessageProcessor
       return pending_order
     end
     return pending_order if accept_variant_bundle_offer
+    return pending_order if accept_offered_product
     return pending_order if handle_category_discovery
     return pending_order if apply_action_plan
     if pending_order.collecting_quantity? && parsed_quantity.present? && content.match?(ConversationActionPlanner::ORDERING_CUE) && matching_product.blank?
@@ -150,6 +151,22 @@ class ConversationMessageProcessor
   private
 
   attr_reader :message, :pending_order, :content, :interpretation
+
+  def accept_offered_product
+    acceptance = CataloguePurchaseAcceptance.new(message: message, pending_order: pending_order).call
+    return false unless acceptance
+
+    if acceptance.product
+      if pending_order.product_id == acceptance.product.id
+        @outcome = :product_selected
+      else
+        select_product_record(acceptance.product, collect_details: false)
+      end
+    else
+      @outcome = :offered_reference_clarification
+    end
+    true
+  end
 
   def handle_category_discovery
     return false if catalogue_preferences.fragrance? || product_resolution.matched?
