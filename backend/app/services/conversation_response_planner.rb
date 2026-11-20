@@ -80,7 +80,9 @@ class ConversationResponsePlanner
   end
 
   def combined_reply
-    return base_reply if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
+    if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
+      return [ checkout_catalogue_answers, base_reply ].compact.uniq.join("\n\n")
+    end
 
     replies = secondary_outcomes.map do |secondary_outcome|
       BotReplyGenerator.new(
@@ -91,13 +93,21 @@ class ConversationResponsePlanner
         address_preference: address_preference,
         include_follow_up: false
       ).content
-    end + [ base_reply ]
+    end + [ checkout_catalogue_answers, base_reply ]
     if customer_message.content.match?(/\bwarranty\b/i) && outcome == :return_policy_requested
       locale = preferred_language(conversation.conversation_state.to_h) == "banglish" ? "banglish" : "en"
       replies << I18n.t("catalogue_answers.#{locale}.unknown",
         topic: I18n.t("catalogue_answers.#{locale}.topics.warranty"))
     end
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
+  end
+
+  def checkout_catalogue_answers
+    return unless outcome.in?(Constants::Conversation::CHECKOUT_PROGRESS_OUTCOMES)
+    return unless pending_order.product && pending_order.line_items.size <= 1
+
+    CatalogueQuestionAnswerer.new(product: pending_order.product, text: customer_message.content,
+      language: preferred_language(conversation.conversation_state.to_h)).content
   end
 
   def focused_clarification

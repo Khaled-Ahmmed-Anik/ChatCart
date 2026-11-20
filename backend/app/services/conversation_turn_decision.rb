@@ -15,6 +15,9 @@ class ConversationTurnDecision
     if text.match?(Constants::Conversation::EXPLICIT_CANCELLATION) && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:cancel, :cancelled)
     end
+    if request.purchase_declined? && order.product.present? && !order.confirmed? && !order.submitted_to_woocommerce?
+      return decision(:pause, :order_paused)
+    end
     return decision(:answer, :confirmation_deferred) if request.browsing_only?
     return decision(:answer, :device_preference_requested) if text.match?(Constants::Catalogue::DEVICE_RECALL)
     return decision(:answer, :product_comparison_requested) if request.comparison? && reference.offered_products.any?

@@ -14,7 +14,12 @@ class ConversationTurnRequest
   end
 
   def browsing_only?
-    text.match?(Constants::Conversation::BROWSING_ONLY)
+    text.match?(Constants::Conversation::BROWSING_ONLY) || purchase_declined?
+  end
+
+  def purchase_declined?
+    final_clause = text.split(/\b(?:but|instead|kintu|borong)\b/).last.to_s
+    final_clause.match?(Constants::Conversation::PURCHASE_DECLINED)
   end
 
   def comparison?
