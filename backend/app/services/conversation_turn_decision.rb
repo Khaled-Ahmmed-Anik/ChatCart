@@ -21,6 +21,7 @@ class ConversationTurnDecision
     return decision(:answer, :confirmation_deferred) if request.browsing_only?
     return decision(:answer, :device_preference_requested) if text.match?(Constants::Catalogue::DEVICE_RECALL)
     return decision(:answer, :product_comparison_requested) if request.comparison? && reference.offered_products.any?
+    return decision(:commerce, nil) if text.match?(Constants::Catalogue::LOWER_PRICE_REQUEST) && !request.comparison?
     position = reference.option_position
     if position && reference.offered_products.any? && position >= reference.offered_products.size
       return decision(:answer, :offered_reference_clarification)

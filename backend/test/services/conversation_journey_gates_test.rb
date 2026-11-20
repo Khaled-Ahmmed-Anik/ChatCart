@@ -99,4 +99,43 @@ class ConversationJourneyGatesTest < ActiveSupport::TestCase
     assert_equal({ @charger.id => 1, @buds.id => 2 }, items)
     assert_nil results.last.conversation.reload.conversation_state["cart_repair"]
   end
+
+  test "production catalogue with standard variants accepts purchase after discovery" do
+    @buds.product_variants.create!(name: "Standard", price: 729, stock_quantity: 10)
+    @buds.update!(aliases: [ "Hoco Earbuds", "Wireless Earbuds" ])
+    @business.products.create!(name: "Pro 2", aliases: [ "Wireless Earbuds" ], category: "earbuds", price: 599, stock_quantity: 10)
+    @buds.update!(description: "Battery playback up to 7 hours. ANC is supported.")
+    assert_conversation_journey(business: @business, steps: [
+      { say: "I need earbuds under 800 taka for calls. What would you suggest?" },
+      { say: "I will take Hoco EQ34 Plus. How long does the battery last, and does it have ANC?",
+        includes: [ "7 hours", "ANC" ], order: { product_id: @buds.id, quantity: nil } },
+      { say: "Two pieces.", order: { product_id: @buds.id, quantity: 2 } },
+      { say: "Is delivery included?", excludes: [ "Package contents" ], order: { quantity: 2 } }
+    ])
+  end
+
+  test "Banglish accepts previous category and quantity directly after an offer" do
+    [ [ "ager charger tai nibo", nil ], [ "2 ta", 2 ] ].each do |phrase, quantity|
+      assert_conversation_journey(business: @business, steps: [
+        { say: "Samsung A54 er jonno charger lagbe, budget 2000" },
+        { say: phrase, order: { product_id: @charger.id, quantity: quantity } }
+      ])
+    end
+  end
+
+  test "cheaper request filters the same category rather than repeating the current price" do
+    cheap = @business.products.create!(name: "Budget USB-C Charger", category: "charger", price: 999, stock_quantity: 10)
+    assert_equal [ "earbuds" ], CatalogueCategoryResolver.rejected_categories(business: @business, text: "cheaper charger, not earbuds")
+    assert_conversation_journey(business: @business, steps: [
+      { say: "Anker Nano 45W er dam koto?" },
+      { say: "aro kom dam e ache?", includes: [ cheap.name ], excludes: [ "protita" ] }
+    ])
+  end
+
+  test "no cheaper match does not repeat the expensive offer or change categories" do
+    assert_conversation_journey(business: @business, steps: [
+      { say: "Samsung A54 er jonno charger lagbe, budget 2000" },
+      { say: "aro kom dam e ache?", includes: [ "kom damer option pelam na" ], excludes: [ "Hoco", "1849" ] }
+    ])
+  end
 end

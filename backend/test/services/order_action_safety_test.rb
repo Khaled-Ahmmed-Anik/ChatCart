@@ -28,6 +28,20 @@ class OrderActionSafetyTest < ActiveSupport::TestCase
     end
   end
 
+  test "explicit full product name overrides a coarse classifier entity during discovery" do
+    @product.update!(category: "earbuds")
+    @business.products.create!(name: "Hoco Tracker", category: "tracker", price: 799, stock_quantity: 10)
+    @conversation.update!(conversation_state: { "shopping_preferences" => { "categories" => [ "earbuds" ], "maximum_budget" => 800 } })
+    text = "I will take Hoco EQ34 Plus. How long does the battery last, and does it have ANC?"
+    message = @conversation.messages.create!(sender_type: :customer, content: text)
+    interpretation = AiIntentClassifier::Result.new(intent: "select_product", secondary_intents: [], confidence: 0.5,
+      entities: { product_name: "Hoco" }, language: "english", sentiment: "neutral", needs_clarification: false, possible_intents: [])
+    ConversationMessageProcessor.new(message: message, pending_order: @order, interpretation: interpretation).process
+    assert_equal @product.id, @order.reload.product_id
+    assert_predicate @order, :collecting_quantity?
+    assert_nil @order.quantity
+  end
+
   test "cancel works across all unconfirmed checkout stages" do
     %w[collecting_product collecting_variant collecting_quantity collecting_name collecting_phone collecting_address awaiting_confirmation].each do |stage|
       [ "cancel", "Cancel this test order.", "Puro test order cancel koren." ].each do |text|

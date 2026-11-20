@@ -1,6 +1,7 @@
 en:
   chat_language:
     en:
+      cancelled: "Your order has been cancelled. If you change your mind, just send “new order”."
       browsing: "Of course—feel free to explore. I won’t confirm an order unless you explicitly ask. What else would you like to know?"
       saved_unconfirmed: "Your selection is saved, but it isn’t confirmed yet. You can continue, change it, or keep browsing."
       product_follow_up: "What else would you like to know about this product, or would you like to order it?"
@@ -13,6 +14,7 @@ en:
         one: "item"
         other: "items"
     banglish:
+      cancelled: "Apnar order cancel hoyeche. Abar shuru korte chaile “new order” likhun."
       browsing: "Ji, nischinte dekhun. Apni na bolle order confirm korbo na. Ar ki jante chan?"
       saved_unconfirmed: "Apnar selection save ache, confirm hoyni. Continue, change, ba aro browse korte paren."
       product_follow_up: "Ei product niye ar ki jante chan, naki order korte chan?"
@@ -25,6 +27,7 @@ en:
         one: "item"
         other: "items"
     bn:
+      cancelled: "আপনার অর্ডার বাতিল হয়েছে। আবার শুরু করতে চাইলে “new order” লিখুন।"
       browsing: "জি, নিশ্চিন্তে দেখুন। আপনি না বললে অর্ডার নিশ্চিত করব না। আর কী জানতে চান?"
       saved_unconfirmed: "আপনার পছন্দ সংরক্ষিত আছে, নিশ্চিত হয়নি। চালিয়ে যেতে, বদলাতে বা আরও দেখতে পারেন।"
       product_follow_up: "এই পণ্য সম্পর্কে আর কী জানতে চান, নাকি অর্ডার করতে চান?"

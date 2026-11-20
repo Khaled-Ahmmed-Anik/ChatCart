@@ -28,7 +28,13 @@ class ProductRecommendationService
     preferred = eligible.select { |offer| matches_requested_profile?(offer.product) }
     eligible = preferred if preferred.any?
     exact_match = eligible.any?
-    candidates = exact_match ? eligible : closest_candidates(minimum: minimum, maximum: maximum)
+    candidates = if exact_match
+      eligible
+    elsif preferences["price_direction"] == "lower"
+      []
+    else
+      closest_candidates(minimum: minimum, maximum: maximum)
+    end
     product_offers = candidates.group_by { |offer| offer.product.id }.values.map do |product_options|
       preferred_offer(product_options, minimum: minimum, maximum: maximum, exact_match: exact_match)
     end

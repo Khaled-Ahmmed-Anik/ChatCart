@@ -12,7 +12,10 @@ class CataloguePurchaseAcceptance
     text = ConversationTextNormalizer.call(message.content)
     reference_choice = text.match?(Constants::Catalogue::PURCHASE_REFERENCE_ACCEPTANCE)
     acknowledgement = text.match?(Constants::Catalogue::PURCHASE_ACKNOWLEDGEMENT)
-    return unless reference_choice || acknowledgement || text.match?(Constants::Catalogue::CATEGORY_PURCHASE_SUFFIX)
+    previous_category = text.match(Constants::Catalogue::PREVIOUS_CATEGORY_ACCEPTANCE)
+    quantity = ConversationQuantityParser.call(text)
+    quantity_acceptance = quantity.present? && text.match?(Constants::Catalogue::OFFER_QUANTITY_ACCEPTANCE) && purchase_question?
+    return unless reference_choice || acknowledgement || previous_category || quantity_acceptance || text.match?(Constants::Catalogue::CATEGORY_PURCHASE_SUFFIX)
     return unless order.pending_order_items.empty?
     return if acknowledgement && !purchase_question?
 
@@ -21,11 +24,12 @@ class CataloguePurchaseAcceptance
 
     candidates = if reference_choice
       order.product ? offered.select { |product| product.id == order.product_id } : offered
-    elsif acknowledgement
+    elsif acknowledgement || quantity_acceptance
       offered
     else
-      categories = CatalogueCategoryResolver.call(business: order.conversation.business, text: text)
-      return unless categories.any? { |category| category_choice?(text, category) }
+      category_text = previous_category ? previous_category[1] : text
+      categories = CatalogueCategoryResolver.call(business: order.conversation.business, text: category_text)
+      return unless previous_category || categories.any? { |category| category_choice?(text, category) }
       offered.select { |product| categories.include?(product.category) }
     end
     return if candidates.empty?

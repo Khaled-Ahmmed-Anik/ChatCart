@@ -10,6 +10,7 @@ module Constants
     DEVICE_RECALL = /\b(?:what was my device|my device model|device model.*(?:ki|bolchilam))\b/i
     MAXIMUM_EVIDENCE_LINES = 4
     MAXIMUM_FACT_LENGTH = 600
+    MAXIMUM_RECOMMENDATION_SUMMARY_LENGTH = 120
     INCLUSION_EVIDENCE = /\b(?:include[ds]?|including|package|box|supplied|provided|comes? with|sold separately)\b/i
     UNVERIFIED_EVIDENCE = /\b(?:confirm|check|verify|unverified|unknown|not verified|not confirmed)\b/i
     KNOWLEDGE_PROFILES = {
@@ -44,6 +45,9 @@ module Constants
     OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
     PURCHASE_REFERENCE_ACCEPTANCE = /\A(?:(?:eta|eita|etai|eitai|ei|ai|oita|oitai)(?:\s+product)?(?:\s+tai?)?(?:\s+i)?\s+(?:nibo|nite chai)|(?:i\s+)?(?:want|will take|would like)\s+(?:this|that)(?:\s+(?:one|product))?|(?:this|that)(?:\s+one)?\s+please)\z/i
     PURCHASE_ACKNOWLEDGEMENT = /\A(?:g|ji|jee|yes|yeah|ha|haa|hya|হ্যাঁ|জি)\z/i
+    PREVIOUS_CATEGORY_ACCEPTANCE = /\A(?:ager|previous)\s+(.+?)\s+(?:ta|tai|one)\s+(?:nibo|nite chai|please)\z/i
+    LOWER_PRICE_REQUEST = /\b(?:cheaper|less expensive|lower price|kom dam|kom dame)\b|কম দামে?/i
+    OFFER_QUANTITY_ACCEPTANCE = /\A(?:\d+|one|two|three)\s*(?:pieces?|pcs?|bottles?|units?|ta)\z/i
     CATEGORY_PURCHASE_SUFFIX = /\s+(?:ta|ti)(?:\s+(?:nibo|nite chai|please))?\z/i
     PURCHASE_OFFER_QUESTION = /\b(?:nite chan|niben|order korte chan|would you like to (?:buy|order|take)|do you want (?:this|that))\b|নিতে চান|নেবেন|অর্ডার করতে চান/i
     MINIMUM_CATEGORY_TYPO_LENGTH = 5
