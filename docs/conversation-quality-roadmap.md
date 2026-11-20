@@ -48,9 +48,50 @@ checkout, inventory and final-confirmation guards remain authoritative. Shared
 question predicates prevent variants/price/comparison detection from drifting.
 Customer-message metadata records the selected route separately from the actual
 persisted outcome. Model classification is a suggestion, not an order transition.
-# Reply meaning safety
+## Reply meaning safety
 
 Naturalized checkout questions must retain a cue for the expected field, not merely a question mark. Negative, unknown, dependency, and exclusivity statements in the deterministic reply must survive unchanged apart from formatting. When a rewrite fails these conservative checks, the existing deterministic fallback is used. This deliberately favors safety over paraphrasing limitations; it is not a general semantic entailment model and does not certify arbitrary generated claims.
-# Mixed messages and negation
+## Mixed messages and negation
 
 Explicit purchase refusals in English and Banglish pause checkout without selecting an offered product. Contrast markers are inspected using the final clause so an earlier refusal does not automatically veto a later positive request. Successful single-product checkout progress also answers every recognized catalogue topic in the same customer message, before the next checkout prompt. Multi-product fact attribution remains conservative: it does not apply one product's specifications to a whole cart. Unknown facts retain the existing localized unverified answer.
+
+## Category knowledge and missing information
+
+WC-087 adds electronics, fragrance, apparel and food profiles. A product's category
+takes priority over its business category; unknown sectors use the general profile.
+Profiles suggest information to collect, not product features to assume.
+
+Owners/admins can use `GET /api/products/:id/knowledge_status` with their normal
+authenticated session. The read-only endpoint is tenant-scoped. It returns profile,
+missing description/image/category fields, missing structured topics and available
+structured topics. It does not certify correctness or change product stock/prices.
+Missing structured topics may already be described in prose: this report measures
+structured coverage, not whether all possible answers are absent.
+
+Add seller-approved information through the existing product update endpoint:
+
+```json
+{
+  "product": {
+    "product_attributes": {
+      "catalogue_facts": {
+        "material": "Material: 100% cotton.",
+        "care": "Cold wash only. Do not tumble dry."
+      }
+    }
+  }
+}
+```
+
+Preserve existing `product_attributes` keys when updating: the existing API replaces
+that JSON object rather than deep-merging it. Supported topic keys are defined in
+`Constants::Catalogue::QUESTION_TOPICS`; values must be nonblank strings of at most
+600 characters. Invalid/oversized values are ignored as evidence and remain missing
+in diagnostics. No new environment variables or migrations are required.
+
+Explicit structured topic facts supersede description evidence for that topic.
+Absent structured facts retain existing description-based answers and localized
+unknown handling. Seller catalogue data is **not independently verified**: the API
+says so explicitly. Sellers must verify claims, preserve limitations, and avoid
+placing customer personal data in catalogue fields. No automatic factual enrichment
+or new dedicated frontend editor is included in this unit.

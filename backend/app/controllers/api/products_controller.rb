@@ -1,7 +1,7 @@
 module Api
   class ProductsController < BaseController
     before_action -> { require_roles!(:owner, :admin) }, except: %i[index show]
-    before_action :set_product, only: %i[show update destroy]
+    before_action :set_product, only: %i[show update destroy knowledge_status]
 
     def index
       render json: current_business.products.includes(:product_variants).order(:name), include: :product_variants
@@ -9,6 +9,10 @@ module Api
 
     def show
       render json: @product, include: :product_variants
+    end
+
+    def knowledge_status
+      render json: CatalogueKnowledgeProfile.new(@product).status
     end
 
     def create

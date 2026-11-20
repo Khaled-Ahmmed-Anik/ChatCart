@@ -22,6 +22,12 @@ en:
         waterproof: "Water resistance"
         medical: "Medical accuracy"
         designs: "Available designs"
+        scent: "Scent notes"
+        longevity: "Fragrance longevity"
+        material: "Fabric and material"
+        care: "Care instructions"
+        ingredients: "Ingredients"
+        allergens: "Allergen information"
     banglish:
       intro: "%{product} — %{price} theke. Catalogue-e deya information:"
       unknown: "%{topic} catalogue-e verified nei. Seller-ke confirm korte hobe; ami promise korte parchi na."

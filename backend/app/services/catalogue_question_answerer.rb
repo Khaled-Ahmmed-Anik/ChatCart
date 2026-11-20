@@ -9,7 +9,8 @@ class CatalogueQuestionAnswerer
     return if product.blank? || topics.empty?
 
     answers = topics.map do |topic, definition|
-      evidence = evidence_lines.select { |line| line.match?(definition.fetch(:evidence)) }
+      declared_fact = declared_facts[topic.to_s]
+      evidence = declared_fact.present? ? [ declared_fact ] : evidence_lines.select { |line| line.match?(definition.fetch(:evidence)) }
       if topic == :designs
         evidence = product.available_variants.map do |variant|
           translation("available_variant", name: variant.display_name,
@@ -32,6 +33,10 @@ class CatalogueQuestionAnswerer
   private
 
   attr_reader :product, :text, :locale
+
+  def declared_facts
+    @declared_facts ||= CatalogueKnowledgeProfile.new(product).facts
+  end
 
   def topics
     @topics ||= Constants::Catalogue::QUESTION_TOPICS.select { |_topic, definition| text.match?(definition.fetch(:question)) }

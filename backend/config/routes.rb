@@ -21,7 +21,9 @@ Rails.application.routes.draw do
 
   namespace :api do
     resource :business, only: %i[show update]
-    resources :products
+    resources :products do
+      member { get :knowledge_status }
+    end
     resource :business_policy, only: %i[show update]
     resources :channel_connections, only: %i[index create update destroy]
     resources :users, only: %i[index create update destroy]

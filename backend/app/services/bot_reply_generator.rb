@@ -423,8 +423,13 @@ class BotReplyGenerator
   def product_details_reply
     product = contextual_product
     return product_selection_prompt if product.blank?
+    catalogue_facts = CatalogueKnowledgeProfile.new(product).facts
+    if performance_question? && product.product_attributes.to_h.values_at("longevity_hours", "projection").any?(&:present?) &&
+        catalogue_facts["longevity"].blank?
+      return product_performance_reply(product)
+    end
 
-    unless CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
+    unless catalogue_facts.empty? && CataloguePreferenceExtractor.new(customer_message&.content.to_s, business: pending_order.conversation.business).fragrance?
       answer = CatalogueQuestionAnswerer.new(product: product, text: customer_message&.content.to_s,
         language: banglish? ? "banglish" : "english").content
       return answer if answer.present?

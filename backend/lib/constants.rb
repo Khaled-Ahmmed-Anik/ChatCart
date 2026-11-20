@@ -9,6 +9,13 @@ module Constants
   module Catalogue
     DEVICE_RECALL = /\b(?:what was my device|my device model|device model.*(?:ki|bolchilam))\b/i
     MAXIMUM_EVIDENCE_LINES = 4
+    MAXIMUM_FACT_LENGTH = 600
+    KNOWLEDGE_PROFILES = {
+      "electronics" => { category: /electronic|tech|gadget|charger|earbud|watch/i, topics: %w[compatibility warranty package] },
+      "fragrance" => { category: /perfume|fragrance|attar/i, topics: %w[scent longevity] },
+      "apparel" => { category: /apparel|clothing|fashion|shirt|dress/i, topics: %w[material care] },
+      "food" => { category: /food|bakery|cake|snack/i, topics: %w[ingredients allergens] }
+    }.freeze
     QUESTION_TOPICS = {
       battery: { question: /\bbattery|\bhours?\b|ghonta|khon chole|দিন চলে/i, evidence: /battery|playback|hours?|mah|CR2032|months?/i },
       noise: { question: /\b(?:anc|enc|noise|call quality|microphone)\b/i, evidence: /\b(?:anc|enc|noise|microphone|call)\b/i },
@@ -22,7 +29,13 @@ module Constants
       tracking: { question: /\b(?:gps|live|tracker|pet|car|ecosystem|network|simultaneous|pair)\b/i, evidence: /GPS|real.time|network|ecosystem|one .*time|guaranteed|participating|SIM/i },
       waterproof: { question: /waterproof|\bswim/i, evidence: /waterproof|swim|water.resistan/i },
       medical: { question: /medical|diagnos|heart disease|heart condition/i, evidence: /medical|diagnos|wellness|health/i },
-      designs: { question: /\b(?:designs?|colou?rs?)\b/i, evidence: /design|colou?r/i }
+      designs: { question: /\b(?:designs?|colou?rs?)\b/i, evidence: /design|colou?r/i },
+      scent: { question: /\b(?:scent|notes|smell|ghran)\b/i, evidence: /scent|notes|smell|floral|woody|oud|citrus/i },
+      longevity: { question: /\b(?:longevity|lasting|lasts|lasting time)\b/i, evidence: /longevity|lasting|lasts|hours?/i },
+      material: { question: /\b(?:material|fabric|cotton|kapor)\b/i, evidence: /material|fabric|cotton|polyester|silk/i },
+      care: { question: /\b(?:wash|washing|care instructions)\b/i, evidence: /wash|care|dry.clean/i },
+      ingredients: { question: /\b(?:ingredients|upokoron)\b/i, evidence: /ingredients|contains|made with/i },
+      allergens: { question: /\b(?:allergens?|allergy|nuts?|gluten)\b/i, evidence: /allergens?|allergy|nuts?|gluten|cross.contamin/i }
     }.freeze
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
     PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
@@ -82,7 +95,7 @@ module Constants
       "customer_name" => /\b(?:name|naam|nam)\b|নাম/i,
       "phone" => /\b(?:phone|mobile|number|contact)\b|ফোন|মোবাইল|নম্বর/i,
       "address" => /\b(?:address|location|thikana|where)\b|ঠিকানা|কোথায়/i,
-      "quantity" => /\b(?:quantity|many|koyta|koto|bottles?|pieces?|units?)\b|কয়টা|কতটি|পরিমাণ/i,
+      "quantity" => /\b(?:quantity|many|koyta|bottles?|pieces?|units?)\b|কয়টা|কতটি|পরিমাণ/i,
       "variant" => /\b(?:size|variant|ml|colour|color|design|option)\b|সাইজ|রং|ডিজাইন/i,
       "product" => /\b(?:product|perfume|fragrance|one|which|choose|niben|nite|order|buy|take|proceed|go ahead)\b|পণ্য|কোন|নিবেন|নিতে|অর্ডার/i,
       "confirmation" => /\b(?:confirm|correct|proceed|place|thik|final)\b|নিশ্চিত|ঠিক|কনফার্ম/i
