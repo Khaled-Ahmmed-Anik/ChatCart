@@ -22,3 +22,18 @@ engine. They must stay unmerged until their individual and combined checks pass.
 Each unit needs regression tests, documentation, no production-data mutation, and
 passing hosted backend/frontend/security/lint checks. The combined local replay is
 an additional gate, not a calibrated accuracy score or a Meta transport test.
+
+## Typed questions
+
+WC-083 adds `active_question` and bounded `question_history` in existing conversation
+JSON state. Contracts contain kind, expected answer, current order/product/variant,
+the actual offered product IDs and the emitted bot-message ID; no contact values.
+The planner creates the contract before rewriting, and the recorder binds it to
+the final saved reply. Replies cannot change the kind by changing their wording.
+Progress answers the preceding question; replacement supersedes it; terminal
+orders close it. A stale order, changed offer or intervening bot reply invalidates
+short purchase acknowledgements. Existing conversations without a contract retain
+the prior conservative wording-based fallback until their next planned reply.
+Category discovery asks about use/device first, then explicitly asks product
+acceptance once that preference is known. Acknowledgement selects only the product;
+quantity, variants and final confirmation remain separate steps.

@@ -40,7 +40,10 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
     %w[g ji].each_with_index do |text, index|
       @customer = "ack-#{index}"
       result = record("charger ase?")
-      result.conversation.messages.create!(sender_type: :bot, content: "Apni ki eta-i nite chan?")
+      prompt = result.conversation.messages.create!(sender_type: :bot, content: "Apni ki eta-i nite chan?")
+      ConversationQuestionState.new(result.conversation).record!(message: prompt, order: result.pending_order,
+        contract: { "kind" => "product_acceptance", "pending_order_id" => result.pending_order.id,
+          "offered_product_ids" => [ @charger.id ] })
       result = record(text)
       assert_equal @charger.id, result.pending_order.reload.product_id
       assert_equal "select_product", result.interpretation.intent
