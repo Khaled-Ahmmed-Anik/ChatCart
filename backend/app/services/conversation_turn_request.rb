@@ -17,6 +17,20 @@ class ConversationTurnRequest
     text.match?(Constants::Conversation::BROWSING_ONLY)
   end
 
+  def comparison?
+    text.match?(/\b(compare|comparison|difference|versus|vs|better)\b/)
+  end
+
+  def price?
+    text.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:price_inquiry]) || text.include?("how much")
+  end
+
+  def variants?
+    text.match?(/\b(size|sizes|variant|variants)\b.*\b(option|options|available|have|ache|ki|what|which)\b/) ||
+      text.match?(/\b(what|which|available|ki ki)\b.*\b(size|sizes|variant|variants)\b/) ||
+      text.match?(/\A(size|sizes|size options|variant|variants)\z/)
+  end
+
   private
 
   attr_reader :text

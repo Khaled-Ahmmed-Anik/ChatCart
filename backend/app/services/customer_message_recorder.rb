@@ -87,6 +87,7 @@ class CustomerMessageRecorder
       conversation.reload
       pending_order.conversation = conversation
       outcome = processor.outcome
+      message.update!(metadata: message.metadata.merge("routing_decision" => processor.decision.metadata)) if processor.decision
       record_outcome(message, outcome)
       ConversationClassificationFeedback.new(message: message).record_outcome!(outcome)
       GuidedSalesConversation.new(conversation).sync!(outcome: outcome, pending_order: pending_order)
