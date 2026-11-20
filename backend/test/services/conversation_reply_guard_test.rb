@@ -71,6 +71,13 @@ class ConversationReplyGuardTest < ActiveSupport::TestCase
     assert_not build_guard(candidate: "The Oud is selected. Location is always live.", fallback: fallback).valid?
   end
 
+  test "ambiguous koto price question cannot replace a quantity question" do
+    plan = Struct.new(:facts, :pending_question, :question_contract).new({}, "quantity", { "field" => "quantity" })
+    guard = ConversationReplyGuard.new(candidate: "The Oud-er dam koto?", fallback: "The Oud-er koyta niben?",
+      pending_order: @order, response_plan: plan)
+    assert_not guard.valid?
+  end
+
   private
 
   def build_guard(candidate:, fallback:, evidence: [], recent: [])

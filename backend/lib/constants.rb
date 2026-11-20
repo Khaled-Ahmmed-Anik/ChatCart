@@ -95,7 +95,7 @@ module Constants
       "customer_name" => /\b(?:name|naam|nam)\b|নাম/i,
       "phone" => /\b(?:phone|mobile|number|contact)\b|ফোন|মোবাইল|নম্বর/i,
       "address" => /\b(?:address|location|thikana|where)\b|ঠিকানা|কোথায়/i,
-      "quantity" => /\b(?:quantity|many|koyta|koto|bottles?|pieces?|units?)\b|কয়টা|কতটি|পরিমাণ/i,
+      "quantity" => /\b(?:quantity|many|koyta|bottles?|pieces?|units?)\b|কয়টা|কতটি|পরিমাণ/i,
       "variant" => /\b(?:size|variant|ml|colour|color|design|option)\b|সাইজ|রং|ডিজাইন/i,
       "product" => /\b(?:product|perfume|fragrance|one|which|choose|niben|nite|order|buy|take|proceed|go ahead)\b|পণ্য|কোন|নিবেন|নিতে|অর্ডার/i,
       "confirmation" => /\b(?:confirm|correct|proceed|place|thik|final)\b|নিশ্চিত|ঠিক|কনফার্ম/i
