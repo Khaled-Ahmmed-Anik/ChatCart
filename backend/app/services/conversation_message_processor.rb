@@ -5,7 +5,8 @@ class ConversationMessageProcessor
     @message = message
     @pending_order = pending_order
     @content = message.content.to_s.strip
-    @interpretation = ConversationEntityValidator.call(interpretation, @content)
+    @interpretation = ConversationEntityValidator.call(interpretation, @content,
+      products: pending_order.conversation.business.products.available_for_sale.to_a)
     @photo_product = photo_product
     @photo_details = photo_details
   end
@@ -18,6 +19,28 @@ class ConversationMessageProcessor
 
     if @photo_product
       select_photo_product
+      return pending_order
+    end
+
+    if cancellation? && !pending_order.confirmed? && !pending_order.submitted_to_woocommerce?
+      pending_order.cancelled!
+      @outcome = :cancelled
+      return pending_order
+    end
+    if ConversationTurnRequest.new(content).browsing_only?
+      @outcome = :confirmation_deferred
+      return pending_order
+    end
+    if ConversationTurnRequest.new(content).information_only? && product_resolution.matched? &&
+        requested_variant_sizes.empty? && ConversationActionPlanner.policy_information_outcomes(content).empty?
+      remember_referenced_product!
+      @outcome = if price_question?
+        :price_inquiry
+      elsif stock_question?
+        :stock_inquiry
+      else
+        :product_details_requested
+      end
       return pending_order
     end
 
@@ -663,7 +686,7 @@ class ConversationMessageProcessor
 
     return update_product_from_content if product_correction_request?
     return update_variant_from_content if variant_correction_request?
-    return apply_ai_correction if ai_change_intent?
+    return true if ai_change_intent? && apply_ai_correction
 
     case content
     when /\A(?:actually[\s,]*)?(?:change|update)\s+(?:the\s+)?quantity\s+(?:to\s+)?(.+)\z/i,
@@ -1092,17 +1115,7 @@ class ConversationMessageProcessor
   end
 
   def parse_quantity(value)
-    normalized = value.to_s.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
-      .gsub(/\b(first|second|third|last|previous|prothom|ditiyo|tritiyo)\s+one\b/, "")
-      .gsub(/\b\d+(?:\.\d+)?\s*ml\b/, "")
-
-    word_quantity = Constants::Conversation::NUMBER_WORDS.find do |word, _number|
-      normalized.match?(/\b#{word}\b/)
-    end&.last
-    return word_quantity if word_quantity.present?
-
-    numeric_quantity = normalized[/\d+/]&.to_i
-    numeric_quantity if numeric_quantity&.positive?
+    ConversationQuantityParser.call(value, products: catalog.available_for_sale.to_a)
   end
 
   def collect_quantity_from_product_selection

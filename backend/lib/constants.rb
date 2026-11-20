@@ -52,6 +52,10 @@ module Constants
   end
 
   module Conversation
+    PRODUCT_FACT_QUESTION = /\b(?:what|which|how|does|do|is|will|can|tell|describe|compare|difference|battery|warranty|compatib\w*|included|cable|keychain|capacity|support|fit|koto|koyta|koy|ache|ase|hobe|cholbe|chole|bolen|thakbe)\b|কত|কোন|আছে|বলেন/i
+    EXPLICIT_PURCHASE_ACTION = /\b(?:buy|take|send|give|add|remove|change|update|nibo|den|dao|din|koren|korun)\b|নিবো|দেন|করেন/i
+    EXPLICIT_QUANTITY_UNITS = /\b(?:\d+|one|two|three|ekta|duita)\s*(?:pieces?|pcs?|bottles?|units?|ta)\b/i
+    BROWSING_ONLY = /\b(?:just browsing|only browsing|browsing only|only wanted information|just looking|do not (?:place|create|confirm)|not ordering|not an order|order (?:ekhon na|na)|sudhu (?:dekhchi|information)|pore decide)\b/i
     LARGER_OPTION_QUESTION = /\b(?:bigger|larger|next size|aro boro|boro size)\b|আরও বড়|বড় সাইজ/i
     CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i
@@ -72,7 +76,7 @@ module Constants
       "address" => /\A(?:change|update|edit)\s+(?:my\s+|the\s+)?address[?.! ]*\z|\Aaddress\s+change\s+korbo[?.! ]*\z/i,
       "customer_name" => /\A(?:change|update|edit)\s+(?:my\s+)?name[?.! ]*\z|\A(?:name|naam)\s+change\s+korbo[?.! ]*\z/i
     }.freeze
-    QUANTITY_CORRECTION = /\A(?:actually[\s,]*)?(?:(?:পরিমাণ|quantity)\s+)?(?:[0-9০-৯]+\s*(?:টা|ta|bottles?)?|one|two|three|ekta|duita|একটা|দুইটা)\s+(?:ta\s+)?(?:koren|korun|করেন|করুন|hobe|হবে)[?.! ]*\z/i
+    QUANTITY_CORRECTION = /\A(?:actually[\s,]*)?(?:(?:change|update)\s+(?:the\s+)?quantity\s+(?:to\s+)?[0-9০-৯]+|(?:(?:পরিমাণ|quantity)\s+)?(?:[0-9০-৯]+\s*(?:টা|ta|bottles?)?|one|two|three|ekta|duita|একটা|দুইটা)\s+(?:ta\s+)?(?:koren|korun|kore den|করেন|করুন|hobe|হবে))[?.! ]*\z/i
     GREETING_ONLY = /\A(?:hi|hello|hey|assalamu?\s*alaikum|assalamu?laikum|assalamulaikum|salam|হ্যালো|আসসালামু আলাইকুম)(?:\s+(?:there|bhai|apu|sir|madam))?[!. ]*\z/i
     THANKS_ONLY = /\A(?:thanks(?: a lot)?|thank you(?: very much)?|dhonnobad|onek dhonnobad|ধন্যবাদ|অনেক ধন্যবাদ)[!. ]*\z/i
     CUSTOMER_NAME_PREFIX = /\A(?:(?:hi|hello|hey|হ্যালো)(?:\s+there)?[,!. ]+)?(?:my name is|i am|i'm|amar naam|amar nam|name|naam|আমার নাম)\s*[:=-]?\s*(.+?)[.! ]*\z/i
@@ -105,7 +109,7 @@ module Constants
       ha haa ji jii thik thikache accha acha
     ].freeze
     EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
-    EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|cancel (?:my |the |this )?order(?: please)?|please cancel (?:my |the )?order|order cancel(?: koro| korun)?|বাতিল করুন)[.! ]*\z/i
+    EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|(?:please )?cancel (?:(?:my|the|this|entire)\s+)*(?:test\s+)?order(?: please)?|(?:ei |puro )?(?:test )?order(?: ta)? (?:cancel|bad|batil)(?: koro| korun| koren| den)?|batil koren|বাতিল করুন|অর্ডার(?:টা)? বাতিল করুন)[.! ]*\z/i
     NON_NAME_SENTENCE = /(?:\b(?:password|forgot|cannot|can't|don't|do not|confirm|cancel|delivery|refund|payment)\b|পাসওয়ার্ড|বাতিল|পরে)/i
     AI_OUTCOMES = {
       "greeting" => :greeting, "thanks" => :thanks, "help" => :help, "wellbeing" => :wellbeing,

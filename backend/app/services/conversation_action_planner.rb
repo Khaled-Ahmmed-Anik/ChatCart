@@ -104,15 +104,7 @@ class ConversationActionPlanner
   end
 
   def selected_quantity
-    normalized = content.downcase.tr("০১২৩৪৫৬৭৮৯", "0123456789")
-      .gsub(/\b\d+(?:\.\d+)?\s*(?:ml|মিলি)\b/i, " ")
-      .gsub(/\b01[3-9]\d{8}\b/, " ")
-    word = Constants::Conversation::NUMBER_WORDS.find do |candidate, _number|
-      normalized.match?(/\b#{Regexp.escape(candidate)}\b(?!\s*(?:days?|din|hours?|ghonta|taka|tk|ml|kg|gm)\b)/)
-    end
-    return word.last if word.present?
-
-    normalized[/\b(\d+)\s*(?:ta|ti|pieces?|pcs?|bottles?|units?)\b/, 1]&.to_i&.then { |value| value if value.positive? }
+    ConversationQuantityParser.call(content, products: business.products.available_for_sale.to_a)
   end
 
   def informational_outcomes
@@ -126,6 +118,7 @@ class ConversationActionPlanner
   end
 
   def ordering_cue?
+    return false if ConversationTurnRequest.new(content).information_only?
     return false if content.match?(/\b(?:don t|do not|not ready|later|pore|nibo na|chai na)\b/i)
     return false if interpretation&.needs_clarification
     return false if interpretation.present? && interpretation.intents.intersect?(%w[compare_products reject_recommendations defer_confirmation])
