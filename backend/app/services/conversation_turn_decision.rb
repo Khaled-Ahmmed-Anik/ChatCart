@@ -67,7 +67,7 @@ class ConversationTurnDecision
   end
 
   def factual?
-    request.information_only? && reference.product && !text.match?(/\d+(?:\.\d+)?\s*(?:ml|মিলি)/i) &&
+    request.information_only? && reference.product && !text.tr("০১২৩৪৫৬৭৮৯", "0123456789").match?(/\d+(?:\.\d+)?\s*(?:ml|মিলি)/i) &&
       ConversationActionPlanner.policy_information_outcomes(text).empty? &&
       !text.match?(Constants::Conversation::CART_TOTAL_REQUEST) && !text.match?(Constants::Conversation::CART_CONTENTS_REQUEST)
   end

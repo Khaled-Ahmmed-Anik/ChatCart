@@ -37,6 +37,11 @@ class ConversationTurnDecisionTest < ActiveSupport::TestCase
     assert_predicate @order.reload, :confirmed?
   end
 
+  test "Bengali explicit sizes retain the existing variant inquiry path" do
+    message = @conversation.messages.create!(sender_type: :customer, content: "Anker Charger ১০ মিলি দাম কত?")
+    assert_equal :commerce, ConversationTurnDecision.new(message: message, pending_order: @order).call.route
+  end
+
   test "saved telemetry separates routing from actual persisted outcome" do
     result = assert_conversation_journey(business: @business, steps: [
       { say: "charger ase?" }, { say: "charger ta", order: { product_id: @product.id, quantity: nil } }
