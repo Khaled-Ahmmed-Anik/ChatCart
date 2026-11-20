@@ -10,6 +10,8 @@ module Constants
     DEVICE_RECALL = /\b(?:what was my device|my device model|device model.*(?:ki|bolchilam))\b/i
     MAXIMUM_EVIDENCE_LINES = 4
     MAXIMUM_FACT_LENGTH = 600
+    INCLUSION_EVIDENCE = /\b(?:include[ds]?|including|package|box|supplied|provided|comes? with|sold separately)\b/i
+    UNVERIFIED_EVIDENCE = /\b(?:confirm|check|verify|unverified|unknown|not verified|not confirmed)\b/i
     KNOWLEDGE_PROFILES = {
       "electronics" => { category: /electronic|tech|gadget|charger|earbud|watch/i, topics: %w[compatibility warranty package] },
       "fragrance" => { category: /perfume|fragrance|attar/i, topics: %w[scent longevity] },
@@ -89,6 +91,7 @@ module Constants
   end
 
   module Conversation
+    CART_CONJUNCTION = /\b(?:and|ar|ebong)\b/i
     PURCHASE_DECLINED = /\b(?:nibo na|nite chai na|kinbo na|chai na|do not (?:want|buy|order|take)|don t (?:want|buy|order|take)|not buying|not ordering|will not (?:buy|take|order))\b|নিবো না|নেব না|কিনব না/i
     CHECKOUT_PROGRESS_OUTCOMES = %i[product_selected variant_selected quantity_collected multiple_details_collected cart_updated].freeze
     REPLY_QUESTION_CUES = {

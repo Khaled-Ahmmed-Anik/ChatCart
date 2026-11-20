@@ -19,6 +19,8 @@ class ConversationCartManager
       end
     end
     matches = product_mentions
+    final_tail = matches.any? ? text[matches.last[:finish]..].to_s : ""
+    unresolved_addition = unresolved_addition?(final_tail)
     repaired = resume_repair(matches)
     return repaired if repaired
     addition = text.match?(/\b(?:add|include|adding)\b|\b(?:aro|r o)\b.*\b(?:product|item)\b/) && !text.match?(/\b(?:not|don t|do not)\b/)
@@ -28,7 +30,9 @@ class ConversationCartManager
     command = addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
-    explicit_list = matches.any? && message.content.match?(/\+|\b(?:and|ar|ebong)\b/i) && text.match?(/\d/)
+    quantity = ConversationQuantityParser.call(text, products: matches.map { |match| match[:product] })
+    explicit_list = matches.any? && text.match?(Constants::Conversation::CART_CONJUNCTION) &&
+      (matches.size > 1 || quantity.present? || unresolved_addition)
     return unless command || explicit_list || ((matches.size > 1 || multiple_clause) && purchase)
     return if text.match?(/\b(?:compare|difference|better|vs|nibo na|chai na|do not|don t)\b/)
     return if matches.any? do |match|
@@ -42,10 +46,8 @@ class ConversationCartManager
       key = text.match?(/\b(?:ager|aro|korte|korbo|cai|chai)\b/) ? "cart_banglish.choose_product" : "cart.choose_product"
       return clarification(I18n.t(key))
     end
-    final_tail = text[matches.last[:finish]..].to_s
     plans = build_plans(matches)
-    if final_tail.match?(/\b(?:and|ar|ebong)\b\s+\S/) &&
-        ConversationActionPlanner::INFORMATIONAL_PATTERNS.values.none? { |pattern| final_tail.match?(pattern) }
+    if unresolved_addition
       store_repair(plans, replace_cart: explicit_list && !command, unknown: true)
       return clarification(translation("unknown"))
     end
@@ -72,6 +74,16 @@ class ConversationCartManager
   private
 
   attr_reader :message, :order, :text
+
+  def unresolved_addition?(tail)
+    tail.split(Constants::Conversation::CART_CONJUNCTION).drop(1).reject(&:blank?).any? do |clause|
+      next true if clause.match?(Constants::Conversation::EXPLICIT_PURCHASE_ACTION) ||
+        clause.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
+
+      !ConversationTurnRequest.new(clause).information_only? &&
+        ConversationActionPlanner::INFORMATIONAL_PATTERNS.values.none? { |pattern| clause.match?(pattern) }
+    end
+  end
 
   def build_plans(matches)
     matches.each_with_index.map do |match, index|

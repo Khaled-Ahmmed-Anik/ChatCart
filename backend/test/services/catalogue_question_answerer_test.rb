@@ -25,6 +25,30 @@ class CatalogueQuestionAnswererTest < ActiveSupport::TestCase
     assert_includes reply, "Warranty is not verified"
   end
 
+  test "cable performance evidence does not verify package inclusion" do
+    @product.update!(description: "Charging Cable: Confirm whether included in your package.\nCharging speed depends on device and cable compatibility.")
+    reply = CatalogueQuestionAnswerer.new(product: @product, text: "Cable included and warranty?").content
+    assert_includes reply, "Cable inclusion is not verified"
+    assert_includes reply, "Warranty is not verified"
+  end
+
+  test "shared evidence appears only once across requested topics" do
+    @product.update!(description: "Cable included in the package.\nCharging speed depends on device and cable compatibility.")
+    reply = CatalogueQuestionAnswerer.new(product: @product, text: "Cable included? What is the charging speed? Package contents?").content
+    assert_equal 1, reply.scan("Cable included in the package.").size
+    assert_equal 1, reply.scan("Charging speed depends on device and cable compatibility.").size
+  end
+
+  test "negative cable inclusion and seller declared facts are preserved" do
+    @product.update!(description: "Cable is not included in the package.")
+    reply = CatalogueQuestionAnswerer.new(product: @product, text: "Cable included?").content
+    assert_includes reply, "Cable is not included"
+    @product.update!(product_attributes: { catalogue_facts: { cable: "USB-C cable supplied separately; not included." } })
+    reply = CatalogueQuestionAnswerer.new(product: @product, text: "Cable included?").content
+    assert_includes reply, "supplied separately; not included"
+    assert_not_includes reply, "Cable inclusion is not verified"
+  end
+
   test "tracking limitations are retained instead of a GPS promise" do
     @product.update!(description: "Apple and Google networks supported.\nNot a standalone real-time GPS tracker.\nLocation updates depend on participating devices.\nPair with one ecosystem at a time.")
     reply = CatalogueQuestionAnswerer.new(product: @product, text: "Is this live GPS for my car?").content
