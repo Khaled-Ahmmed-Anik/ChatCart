@@ -1,0 +1,32 @@
+en:
+  errors:
+    messages:
+      invalid_catalogue_media: "must contain at most %{count} media entries and references, with public HTTPS file URLs, image/video type, actual/promotional label, and an optional variant name (videos must not be watch-page links)"
+  product_media:
+    en:
+      channel_unavailable: "Product photo/video sending is currently supported in Messenger. I can help with product details here."
+      choose_product: "Which product would you like media or information for? Please send its name."
+      choose_variant: "Which exact variant do you mean? Please send its catalogue variant name so I can find the right media."
+      unknown_link: "I cannot match that link to a saved product. Please send a screenshot or the product name."
+      linked_product: "That link matches %{name}, starting from ৳%{price}. What would you like to know?"
+      actual: "Here is seller-labelled actual product media for %{name}."
+      catalogue: "Here is catalogue/promotional media for %{name}; it is not verified as an actual product photo or recording."
+      unavailable: "The requested media is not available for this product/variant. I will not substitute a different product or claim a catalogue image is a real photo. Would you like product details instead?"
+    banglish:
+      channel_unavailable: "Product-er chobi/video pathano ekhon Messenger-e supported. Ekhane product details diye help korte pari."
+      choose_product: "Kon product-er chobi, video ba information chan? Product-er naam bolben?"
+      choose_variant: "Kon variant-ta bujhiyechen? Catalogue-er exact variant naam bolle matching chobi/video khujte parbo."
+      unknown_link: "Ei link-ta saved product-er sathe match korte parini. Screenshot ba product-er naam pathaben?"
+      linked_product: "Ei link-ta %{name}-er, dam ৳%{price} theke. Ki jante chan?"
+      actual: "%{name}-er seller actual bole mark kora chobi/video dichhi."
+      catalogue: "%{name}-er catalogue/promotional chobi/video dichhi; actual product-er chobi/recording hisebe verified noy."
+      unavailable: "Ei product/variant-er requested chobi/video add kora nei. Onno product-er chobi ba catalogue photo-ke real bolbo na. Product details jante chan?"
+    bn:
+      channel_unavailable: "পণ্যের ছবি বা ভিডিও পাঠানো এখন মেসেঞ্জারে সমর্থিত। এখানে পণ্যের তথ্য দিয়ে সাহায্য করতে পারি।"
+      choose_product: "কোন পণ্যের ছবি, ভিডিও বা তথ্য চান? পণ্যের নাম বলবেন?"
+      choose_variant: "কোন ভ্যারিয়েন্টটি বোঝাচ্ছেন? ক্যাটালগের সঠিক ভ্যারিয়েন্টের নাম জানালে মিলিয়ে ছবি বা ভিডিও দিতে পারব।"
+      unknown_link: "এই লিংকটি সংরক্ষিত পণ্যের সঙ্গে মেলাতে পারিনি। স্ক্রিনশট বা পণ্যের নাম পাঠাবেন?"
+      linked_product: "এই লিংকটি %{name}-এর, দাম ৳%{price} থেকে। কী জানতে চান?"
+      actual: "%{name}-এর বিক্রেতার আসল হিসেবে চিহ্নিত ছবি বা ভিডিও দিচ্ছি।"
+      catalogue: "%{name}-এর ক্যাটালগ বা প্রচারণার ছবি/ভিডিও দিচ্ছি; এটি আসল পণ্যের ছবি বা রেকর্ডিং হিসেবে যাচাই করা নয়।"
+      unavailable: "এই পণ্য বা ভ্যারিয়েন্টের চাওয়া ছবি/ভিডিও যোগ করা নেই। অন্য পণ্যের ছবি দেব না বা ক্যাটালগের ছবিকে আসল বলব না। পণ্যের বিস্তারিত জানতে চান?"

@@ -28,6 +28,30 @@ class SendMessengerReplyJobTest < ActiveJob::TestCase
     assert_nil delivery.last_error
   end
 
+  test "partial media delivery resumes after the last acknowledged part" do
+    delivery = create_delivery
+    delivery.message.update!(metadata: { "attachments" => [ { "type" => "image", "url" => "https://cdn.shop.test/real.jpg" } ] })
+    requests = []
+    success = fake_response(success: true, code: 200)
+    failure = fake_response(success: false, code: 503)
+    with_http_post_stub(->(_uri, body, _headers) {
+      requests << JSON.parse(body)
+      requests.size == 1 ? success : failure
+    }) { SendMessengerReplyJob.perform_now(delivery) }
+    assert_equal "retrying", delivery.reload.status
+    assert_equal 1, delivery.message.reload.metadata["messenger_parts_sent"]
+    with_http_post_stub(->(_uri, body, _headers) {
+      requests << JSON.parse(body)
+      success
+    }) { SendMessengerReplyJob.perform_now(delivery) }
+    assert_equal "delivered", delivery.reload.status
+    assert_equal 3, requests.size
+    assert_equal "Hello", requests.first.dig("message", "text")
+    assert_equal "image", requests.last.dig("message", "attachment", "type")
+    assert_equal "https://cdn.shop.test/real.jpg", requests.last.dig("message", "attachment", "payload", "url")
+    with_http_post_stub(->(*) { flunk("Delivered media must not be resent") }) { SendMessengerReplyJob.perform_now(delivery) }
+  end
+
   test "records a permanent failure without retrying" do
     delivery = create_delivery
     response = fake_response(success: false, code: 400, body: '{"error":"invalid recipient"}')

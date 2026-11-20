@@ -16,6 +16,7 @@ class Product < ApplicationRecord
   before_validation :disable_archived_product
   before_validation :normalize_image_urls, if: :will_save_change_to_image_urls?
   validates :image_urls, product_image_urls: true, if: :will_save_change_to_image_urls?
+  validates_with ProductMediaValidator, if: :will_save_change_to_product_attributes?
 
   scope :active, -> { where(active: true) }
   scope :available_for_sale, -> { active.where(archived_at: nil) }

@@ -79,6 +79,7 @@ Detailed implementation documentation:
 - [Sector recommendations and multi-product orders](docs/multi-product-orders.md) — catalogue attributes, cart changes, shared checkout, stock checks, and rollout.
 - [Product image catalogue](docs/product-image-catalogue.md) — image links, cover selection, previews, validation, and the boundary before photo recognition.
 - [Customer photo recognition](docs/customer-photo-recognition.md) — opt-in Messenger matching, Gemini privacy, safe downloads, confirmation and MVP limits.
+- [Product media and reference links](docs/product-media-and-reference-links.md) — seller-labelled real photos/videos, variant-safe Messenger replies, saved Facebook links and delivery retry limits.
 - [Meta production checklist](docs/meta-production-checklist.md) — publishing Messenger and WhatsApp integrations.
 - [Free MVP deployment](docs/free-production-deployment.md) — Render, Neon, Cloudflare Pages, production secrets, verification, and releases.
 

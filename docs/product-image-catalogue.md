@@ -10,8 +10,10 @@ or model API call is required.
 
 The gallery itself does not make model calls or change checkout. The optional
 [customer-photo recognition extension](customer-photo-recognition.md) can compare
-Messenger photos with these references when explicitly enabled. Sending product
-pictures through Messenger and direct seller file uploads remain separate work.
+Messenger photos with these references when explicitly enabled. The
+[product media extension](product-media-and-reference-links.md) sends saved
+photos/videos through Messenger on request, distinguishing seller-labelled actual
+media from promotional catalogue images. Direct seller file uploads remain separate work.
 
 ## Seller workflow
 

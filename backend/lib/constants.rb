@@ -1,4 +1,23 @@
 module Constants
+  module ProductMedia
+    KEY = "catalogue_media"
+    LINKS_KEY = "reference_urls"
+    MAX_ITEMS = 12
+    MAX_ATTACHMENTS = 3
+    MAX_VARIANT_LENGTH = 100
+    KINDS = %w[image video].freeze
+    AUTHENTICITIES = %w[actual promotional].freeze
+    REQUEST = /\b(?:photos?|pictures?|pics?|images?|videos?|chobi|chhobi)\b|ছবি|ভিডিও/i
+    VIDEO_REQUEST = /\bvideos?\b|ভিডিও/i
+    ACTUAL_REQUEST = /\b(?:real|actual|original|as[oa]l|nijer)\b|আসল/i
+    COLOUR_REQUEST = /\b(?:black|white|red|blue|green|pink|gold|silver)\b/i
+    FACEBOOK_HOSTS = %w[facebook.com www.facebook.com m.facebook.com web.facebook.com fb.watch].freeze
+    VIDEO_PAGE_HOSTS = (FACEBOOK_HOSTS + %w[youtube.com www.youtube.com m.youtube.com youtu.be]).freeze
+    CONTEXT_WORDS = %w[real actual original asol asal nijer photo photos picture pictures pic pics image images video videos chobi chhobi
+      show send give me us please den din dao dekhaw dekhao ache ase ki can you i see this that it its ei eta etar eita oita
+      product products er the a of for and or].freeze
+    URL = %r{https?://[^\s<>]+}i
+  end
   module Automation
     PAUSED = "automation_paused"
     PAUSED_AT = "automation_paused_at"

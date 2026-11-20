@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { customerName, HANDOVER_REASONS, formatMessageTime } from "../../lib/inbox";
 import { automationMessages } from "../../locales/automation";
+import { MessageMedia } from "../products/MessageMedia";
 
 const NEAR_BOTTOM_PX = 80;
 
@@ -37,6 +38,7 @@ export function ConversationThread({ conversation, canManage, draft, onDraft, on
       {messages.length ? messages.map((message) => <article key={message.id} className={`inbox-message ${message.sender_type}`}>
         <small>{message.sender_type === "customer" ? customerName(conversation) : message.sender_type === "seller" ? "Seller" : "Assistant"}</small>
         <p>{message.content || "[Attachment]"}</p>
+        <MessageMedia attachments={message.metadata?.attachments} language={navigator.language.split("-")[0]} />
         {message.created_at && <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>}
       </article>) : <p className="state">No messages in this conversation yet.</p>}
     </div>
