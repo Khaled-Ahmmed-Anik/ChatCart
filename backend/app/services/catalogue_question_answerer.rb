@@ -8,31 +8,41 @@ class CatalogueQuestionAnswerer
   def content
     return if product.blank? || topics.empty?
 
+    seen_evidence = Set.new
     answers = topics.map do |topic, definition|
       declared_fact = declared_facts[topic.to_s]
       evidence = declared_fact.present? ? [ declared_fact ] : evidence_lines.select { |line| line.match?(definition.fetch(:evidence)) }
+      if topic == :cable && declared_fact.blank?
+        evidence = evidence.select { |line| line.match?(Constants::Catalogue::INCLUSION_EVIDENCE) }
+      end
       if topic == :designs
         evidence = product.available_variants.map do |variant|
           translation("available_variant", name: variant.display_name,
             price: ActiveSupport::NumberHelper.number_to_delimited(variant.price), count: variant.stock_quantity)
         end
       end
-      if evidence.empty? || topic == :cable && evidence.all? { |line| line.match?(/confirm|check|verify/i) }
+      if evidence.empty? || evidence.all? { |line| line.match?(Constants::Catalogue::UNVERIFIED_EVIDENCE) }
         translation("unknown", topic: translation("topics.#{topic}"))
       else
-        evidence.sort_by { |line| line.match?(/\b(?:not|cannot|require|confirm|depend|one .*time)\b/i) ? 0 : 1 }
-          .first(Constants::Catalogue::MAXIMUM_EVIDENCE_LINES).map { |line| "• #{line}" }.join("\n")
+        evidence_reply(evidence, seen_evidence)
       end
     end
     if topics.key?(:compatibility)
       answers << translation("compatibility_check")
     end
-    [ translation("intro", product: product.name, price: formatted_price), *answers.uniq ].join("\n\n")
+    [ translation("intro", product: product.name, price: formatted_price), *answers.compact.uniq ].join("\n\n")
   end
 
   private
 
   attr_reader :product, :text, :locale
+
+  def evidence_reply(evidence, seen_evidence)
+    selected = evidence.sort_by { |line| line.match?(/\b(?:not|cannot|require|confirm|depend|one .*time)\b/i) ? 0 : 1 }
+      .reject { |line| seen_evidence.include?(line) }.first(Constants::Catalogue::MAXIMUM_EVIDENCE_LINES)
+    seen_evidence.merge(selected)
+    selected.map { |line| "• #{line}" }.join("\n").presence
+  end
 
   def declared_facts
     @declared_facts ||= CatalogueKnowledgeProfile.new(product).facts
