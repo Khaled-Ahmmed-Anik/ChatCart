@@ -15,7 +15,7 @@ class ConversationProductInquiry
     resolution = ProductResolutionService.new(business: order.conversation.business, query: content).resolve
     return clear! if resolution.ambiguous?
     selected = resolution.product if resolution.matched?
-    if !selected && content.match?(Constants::Catalogue::PRODUCT_REFERENCE)
+    if !selected && (content.match?(Constants::Catalogue::PRODUCT_REFERENCE) || ConversationTurnRequest.new(content).information_only?)
       selected = CatalogueConversationReference.new(conversation: order.conversation, text: content).product
     end
     unless selected

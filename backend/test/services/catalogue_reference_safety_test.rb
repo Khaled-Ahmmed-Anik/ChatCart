@@ -33,7 +33,33 @@ class CatalogueReferenceSafetyTest < ActiveSupport::TestCase
     assert_nil CatalogueConversationReference.new(conversation: @conversation, text: "this one").product
   end
 
+  test "comparison price question preserves offered products for a following brand reference" do
+    @conversation.update!(conversation_state: { "last_offered_options" => { "kind" => "products", "options" => [ { "id" => @hoco.id }, { "id" => @buds.id } ] } })
+    result = CustomerMessageRecorder.new(business: @business, channel: "facebook", external_customer_id: "reference",
+      content: "Which one is cheaper and what is the difference in price?").record
+    assert_includes result.bot_reply.content, "130"
+    result = CustomerMessageRecorder.new(business: @business, channel: "facebook", external_customer_id: "reference",
+      content: "I prefer the Hoco one. Remind me of its price.").record
+    assert_includes result.bot_reply.content, "729"
+    refute_includes result.bot_reply.content, "299"
+  end
+
+  test "out of range ordinal clarifies without replacing the actual offered list" do
+    @conversation.update!(conversation_state: { "last_offered_options" => { "kind" => "products", "options" => [ { "id" => @hoco.id } ] } })
+    result = CustomerMessageRecorder.new(business: @business, channel: "facebook", external_customer_id: "reference",
+      content: "The second one: what is its price?").record
+    assert_equal :offered_reference_clarification, result.outcome
+    assert_equal [ @hoco.id ], @conversation.reload.conversation_state.dig("last_offered_options", "options").map { |option| option["id"] }
+    refute_includes result.bot_reply.content, "299"
+  end
+
   test "negative category is not returned as the requested category" do
     assert_empty CatalogueCategoryResolver.call(business: @business, text: "not earbuds")
+  end
+
+  test "negative protective case requests exclude accessories without excluding earbuds" do
+    result = ProductResolutionService.new(business: @business, query: "No protective cases please; only actual earbuds.").resolve
+    refute_equal @case, result.product
+    refute_includes CatalogueCategoryResolver.call(business: @business, text: "Cover chai na, sudhu earbuds"), "earbuds accessories"
   end
 end

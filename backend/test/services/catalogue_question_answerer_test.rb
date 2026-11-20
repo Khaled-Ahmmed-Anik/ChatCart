@@ -37,4 +37,13 @@ class CatalogueQuestionAnswererTest < ActiveSupport::TestCase
     assert_empty ConversationActionPlanner.policy_information_outcomes("Battery koto din chole?")
     assert_includes ConversationActionPlanner.policy_information_outcomes("delivery koto din lagbe?"), :delivery_time_requested
   end
+
+  test "every second is a tracking interval rather than the second offered product" do
+    @conversation.update!(conversation_state: { "last_offered_options" => { "kind" => "products", "options" => [ { "id" => @product.id } ] } })
+    @product.update!(description: "Not a standalone real-time GPS tracker. Location updates depend on participating devices.")
+    result = CustomerMessageRecorder.new(business: @business, channel: "facebook", external_customer_id: "grounded",
+      content: "Can it track a car live every second?").record
+    assert_includes result.bot_reply.content, "Not a standalone"
+    refute_equal :offered_reference_clarification, result.outcome
+  end
 end

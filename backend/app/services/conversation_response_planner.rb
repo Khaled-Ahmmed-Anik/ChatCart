@@ -198,14 +198,7 @@ class ConversationResponsePlanner
   end
 
   def preferred_language(previous_state)
-    detected_language = interpretation&.language
-    if customer_message.content.to_s.split.size <= 2 && previous_state["preferred_language"].present? &&
-        outcome != :language_preference
-      return previous_state["preferred_language"]
-    end
-    return detected_language if detected_language.in?(%w[english banglish bengali]) && interpretation.confidence >= 0.7
-
-    previous_state.fetch("preferred_language", "english")
+    ConversationLanguagePreference.choose(customer_message.content, previous_state, interpretation: interpretation)
   end
 
   def preferred_tone
