@@ -55,6 +55,22 @@ class ConversationReplyGuardTest < ActiveSupport::TestCase
     assert_not guard.valid?
   end
 
+  test "rejects a different checkout question even when it ends in a question mark" do
+    assert_not build_guard(candidate: "The Oud is selected. What is your phone number?",
+      fallback: "The Oud is selected. What name should I use?").valid?
+  end
+
+  test "retains negative product limitations instead of reversing them" do
+    fallback = "The Oud is selected. Warranty is not verified. What name should I use?"
+    assert_not build_guard(candidate: "The Oud is selected. Warranty is verified. What name should I use?", fallback: fallback).valid?
+    assert build_guard(candidate: "The Oud is selected. Warranty is not verified. What name shall I use?", fallback: fallback).valid?
+  end
+
+  test "retains dependency and exclusivity constraints" do
+    fallback = "The Oud is selected. Location depends on nearby devices. Pair with one ecosystem at a time."
+    assert_not build_guard(candidate: "The Oud is selected. Location is always live.", fallback: fallback).valid?
+  end
+
   private
 
   def build_guard(candidate:, fallback:, evidence: [], recent: [])

@@ -48,3 +48,6 @@ checkout, inventory and final-confirmation guards remain authoritative. Shared
 question predicates prevent variants/price/comparison detection from drifting.
 Customer-message metadata records the selected route separately from the actual
 persisted outcome. Model classification is a suggestion, not an order transition.
+# Reply meaning safety
+
+Naturalized checkout questions must retain a cue for the expected field, not merely a question mark. Negative, unknown, dependency, and exclusivity statements in the deterministic reply must survive unchanged apart from formatting. When a rewrite fails these conservative checks, the existing deterministic fallback is used. This deliberately favors safety over paraphrasing limitations; it is not a general semantic entailment model and does not certify arbitrary generated claims.

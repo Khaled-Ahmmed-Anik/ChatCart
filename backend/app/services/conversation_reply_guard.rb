@@ -18,6 +18,7 @@ class ConversationReplyGuard
       uses_only_approved_prices? &&
       uses_only_approved_products? &&
       uses_only_approved_claims? &&
+      preserves_limitations? &&
       preserves_required_question? &&
       not_a_recent_duplicate?
   end
@@ -95,7 +96,19 @@ class ConversationReplyGuard
     return true if response_plan&.pending_question.blank?
     return true unless fallback.include?("?")
 
-    candidate.include?("?")
+    return false unless candidate.include?("?")
+
+    contract = response_plan.respond_to?(:question_contract) ? response_plan.question_contract.to_h : {}
+    field = contract["field"].presence || response_plan.pending_question.to_s
+    cue = Constants::Conversation::REPLY_QUESTION_CUES[field]
+    return true unless cue
+
+    candidate.split(/(?<=[.!?])\s+|\n/).any? { |sentence| sentence.include?("?") && sentence.match?(cue) }
+  end
+
+  def preserves_limitations?
+    fallback.split(/\n|(?<=[.!?])\s+/).select { |sentence| sentence.match?(Constants::Conversation::REPLY_LIMITATION) }
+      .all? { |sentence| normalize(candidate).include?(normalize(sentence)) }
   end
 
   def not_a_recent_duplicate?
