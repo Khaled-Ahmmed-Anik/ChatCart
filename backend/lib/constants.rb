@@ -76,6 +76,16 @@ module Constants
   end
 
   module Conversation
+    REPLY_QUESTION_CUES = {
+      "customer_name" => /\b(?:name|naam|nam)\b|নাম/i,
+      "phone" => /\b(?:phone|mobile|number|contact)\b|ফোন|মোবাইল|নম্বর/i,
+      "address" => /\b(?:address|location|thikana|where)\b|ঠিকানা|কোথায়/i,
+      "quantity" => /\b(?:quantity|many|koyta|koto|bottles?|pieces?|units?)\b|কয়টা|কতটি|পরিমাণ/i,
+      "variant" => /\b(?:size|variant|ml|colour|color|design|option)\b|সাইজ|রং|ডিজাইন/i,
+      "product" => /\b(?:product|perfume|fragrance|one|which|choose|niben|nite|order|buy|take|proceed|go ahead)\b|পণ্য|কোন|নিবেন|নিতে|অর্ডার/i,
+      "confirmation" => /\b(?:confirm|correct|proceed|place|thik|final)\b|নিশ্চিত|ঠিক|কনফার্ম/i
+    }.freeze
+    REPLY_LIMITATION = /\b(?:not|cannot|can't|unverified|unknown|depends?|require|only|one .*time|confirm whether|not verified|na)\b|যাচাই|নিশ্চিত নয়|নির্ভর|নেই|নয়/i
     QUESTION_HISTORY_LIMIT = 5
     QUESTION_FIELDS = {
       "collecting_product" => [ "product", "product_reference" ],
