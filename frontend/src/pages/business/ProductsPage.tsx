@@ -7,6 +7,8 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { ProductImage } from "../../components/products/ProductImage";
 import { ProductImagesField } from "../../components/products/ProductImagesField";
+import { ProductMediaFields } from "../../components/products/ProductMediaFields";
+import { ordinaryProductAttributes, readProductMedia, PRODUCT_MEDIA_KEY, PRODUCT_LINKS_KEY, type ProductMedia } from "../../lib/productMedia";
 import { ApproveDashboardProductImportDocument, ArchiveDashboardProductDocument, DashboardProductsDocument, PreviewDashboardProductImportDocument, SaveDashboardProductDocument, type DashboardProductsQuery, type ProductInput } from "../../graphql/generated/graphql";
 import { graphqlRequest } from "../../lib/graphqlClient";
 import { parseProductAttributes, formatProductAttributes } from "../../lib/productAttributes";
@@ -20,6 +22,8 @@ const blankVariant = (): VariantDraft => ({ name: "", size: "", sku: "", price: 
 export function ProductsPage() {
   const imageLanguage = navigator.language.split("-")[0];
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [media, setMedia] = useState<ProductMedia[]>([]);
+  const [referenceLinks, setReferenceLinks] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
   const [variants, setVariants] = useState<VariantDraft[]>([]);
@@ -46,7 +50,12 @@ export function ProductsPage() {
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
 
-  const edit = (product: Product) => { setEditing(product); setImageUrls(product.imageUrls); setVariants(product.variants); setComboItems(product.comboItems.map(item=>({id:item.id,componentProductId:item.componentProduct.id,quantity:item.quantity,selectionGroup:item.selectionGroup||undefined,required:item.required,position:item.position}))); setOpen(true); };
+  const edit = (product: Product) => {
+    const attributes = (product.productAttributes || {}) as Record<string, unknown>;
+    setMedia(readProductMedia(attributes));
+    setReferenceLinks(Array.isArray(attributes[PRODUCT_LINKS_KEY]) ? attributes[PRODUCT_LINKS_KEY].join("\n") : "");
+    setEditing(product); setImageUrls(product.imageUrls); setVariants(product.variants); setComboItems(product.comboItems.map(item=>({id:item.id,componentProductId:item.componentProduct.id,quantity:item.quantity,selectionGroup:item.selectionGroup||undefined,required:item.required,position:item.position}))); setOpen(true);
+  };
   const updateVariant = (index: number, values: Partial<VariantDraft>) => setVariants(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
   const columns = [
     { key: "name", label: "Product", render: (row: Product) => <div className="product-catalogue-cell"><ProductImage url={row.imageUrls[0]} productName={row.name} language={imageLanguage} /><div><strong>{row.name}</strong><small>{row.shortDescription || row.description || "No description"}</small></div></div> },
@@ -62,6 +71,8 @@ export function ProductsPage() {
     const form = event.currentTarget;
     const values = Object.fromEntries(new FormData(form));
     const productAttributes = parseProductAttributes(String(values.product_attributes || ""));
+    productAttributes[PRODUCT_MEDIA_KEY] = media.map(item => ({ ...item, url: item.url.trim(), variant: item.variant?.trim() || "" }));
+    productAttributes[PRODUCT_LINKS_KEY] = referenceLinks.split("\n").map(url => url.trim()).filter(Boolean);
     save.mutate({ id: editing?.id, input: {
       name: String(values.name), price: String(values.price), stockQuantity: Number(values.stock_quantity),
       description: String(values.description || ""), shortDescription: String(values.short_description || ""),
@@ -78,12 +89,13 @@ export function ProductsPage() {
   }
 
   return <>
-    <PageHeader title="Products" description="The catalog, variants, combos, aliases, and verified facts used for recommendations." actions={<><button className="button secondary" onClick={()=>{setImportDraft(null);setImportOpen(true)}}>Import from URL</button><button onClick={() => { setEditing(null); setImageUrls([]); setVariants([]); setComboItems([]); setOpen(true); }}>Add product</button></>} />
+    <PageHeader title="Products" description="The catalog, variants, combos, aliases, and verified facts used for recommendations." actions={<><button className="button secondary" onClick={()=>{setImportDraft(null);setImportOpen(true)}}>Import from URL</button><button onClick={() => { setEditing(null); setImageUrls([]); setMedia([]); setReferenceLinks(""); setVariants([]); setComboItems([]); setOpen(true); }}>Add product</button></>} />
     <Panel><DataTable columns={columns} rows={query.data!.products} emptyMessage="Add a product to start taking orders." /></Panel>
     <Modal title={editing ? "Edit product" : "Add product"} open={open} onClose={() => { setOpen(false); setEditing(null); }}>
       <form key={editing?.id || "new"} onSubmit={submit}>
         <label>Product name<input name="name" defaultValue={editing?.name} required /></label>
         <ProductImagesField value={imageUrls} onChange={setImageUrls} productName={editing?.name || ""} language={imageLanguage} />
+        <ProductMediaFields media={media} onChange={setMedia} links={referenceLinks} onLinksChange={setReferenceLinks} language={imageLanguage} />
         <label>Aliases <small>Comma-separated English, Bangla, or Banglish names</small><input name="aliases" defaultValue={editing?.aliases.join(", ")||""} placeholder="Club, TheClub, ক্লাব" /></label>
         <div className="form-grid"><label>Product type<select name="product_type" defaultValue={editing?.productType||"standard"}><option value="standard">Standard product</option><option value="fixed_combo">Fixed combo</option><option value="configurable_combo">Configurable combo</option></select></label><label>Stock strategy<select name="stock_strategy" defaultValue={editing?.stockStrategy||"independent"}><option value="independent">Independent stock</option><option value="component_derived">Derived from components</option><option value="manual">Manual availability</option></select></label></div>
         <div className="form-grid"><label>Category<input name="category" defaultValue={editing?.category || ""} placeholder="Fragrance" /></label><label>Tags<input name="tags" defaultValue={editing?.tags || ""} placeholder="oud, woody, premium" /></label><label>Base price<input name="price" type="number" min="0" step="0.01" defaultValue={editing?.price} required /></label><label>Base stock<input name="stock_quantity" type="number" min="0" defaultValue={editing?.stockQuantity} required /></label></div>
@@ -91,7 +103,7 @@ export function ProductsPage() {
         <label>Long description<textarea name="description" defaultValue={editing?.description || ""} /></label>
         <div className="form-grid"><label>Benefits<textarea name="benefits" defaultValue={editing?.benefits || ""} /></label><label>Suitable for<textarea name="suitable_for" defaultValue={editing?.suitableFor || ""} /></label></div>
         <label>Usage instructions<textarea name="usage_instructions" defaultValue={editing?.usageInstructions || ""} /></label>
-        <label>Product attributes <small>One key=value per line. Separate multiple values with |. Used to match customer preferences.</small><textarea name="product_attributes" defaultValue={formatProductAttributes((editing?.productAttributes as Record<string,unknown>) || {})} placeholder={"material=cotton\ncolor=blue | white\npurpose=office"} /></label>
+        <label>Product attributes <small>One key=value per line. Separate multiple values with |. Used to match customer preferences.</small><textarea name="product_attributes" defaultValue={formatProductAttributes(ordinaryProductAttributes((editing?.productAttributes as Record<string,unknown>) || {}))} placeholder={"material=cotton\ncolor=blue | white\npurpose=office"} /></label>
         <div className="variant-heading"><div><strong>Sizes and variants</strong><small>Variant price and stock override the base values.</small></div><button type="button" className="button secondary small" onClick={() => setVariants(current => [...current, blankVariant()])}>Add variant</button></div>
         <div className="variant-list">{variants.map((variant,index) => <div className="variant-row" key={variant.id || index}><input aria-label="Variant name" placeholder="Name" value={variant.name} onChange={event => updateVariant(index,{name:event.target.value})}/><input aria-label="Variant size" placeholder="Size (6 ml)" value={variant.size || ""} onChange={event => updateVariant(index,{size:event.target.value})}/><input aria-label="Variant price" placeholder="Price" type="number" min="0" value={variant.price} onChange={event => updateVariant(index,{price:event.target.value})}/><input aria-label="Variant stock" placeholder="Stock" type="number" min="0" value={variant.stockQuantity} onChange={event => updateVariant(index,{stockQuantity:Number(event.target.value)})}/><button type="button" className="button secondary small" onClick={() => setVariants(current => current.filter((_,i) => i !== index))}>Remove</button></div>)}</div>
         <div className="variant-heading"><div><strong>Combo components</strong><small>Add the products included in a fixed or configurable combo.</small></div><button type="button" className="button secondary small" onClick={()=>setComboItems(current=>[...current,{componentProductId:"",quantity:1,required:true,position:current.length}])}>Add component</button></div>
