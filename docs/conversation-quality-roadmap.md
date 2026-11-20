@@ -3,6 +3,9 @@
 Six ordered PRs improve existing boundaries rather than replace the commerce
 engine. They must stay unmerged until their individual and combined checks pass.
 
+The stack was merged as PRs #97–#102. Follow-up production QA and regression repair
+are documented in [mixed-purchase-faq-repair.md](mixed-purchase-faq-repair.md).
+
 1. **WC-082: real-pipeline journey gates.** Shared test assertions exercise the
    recorder, classification, routing, persisted order and visible response across
    complete turns. External classifier and rewriting are explicitly stubbed; later

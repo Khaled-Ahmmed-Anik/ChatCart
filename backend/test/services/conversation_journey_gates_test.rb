@@ -57,4 +57,46 @@ class ConversationJourneyGatesTest < ActiveSupport::TestCase
       { say: "2 pieces", order: { product_id: @buds.id, quantity: 2 } }
     ])
   end
+
+  test "conjoined English and Banglish FAQs are not additional cart items" do
+    @buds.update!(description: "Battery playback up to 7 hours. ANC is supported.")
+    [
+      "I will take Hoco EQ34 Plus. How long does the battery last, and does it have ANC?",
+      "Hoco EQ34 Plus nibo. Battery koto khon chole ar ANC ache?"
+    ].each do |phrase|
+      results = assert_conversation_journey(business: @business, steps: [
+        { say: "earbuds under 800 taka", order: { product_id: nil } },
+        { say: phrase, includes: [ "7 hours", "ANC" ], excludes: [ "unknown item" ],
+          order: { product_id: @buds.id, quantity: nil, status: "collecting_quantity" } },
+        { say: "Two pieces.", order: { product_id: @buds.id, quantity: 2, status: "collecting_name" } },
+        { say: "cancel", order: { status: "cancelled" } }
+      ])
+      assert_nil results[1].conversation.reload.conversation_state["cart_repair"]
+    end
+  end
+
+  test "explicit quantity and conjoined facts keep a single product order" do
+    @buds.update!(description: "Battery playback up to 7 hours. ANC is supported.")
+    assert_conversation_journey(business: @business, steps: [
+      { say: "Hoco EQ34 Plus 2 pieces nibo and does it have ANC?", includes: [ "ANC" ],
+        order: { product_id: @buds.id, quantity: 2, status: "collecting_name" } }
+    ])
+  end
+
+  test "unknown purchases remain unresolved even when followed by a FAQ" do
+    results = assert_conversation_journey(business: @business, steps: [
+      { say: "I will take Hoco EQ34 Plus and Moon Mist 2 pieces. Does it have ANC?",
+        includes: [ "unknown item" ], order: { product_id: nil, quantity: nil } }
+    ])
+    assert results.last.conversation.reload.conversation_state.dig("cart_repair", "unknown")
+  end
+
+  test "genuine two product carts still retain both quantities alongside questions" do
+    results = assert_conversation_journey(business: @business, steps: [
+      { say: "Anker Nano 45W 1 piece and Hoco EQ34 Plus 2 pieces nibo and does it have ANC?" }
+    ])
+    items = results.last.pending_order.reload.line_items.to_h { |item| [ item.product_id, item.quantity ] }
+    assert_equal({ @charger.id => 1, @buds.id => 2 }, items)
+    assert_nil results.last.conversation.reload.conversation_state["cart_repair"]
+  end
 end
