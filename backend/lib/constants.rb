@@ -60,7 +60,7 @@ module Constants
       allergens: { question: /\b(?:allergens?|allergy|nuts?|gluten)\b/i, evidence: /allergens?|allergy|nuts?|gluten|cross.contamin/i }
     }.freeze
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
-    PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etar|eita|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
+    PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etai|etar|eita|eitai|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
     OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
     PURCHASE_REFERENCE_ACCEPTANCE = /\A(?:(?:eta|eita|etai|eitai|ei|ai|oita|oitai)(?:\s+product)?(?:\s+tai?)?(?:\s+i)?\s+(?:nibo|nite chai)|(?:i\s+)?(?:want|will take|would like)\s+(?:this|that)(?:\s+(?:one|product))?|(?:this|that)(?:\s+one)?\s+please)\z/i
     PURCHASE_ACKNOWLEDGEMENT = /\A(?:g|ji|jee|yes|yeah|ha|haa|hya|হ্যাঁ|জি)\z/i
@@ -182,11 +182,15 @@ module Constants
       order: /\b(?:order|refund|return)\b|অর্ডার|ফেরত/i
     }.freeze
     BANGLISH_WORDS = {
+      "dalivery" => "delivery", "delivary" => "delivery", "delivry" => "delivery",
+      "chage" => "charge", "chrage" => "charge",
       "oitai" => "oita", "eitar" => "etar", "eigula" => "egula", "eigulo" => "egula",
       "agerta" => "ager ta", "agereta" => "ager ta", "kotoo" => "koto",
       "kotho" => "koto", "daam" => "dam", "damm" => "dam",
       "niboo" => "nibo", "nimu" => "nibo", "diben" => "den"
     }.freeze
+    CONTEXTUAL_ACKNOWLEDGEMENT = /\A(?:hae?\s+)*(?:eitai|etai|eita|eta|oita|oitai)(?:\s+to)?\z/i
+    ORDER_CONTINUATION_REQUEST = /\b(?:how (?:can|do) i (?:order|buy)|kivabe order korbo|order kivabe korbo)\b/i
     INITIAL_CATALOG_LIMIT = 6
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,

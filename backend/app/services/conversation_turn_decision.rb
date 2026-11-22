@@ -18,6 +18,22 @@ class ConversationTurnDecision
     if request.purchase_declined? && order.product.present? && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:pause, :order_paused)
     end
+    # Policy questions take precedence over product facts and confirmation. A
+    # mixed purchase command still goes through the cart's validated action plan.
+    policies = ConversationActionPlanner.policy_information_outcomes(text)
+    if policies.any? && !text.match?(Constants::Conversation::CART_MUTATION_CUE) &&
+        !text.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
+      return decision(:answer, policies.first)
+    end
+    if ConversationTextNormalizer.call(text).match?(Constants::Conversation::CONTEXTUAL_ACKNOWLEDGEMENT) && (reference.product || order.product)
+      return decision(:answer, :product_details_requested, reference.product || order.product)
+    end
+    if text.match?(Constants::Conversation::ORDER_CONTINUATION_REQUEST)
+      if order.status.in?(%w[collecting_product collecting_quantity collecting_variant]) && (order.product || reference.product)
+        return decision(:select, :product_selected, order.product || reference.product)
+      end
+      return decision(:answer, :help) if order.product.present? || order.line_items.any?
+    end
     return decision(:answer, :confirmation_deferred) if request.browsing_only?
     return decision(:answer, :device_preference_requested) if text.match?(Constants::Catalogue::DEVICE_RECALL)
     return decision(:answer, :product_comparison_requested) if request.comparison? && reference.offered_products.any?
