@@ -73,6 +73,7 @@ Detailed implementation documentation:
 - [Conversation system](docs/conversation-system.md) — webhook flow, intent handling, memory, guided sales, checkout, recovery, delivery, and diagnostics.
 - [Conversation reliability contract](docs/conversation-reliability.md) — production regression cases, non-destructive carts and acceptance criteria.
 - [Reliability release checklist](docs/conversation-reliability-release-checklist.md) — 100 scripted journeys, verified evidence, recovery diagnostics and pending live gates.
+- [Independent acceptance repairs](docs/independent-acceptance-repair.md) — fresh-test failures, multilingual cart safety, multi-question answers and the limits of regression results.
 - [Structured conversation planner](docs/structured-conversation-planner.md) — safe model tools, grounded natural replies, quality metrics, and staged rollout.
 - [Interactive architecture diagrams](docs/architecture-diagrams.md) — production topology, conversation/order lifecycle, and intent/context resolution.
 - [Tenant-scoped knowledge retrieval](docs/knowledge-retrieval.md) — product/policy indexing, lexical retrieval, citations, and the hybrid RAG boundary.
