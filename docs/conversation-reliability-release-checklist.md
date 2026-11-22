@@ -65,7 +65,8 @@ adding customer data to logs. They do not weaken any existing guard.
 
 ## Recorded development evidence — 23 November 2026 (Bangladesh)
 
-- Combined local suite: **842 tests, 5,796 assertions, zero failures/errors**,
+- Combined local suite after all fixes and dependency patches: **843 tests,
+  5,804 assertions, zero failures/errors**,
   with only `photo_image_normalizer_test.rb` and
   `public_product_image_fetcher_test.rb` excluded because local libvips is absent.
 - The 100-journey matrix is included in that combined run, including repeat
@@ -73,6 +74,8 @@ adding customer data to logs. They do not weaken any existing guard.
   tests passed 102 tests / 1,550 assertions before the repeat-confirmation
   assertions were added; use the combined result as the final local evidence.
 - RuboCop: **323 files**, no offenses.
+- Brakeman 8.1.1: zero warnings. Refreshed dependency advisory audit: no
+  vulnerabilities found after the GraphQL and net-ssh patch updates.
 - Local runtime: installed Ruby 3.4.7; the PR stack updates the required CI and
   Docker runtime to security-patched **3.4.13**. Verify the latest hosted run on
   3.4.13 independently; do not infer that from the local result.
