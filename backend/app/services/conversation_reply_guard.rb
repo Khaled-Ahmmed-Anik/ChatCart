@@ -12,15 +12,21 @@ class ConversationReplyGuard
   end
 
   def valid?
-    candidate.present? &&
-      candidate.length <= MAX_REPLY_LENGTH &&
-      preserves_required_facts? &&
-      uses_only_approved_prices? &&
-      uses_only_approved_products? &&
-      uses_only_approved_claims? &&
-      preserves_limitations? &&
-      preserves_required_question? &&
-      not_a_recent_duplicate?
+    rejection_reason.nil?
+  end
+
+  def rejection_reason
+    return "empty_reply" if candidate.blank?
+    return "reply_too_long" if candidate.length > MAX_REPLY_LENGTH
+    return "required_fact_missing" unless preserves_required_facts?
+    return "unapproved_price" unless uses_only_approved_prices?
+    return "unapproved_product" unless uses_only_approved_products?
+    return "unapproved_claim" unless uses_only_approved_claims?
+    return "limitation_missing" unless preserves_limitations?
+    return "wrong_follow_up_question" unless preserves_required_question?
+    return "recent_duplicate" unless not_a_recent_duplicate?
+
+    nil
   end
 
   private
