@@ -15,6 +15,9 @@ class ConversationTurnDecision
     if text.match?(Constants::Conversation::EXPLICIT_CANCELLATION) && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:cancel, :cancelled)
     end
+    if text.match?(Constants::Conversation::CART_REMOVAL) && !text.match?(/\b(?:shortlist|saved options)\b/i) && order.line_items.any?
+      return decision(:commerce, nil)
+    end
     if request.purchase_declined? && order.product.present? && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:pause, :order_paused)
     end

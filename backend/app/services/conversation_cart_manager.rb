@@ -9,6 +9,7 @@ class ConversationCartManager
 
   def call
     return if ConversationTurnRequest.new(message.content).information_only?
+    return if text.match?(Constants::Conversation::CART_ACTION_NEGATION)
     return clarification(translation("positive_quantity")) if message.content.to_s.tr("০১২৩৪৫৬৭৮৯", "0123456789").match?(/(?:\A|\s)-\s*\d/)
     if (correction = text.match(Constants::Conversation::CART_SHORT_CORRECTION))
       products = order.line_items.map(&:product).uniq.select do |product|
@@ -27,7 +28,7 @@ class ConversationCartManager
     awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
     named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY) && !addition
     item_update = matches.any? && text.match?(Constants::Conversation::CART_ITEM_UPDATE) && !addition
-    command = replacement_request? || addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
+    command = replacement_request? || addition || awaiting_addition || named_quantity || item_update || text.match?(Constants::Conversation::CART_REMOVAL) || text.match?(/\A(?:change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
     quantity = ConversationQuantityParser.call(text, products: matches.map { |match| match[:product] })
@@ -38,7 +39,7 @@ class ConversationCartManager
     return if matches.any? do |match|
       text[match[:finish]..].to_s.match?(/\A\s+(?:na|not)\b/)
     end
-    return if command && matches.empty? && !addition && !text.match?(/\A(?:remove|delete|drop)\b/)
+    return if command && matches.empty? && !addition && !text.match?(Constants::Conversation::CART_REMOVAL)
     return if text.match?(/\A(?:change|update)\b/) && order.pending_order_items.none?
     return Result.new(outcome: :cart_locked, question: nil) if order.confirmed? || order.submitted_to_woocommerce?
     if matches.empty?
@@ -51,7 +52,7 @@ class ConversationCartManager
       store_repair(plans, replace_cart: replacement_request?, unknown: true)
       return clarification(translation("unknown"))
     end
-    if text.match?(/\A(?:remove|delete|drop)\b|\b(?:bad den|bad din)\b/)
+    if text.match?(Constants::Conversation::CART_REMOVAL)
       return remove(text.match?(/\b(?:keep|thak)\b/) ? matches.first(1) : matches)
     end
     return update_item(matches.first) if item_update || named_quantity
@@ -169,8 +170,7 @@ class ConversationCartManager
     matches = products.flat_map do |product|
       names = product.searchable_names.flat_map { |name| [ name, name.sub(/\Athe\s+/i, "") ] }.uniq
       names.filter_map do |name|
-        label = ConversationTextNormalizer.call(name)
-        text.to_enum(:scan, /(?:\A|\s)(#{Regexp.escape(label)})(?=\z|\s)/).map do
+        text.to_enum(:scan, CatalogueProductMention.pattern(name)).map do
           match = Regexp.last_match
           { product: product, start: match.begin(1), finish: match.end(1) }
         end

@@ -114,7 +114,7 @@ module Constants
   end
 
   module Conversation
-    CART_CONJUNCTION = /\b(?:and|ar|ebong)\b/i
+    CART_CONJUNCTION = /\b(?:and|ar|ebong|আর|এবং|ও)\b/i
     PURCHASE_DECLINED = /\b(?:nibo na|nite chai na|kinbo na|chai na|do not (?:want|buy|order|take)|don t (?:want|buy|order|take)|not buying|not ordering|will not (?:buy|take|order))\b|নিবো না|নেব না|কিনব না/i
     CHECKOUT_PROGRESS_OUTCOMES = %i[product_selected variant_selected quantity_collected multiple_details_collected cart_updated].freeze
     REPLY_QUESTION_CUES = {
@@ -148,11 +148,13 @@ module Constants
     CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i
     ENGINE_VERSION = "2026.10.7"
-    CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)/i
+    CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)|সব মিলিয়ে.*কত/i
     CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|ekhon cart e ki ki ache|what is in (?:my |the )?cart(?: now)?)[?.! ]*\z/i
-    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den)\b/i
+    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den|করুন|করেন)\b/i
+    CART_REMOVAL = /\b(?:remove|delete|drop|bad den|bad din|বাদ দিন|বাদ দেন|সরিয়ে দিন)\b/i
+    CART_ACTION_NEGATION = /\b(?:do not|don t|nibo na|chai na)\b|(?:নেব|নিবো|চাই|করবেন|করুন)\s+না(?:\s|\z)/i
     CART_MUTATION_CUE = /\b(?:add|remove|delete|drop|change|update|den|nibo|give|take)\b/i
-    CART_ADDITION = /\b(?:add|include|adding|another|aro)\b|\br o\b/i
+    CART_ADDITION = /\b(?:add|include|adding|another|aro|যোগ করুন|যোগ করেন)\b|\br o\b/i
     CART_REPLACEMENT = /\b(?:replace (?:my |the )?cart|replace (?:my |the )?order items|cart replace)\b/i
     CART_NAMED_QUANTITY = /\b(?:one|two|three|ekta|duita|\d+)\s+(?:koren|korun|করেন|করুন)\z/i
     CART_DISCARD_UNKNOWN = /\b(?:bad|remove|ignore|drop)\b.*\b(?:shudhu|only)\b/i

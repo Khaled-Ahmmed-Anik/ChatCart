@@ -67,7 +67,7 @@ class ConversationActionPlanner
     normalized = content.downcase
     matches = business.products.available_for_sale.select do |product|
       product.searchable_names.any? do |name|
-        normalized.match?(/(?:\A|\s)#{Regexp.escape(ConversationTextNormalizer.call(name))}(?:\z|\s)/)
+        normalized.match?(CatalogueProductMention.pattern(name))
       end
     end
     matches.reject! do |product|
