@@ -881,11 +881,7 @@ class BotReplyGenerator
     information = if kind == :price
       if product.product_variants.any?
         variants = product.available_variants.to_a
-        requested = variants.find do |variant|
-          [ variant.display_name, variant.size, variant.name ].compact.any? do |label|
-            customer_message&.content.to_s.downcase.gsub(/\s+/, "").include?(label.downcase.gsub(/\s+/, ""))
-          end
-        end
+        requested = CatalogueOptionResolver.call(product: product, text: customer_message&.content.to_s)
         selected = requested.present? ? [ requested ] : variants
         selected.map { |variant| "#{variant.display_name}: #{formatted_price(variant.price)}" }.to_sentence
       else

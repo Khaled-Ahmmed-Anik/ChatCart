@@ -16,6 +16,10 @@ class ConversationTurnDecision
       return decision(:cancel, :cancelled)
     end
     normalized = ConversationTextNormalizer.call(text)
+    if request.hypothetical?
+      quote = CataloguePriceQuote.new(conversation: order.conversation, text: text).content
+      return decision(:answer, quote.present? ? :catalogue_quote_requested : :confirmation_deferred)
+    end
     if normalized.match?(Constants::Conversation::CART_ACTION_NEGATION) &&
         [ Constants::Conversation::CART_ADDITION, Constants::Conversation::CART_REMOVAL,
           Constants::Conversation::CART_ITEM_UPDATE ].any? { |pattern| normalized.match?(pattern) }

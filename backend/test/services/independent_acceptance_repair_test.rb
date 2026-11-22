@@ -150,6 +150,55 @@ class IndependentAcceptanceRepairTest < ActiveSupport::TestCase
     assert_equal 1, @business.orders.count
   end
 
+  test "hypothetical purchases quote without changing any checkout details" do
+    [ "What if I buy three earbuds instead?", "jodi earbuds tinta nibo?", "যদি ইয়ারবাড ৩টা নিই?" ].each do |question|
+      @customer = SecureRandom.uuid
+      order = record("add earbuds 1 piece and charger 1 piece").pending_order
+      before = order.reload.attributes
+      result = record(question)
+      assert_equal({ @buds.id => 1, @charger.id => 1 }, quantities(order))
+      assert_equal before, order.reload.attributes
+      assert_equal 0, @business.orders.count
+      assert_includes result.bot_reply.content, "2187"
+    end
+  end
+
+  test "explicit set quantity after a side question changes only the named item" do
+    order = record("add earbuds 1 piece and charger 1 piece").pending_order
+    record("How much is shipping?")
+    record("Set charger quantity to 2")
+    assert_equal({ @buds.id => 1, @charger.id => 2 }, quantities(order))
+    record("Do not set charger quantity to 3")
+    assert_equal({ @buds.id => 1, @charger.id => 2 }, quantities(order))
+  end
+
+  test "general price inquiries cannot find a size inside another word" do
+    @shirt.update!(aliases: [ "shirt" ])
+    order = record("add earbuds 1 piece and charger 1 piece").pending_order
+    result = record("shirt er dam koto bhai?")
+    assert_includes result.bot_reply.content, "550"
+    assert_includes result.bot_reply.content, "600"
+    assert_equal({ @buds.id => 1, @charger.id => 1 }, quantities(order))
+    result = record("shirt Blue L price?")
+    assert_includes result.bot_reply.content, "550"
+    assert_not_includes result.bot_reply.content, "600"
+  end
+
+  test "early policy routing answers return and delivery questions together" do
+    @business.policy.update!(return_policy: "Returns within 7 days")
+    [ "Can I return it and how long will delivery take?",
+      "return kora jabe ar delivery kobe pabo?",
+      "ফেরত দেওয়া যাবে আর ডেলিভারি কতদিন লাগবে?" ].each do |question|
+      @customer = SecureRandom.uuid
+      order = record("earbuds 1 piece den").pending_order
+      result = record(question)
+      assert_includes result.bot_reply.content, "7 days"
+      assert_includes result.bot_reply.content, "2–3 days"
+      assert_equal({ @buds.id => 1 }, quantities(order))
+      assert_equal 0, @business.orders.count
+    end
+  end
+
   private
 
   def quantities(order)

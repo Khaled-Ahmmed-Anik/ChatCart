@@ -7,7 +7,7 @@ class ConversationActionPlanner
   end
 
   INFORMATIONAL_PATTERNS = {
-    return_policy_requested: /\breturn policy\b|রিটার্ন পলিসি/i,
+    return_policy_requested: /\breturn (?:policy|kora|it|this|the|an?|products?)\b|\bcan i return\b|রিটার্ন পলিসি|ফেরত.*(?:দেওয়া|দেয়া|দিতে|যাবে)/i,
     delivery_area_requested: /\b(?:deliver to|delivery areas?|shipping areas?)\b|\b(?:Sylhet|Dhaka|Chattogram)\s+delivery\s+hobe\b/i,
     delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho|included|free)|how much.*(?:delivery|shipping)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
     delivery_time_requested: /\b(delivery|shipping)\s*(time|when|kobe)|(?:delivery|shipping|parcel).*?(?:koto din|koy din|how many days|take)|how long.*(?:delivery|shipping)|ডেলিভারি.*কত\s*দিন|কবে\s*(পাব|আসবে)/i,

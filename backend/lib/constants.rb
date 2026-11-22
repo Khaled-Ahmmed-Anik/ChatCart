@@ -154,7 +154,8 @@ module Constants
     CART_LOCALES = { "en" => "cart", "banglish" => "cart_banglish", "bn" => "cart_bn" }.freeze
     CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)|সব মিলিয়ে.*কত/i
     CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|ekhon cart e ki ki ache|what is in (?:my |the )?cart(?: now)?)[?.! ]*\z/i
-    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den|করুন|করেন|করবেন)\b/i
+    HYPOTHETICAL_PURCHASE = /\b(?:what if|suppose|supposing|if i (?:buy|take|order)|jodi|dhori)\b|যদি|ধরুন/i
+    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update|set)\b|\b(?:koren|korun|kore den|করুন|করেন|করবেন)\b/i
     CART_REMOVAL = /\b(?:remove|delete|drop|bad den|bad din|বাদ দিন|বাদ দেন|বাদ দেবেন|সরিয়ে দিন)\b/i
     CART_ACTION_NEGATION = /\b(?:do not|don t|nibo na|chai na)\b|(?:নেব|নিবো|চাই|করবেন|করুন|দেবেন)\s+না(?:\s|\z)/i
     ORDINAL_PURCHASE = /\b(?:take|buy|nibo|nite chai)\b|নেব|নিবো/i

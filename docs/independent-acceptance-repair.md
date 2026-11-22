@@ -38,7 +38,7 @@ The initial results were preserved separately from repair reruns.
 
 ## Regression coverage and release boundary
 
-`backend/test/services/independent_acceptance_repair_test.rb` adds 16 focused
+`backend/test/services/independent_acceptance_repair_test.rb` adds 20 focused
 regressions, including negative commands, unknown additions, multi-product
 ambiguity, quantity-first syntax, privacy and localized checkout. The full
 existing suite, including the 100-journey development matrix, must remain green.
@@ -52,3 +52,20 @@ controlled; translating prompts does not authorize inventing or rewriting facts.
 This PR stacks on WC-095 (#110). No migration, new environment variable, live
 database write, model training, or production deployment is required to test it.
 Do not merge or deploy solely because the known acceptance cases now pass.
+
+## Follow-up acceptance repair
+
+A separate 12-case, 32-turn exercise initially passed 7/12 cases. It exposed
+hypothetical purchase questions mutating the cart, an unrecognized “set quantity”
+command, unrecognized return-policy phrasing, and variant sizes matching
+substrings inside ordinary words (for example, `M` inside `dam`).
+
+The follow-up routes hypothetical requests to read-only quotes (or clarification
+when no quote is possible), recognizes explicit quantity-setting commands,
+recognizes return-policy questions in all three languages so existing secondary
+answer composition includes them, and reuses the shared token-aware option
+resolver for price inquiries, including compact volume labels. Regression checks cover
+these behaviors and verify that negated updates remain read-only.
+
+The unchanged follow-up cases now pass 12/12 locally with Gemini unavailable.
+They are now regression cases, not an unseen measure of general accuracy.
