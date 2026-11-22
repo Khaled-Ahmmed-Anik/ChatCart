@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Ruby 3.4.7 has prebuilt binaries for 24.04, but not the newer ubuntu-latest image.
+  # Keep Ruby CI and release on the same deliberately selected runner image.
   scan_ruby:
     runs-on: ubuntu-24.04
     defaults:
