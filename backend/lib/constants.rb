@@ -194,6 +194,11 @@ module Constants
     CONTEXTUAL_ACKNOWLEDGEMENT = /\A(?:hae?\s+)*(?:eitai|etai|eita|eta|oita|oitai)(?:\s+to)?\z/i
     ORDER_CONTINUATION_REQUEST = /\b(?:how (?:can|do) i (?:order|buy)|kivabe order korbo|order kivabe korbo)\b/i
     INITIAL_CATALOG_LIMIT = 6
+    INQUIRY_STOP_WORDS = %w[
+      the a an this that one product price cost stock available availability
+      have do you is it how much what please tar ta ti er ase ache koto dam ki
+      আছে কত দাম কি
+    ].freeze
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
       "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,

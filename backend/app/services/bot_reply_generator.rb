@@ -853,6 +853,15 @@ class BotReplyGenerator
   end
 
   def product_information(kind)
+    scoped = CatalogueInquiryScope.new(business: pending_order.conversation.business,
+      text: customer_message&.content.to_s).products
+    if scoped.any? && !ProductResolutionService.new(business: pending_order.conversation.business,
+        query: customer_message&.content.to_s).resolve.matched?
+      visible = scoped.first(Constants::Conversation::INITIAL_CATALOG_LIMIT)
+      remember_options!(:products, visible)
+      return [ experience_translation("inquiry_matches"), *product_catalog_lines(visible),
+        experience_translation("choose_match") ].join("\n")
+    end
     product = contextual_product
     return product_selection_prompt if product.blank?
 
