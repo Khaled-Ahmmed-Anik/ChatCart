@@ -173,14 +173,16 @@ class AiConversationAssistant
   end
 
   def safe_reply?(candidate, fallback)
-    ConversationReplyGuard.new(
+    guard = ConversationReplyGuard.new(
       candidate: candidate,
       fallback: fallback,
       pending_order: pending_order,
       response_plan: response_plan,
       tool_evidence: @tool_evidence,
       recent_replies: recent_bot_replies
-    ).valid?
+    )
+    telemetry["guardrail_reason"] = guard.rejection_reason
+    telemetry["guardrail_reason"].nil?
   end
 
   def log_fallback(error)
