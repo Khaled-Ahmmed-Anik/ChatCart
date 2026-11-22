@@ -25,12 +25,14 @@ class ConversationTurnDecision
         !text.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
       return decision(:answer, policies.first)
     end
-    if ConversationTextNormalizer.call(text).match?(Constants::Conversation::CONTEXTUAL_ACKNOWLEDGEMENT) && reference.product
-      return decision(:answer, :product_details_requested, reference.product)
+    if ConversationTextNormalizer.call(text).match?(Constants::Conversation::CONTEXTUAL_ACKNOWLEDGEMENT) && (reference.product || order.product)
+      return decision(:answer, :product_details_requested, reference.product || order.product)
     end
-    if text.match?(Constants::Conversation::ORDER_CONTINUATION_REQUEST) &&
-        order.status.in?(%w[collecting_product collecting_quantity collecting_variant]) && reference.product
-      return decision(:select, :product_selected, reference.product)
+    if text.match?(Constants::Conversation::ORDER_CONTINUATION_REQUEST)
+      if order.status.in?(%w[collecting_product collecting_quantity collecting_variant]) && (order.product || reference.product)
+        return decision(:select, :product_selected, order.product || reference.product)
+      end
+      return decision(:answer, :help) if order.product.present? || order.line_items.any?
     end
     return decision(:answer, :confirmation_deferred) if request.browsing_only?
     return decision(:answer, :device_preference_requested) if text.match?(Constants::Catalogue::DEVICE_RECALL)
