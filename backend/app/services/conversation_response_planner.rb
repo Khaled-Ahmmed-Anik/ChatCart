@@ -80,8 +80,9 @@ class ConversationResponsePlanner
   end
 
   def combined_reply
+    catalogue_reply = catalogue_question_answers
     if outcome.in?(Constants::Conversation::FOCUSED_OUTCOMES)
-      return [ checkout_catalogue_answers, base_reply ].compact.uniq.join("\n\n")
+      return [ catalogue_reply, base_reply ].compact.uniq.join("\n\n")
     end
 
     replies = secondary_outcomes.map do |secondary_outcome|
@@ -93,8 +94,8 @@ class ConversationResponsePlanner
         address_preference: address_preference,
         include_follow_up: false
       ).content
-    end + [ checkout_catalogue_answers, base_reply ]
-    if customer_message.content.match?(/\bwarranty\b/i) && outcome == :return_policy_requested
+    end + [ catalogue_reply, base_reply ]
+    if catalogue_reply.blank? && customer_message.content.match?(/\bwarranty\b/i) && outcome == :return_policy_requested
       locale = preferred_language(conversation.conversation_state.to_h) == "banglish" ? "banglish" : "en"
       replies << I18n.t("catalogue_answers.#{locale}.unknown",
         topic: I18n.t("catalogue_answers.#{locale}.topics.warranty"))
@@ -102,12 +103,24 @@ class ConversationResponsePlanner
     replies.compact.map(&:strip).reject(&:blank?).uniq.join("\n\n")
   end
 
-  def checkout_catalogue_answers
-    return unless outcome.in?(Constants::Conversation::CHECKOUT_PROGRESS_OUTCOMES)
-    return unless pending_order.product && pending_order.line_items.size <= 1
+  def catalogue_question_answers
+    policy_outcomes = ConversationActionPlanner::INFORMATIONAL_PATTERNS.keys - %i[stock_inquiry price_inquiry]
+    return unless outcome.in?(Constants::Conversation::CHECKOUT_PROGRESS_OUTCOMES + policy_outcomes)
+    language = preferred_language(conversation.conversation_state.to_h)
+    return unless CatalogueQuestionAnswerer.new(product: nil, text: customer_message.content, language: language).requested?
 
-    CatalogueQuestionAnswerer.new(product: pending_order.product, text: customer_message.content,
-      language: preferred_language(conversation.conversation_state.to_h)).content
+    explicit = ProductResolutionService.new(business: conversation.business, query: customer_message.content).resolve
+    products = pending_order.line_items.map(&:product).uniq
+    product = explicit.product if explicit.matched?
+    product ||= products.first if products.one?
+    product ||= pending_order.product if products.empty?
+    if product.blank? && products.many?
+      locale = ConversationLanguagePreference.locale(language)
+      return I18n.t("conversation_experience.#{locale}.question_product", products: products.map(&:name).join(", "))
+    end
+    return unless product
+
+    CatalogueQuestionAnswerer.new(product: product, text: customer_message.content, language: language).content
   end
 
   def focused_clarification
@@ -127,6 +140,9 @@ class ConversationResponsePlanner
 
   def pending_prompt
     return if order_context_paused?
+    if ConversationLanguagePreference.locale(preferred_language(conversation.conversation_state.to_h)) == "bn"
+      return BotReplyGenerator.new(pending_order: pending_order, customer_message: customer_message).content
+    end
     return banglish_pending_prompt if preferred_language(conversation.conversation_state.to_h) == "banglish"
 
     case pending_order.status
@@ -149,6 +165,9 @@ class ConversationResponsePlanner
 
   def continuation_prompt
     return if order_context_paused?
+    if ConversationLanguagePreference.locale(preferred_language(conversation.conversation_state.to_h)) == "bn"
+      return I18n.t("conversation_experience.bn.continue_order", prompt: pending_prompt)
+    end
     if conversation.conversation_state.to_h["context_switch_count"].to_i.positive? && selected_item.present?
       return "Apnar #{selected_item} selection-ta save ache. Eta niye continue korben, change korben, naki ekhon pause rakhben?" if
         preferred_language(conversation.conversation_state.to_h) == "banglish"

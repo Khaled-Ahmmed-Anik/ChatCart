@@ -158,22 +158,25 @@ class BotReplyGenerator
       key = selected_stock.to_i.positive? ? "stock_limit" : "out_of_stock"
       I18n.t("reply_quality.#{banglish? ? 'banglish' : 'en'}.#{key}", stock: selected_stock)
     when :quantity_collected
+      return experience_translation("selection_saved", prompt: status_prompt) if repair_language == "bn"
       "Perfect—#{pending_order.quantity} #{bottle_word(pending_order.quantity)}. What name should I put on the order?"
     when :name_collected
+      return experience_translation("name_saved", name: pending_order.customer_name, prompt: status_prompt) unless repair_language == "en"
       "Thanks, #{pending_order.customer_name}! What phone number should we use for the delivery?"
     when :name_required
-      I18n.t("conversation_safety.#{banglish? ? 'banglish' : 'en'}.name_required")
+      I18n.t("conversation_safety.#{repair_language}.name_required")
     when :checkout_edit_requested
       field = pending_order.conversation.conversation_state.to_h.dig("checkout_edit", "field")
       I18n.t("checkout_edit.#{banglish? ? 'banglish' : 'en'}.#{field}")
     when :invalid_phone
       invalid_phone_reply
     when :phone_collected
+      return experience_translation("selection_saved", prompt: status_prompt) unless repair_language == "en"
       "Got it. What’s the full delivery address?"
     when :address_collected
       confirmation_prompt
     when :multiple_details_collected
-      banglish? ? "Thik ache—selection save korechi. #{status_prompt}" : "Got it. #{status_prompt}"
+      experience_translation("selection_saved", prompt: status_prompt)
     when :confirmation_unclear
       experience_translation("confirmation_help")
     when :confirmation_deferred
@@ -202,6 +205,9 @@ class BotReplyGenerator
   end
 
   def status_prompt
+    if repair_language == "bn" && pending_order.status.in?(%w[collecting_product collecting_name collecting_phone collecting_address])
+      return missing_checkout_prompt
+    end
     return banglish_status_prompt if banglish?
 
     case pending_order.status
@@ -220,7 +226,7 @@ class BotReplyGenerator
     when "awaiting_confirmation"
       confirmation_prompt
     when "confirmed"
-      "Your order is already confirmed ✅"
+      experience_translation("already_confirmed")
     when "cancelled"
       "This order is cancelled. Send “new order” whenever you’d like to begin again."
     else
@@ -288,10 +294,7 @@ class BotReplyGenerator
   def repair_language
     language = ConversationLanguagePreference.choose(customer_message&.content.to_s,
       pending_order.conversation.conversation_state.to_h, interpretation: interpretation)
-    return "bn" if language.in?(%w[bangla bengali bn]) || customer_message&.content.to_s.match?(/[\u0980-\u09FF]/)
-    return "banglish" if language == "banglish"
-
-    "en"
+    ConversationLanguagePreference.locale(language)
   end
 
   def contextual_repair_reply
@@ -314,6 +317,9 @@ class BotReplyGenerator
 
     options = variants.map do |variant|
       "• #{variant.display_name}: #{formatted_price(variant.price)}"
+    end
+    if repair_language == "bn"
+      return [ experience_translation("choose_option"), *options, experience_translation("option_hint") ].join("\n")
     end
     prefix = "reply_quality.#{banglish? ? 'banglish' : 'en'}"
     ([ I18n.t("#{prefix}.choose_option"), *options, "", I18n.t("#{prefix}.option_hint") ]).join("\n")
@@ -345,16 +351,22 @@ class BotReplyGenerator
     variant.size.to_s[/\d+(?:\.\d+)?/]&.to_d || variant.position
   end
 
-  def confirmation_prompt
+  def confirmation_prompt(heading: experience_translation("summary"), request_confirmation: true)
     [
-      "Here’s your order summary:",
+      heading,
       *cart_lines,
       "• #{cart_translation('subtotal', amount: formatted_price(pending_order.total_price))}",
-      ("• Name: #{pending_order.customer_name}" if pending_order.customer_name.present?),
-      ("• Phone: #{pending_order.phone}" if pending_order.phone.present?),
-      ("• Address: #{pending_order.address}" if pending_order.address.present?),
+      ("• #{experience_translation('name')}: #{pending_order.customer_name}" if pending_order.customer_name.present?),
+      ("• #{experience_translation('phone')}: #{pending_order.phone}" if pending_order.phone.present?),
+      ("• #{experience_translation('address')}: #{pending_order.address}" if pending_order.address.present?),
       "",
-      pending_order.ready_for_confirmation? ? "Does everything look right? Reply “confirm” to place it or “cancel” to stop." : missing_checkout_prompt
+      if !request_confirmation
+        experience_translation("already_confirmed")
+      elsif pending_order.ready_for_confirmation?
+        experience_translation("review_confirmation")
+      else
+        missing_checkout_prompt
+      end
     ].compact.join("\n")
   end
 
@@ -366,7 +378,7 @@ class BotReplyGenerator
   end
 
   def cart_translation(key, **options)
-    I18n.t("#{banglish? ? 'cart_banglish' : 'cart'}.#{key}", locale: :en, **options)
+    I18n.t("#{ConversationLanguagePreference.cart_namespace(repair_language)}.#{key}", locale: :en, **options)
   end
 
   def missing_checkout_prompt
@@ -393,8 +405,9 @@ class BotReplyGenerator
   def order_details_reply
     return "You don’t have an order yet. #{product_selection_prompt}" if pending_order.product.blank?
 
-    heading = pending_order.confirmed? ? "Here are your confirmed order details:" : "Here are your current order details:"
-    confirmation_prompt.sub("Here’s your order summary:", heading)
+    confirmed = pending_order.confirmed? || pending_order.submitted_to_woocommerce?
+    heading = experience_translation(confirmed ? "confirmed_summary" : "draft_summary")
+    confirmation_prompt(heading: heading, request_confirmation: !confirmed)
   end
 
   def order_history_reply
@@ -868,11 +881,7 @@ class BotReplyGenerator
     information = if kind == :price
       if product.product_variants.any?
         variants = product.available_variants.to_a
-        requested = variants.find do |variant|
-          [ variant.display_name, variant.size, variant.name ].compact.any? do |label|
-            customer_message&.content.to_s.downcase.gsub(/\s+/, "").include?(label.downcase.gsub(/\s+/, ""))
-          end
-        end
+        requested = CatalogueOptionResolver.call(product: product, text: customer_message&.content.to_s)
         selected = requested.present? ? [ requested ] : variants
         selected.map { |variant| "#{variant.display_name}: #{formatted_price(variant.price)}" }.to_sentence
       else

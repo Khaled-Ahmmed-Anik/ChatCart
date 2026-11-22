@@ -71,7 +71,7 @@ class ProductResolutionService
     name_tokens = tokens(normalized_name)
     return 1.0 if query == normalized_name
     return 0.97 if compact(query) == compact(normalized_name)
-    return 0.94 if query.match?(/(?:\A|\s)#{Regexp.escape(normalized_name)}(?:\z|\s)/)
+    return 0.94 if query.match?(CatalogueProductMention.pattern(name))
     model_codes = normalized_name.scan(/\b[a-z]+\d+[a-z0-9]*\b/)
     return 0.91 if model_codes.any? { |code| query.match?(/\b#{Regexp.escape(code)}\b/) }
     return 0.9 if normalize(recent_product_name) == normalized_name && pronoun_reference?

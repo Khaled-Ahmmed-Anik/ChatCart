@@ -2,8 +2,10 @@ class CatalogueQuestionAnswerer
   def initialize(product:, text:, language: "english")
     @product = product
     @text = text.to_s
-    @locale = language.to_s.in?(%w[banglish bn]) ? language.to_s : "en"
+    @locale = ConversationLanguagePreference.locale(language)
   end
+
+  def requested? = topics.any?
 
   def content
     return if product.blank? || topics.empty?
@@ -51,7 +53,10 @@ class CatalogueQuestionAnswerer
   def topics
     @topics ||= Constants::Catalogue::QUESTION_TOPICS.select { |_topic, definition| text.match?(definition.fetch(:question)) }.tap do |selected|
       selected.delete(:package) if selected.key?(:cable) && !text.match?(/\b(?:package|box|contents|else)\b/i)
-      selected.delete(:package) if ConversationActionPlanner.policy_information_outcomes(text).include?(:delivery_charge_requested)
+      if ConversationActionPlanner.policy_information_outcomes(text).include?(:delivery_charge_requested)
+        selected.delete(:package)
+        selected.delete(:charging) unless text.match?(/\b(?:charging|watts?|battery)\b|চার্জিং|ওয়াট/i)
+      end
     end
   end
 

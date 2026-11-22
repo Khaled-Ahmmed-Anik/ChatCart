@@ -14,7 +14,7 @@ class CatalogueOptionResolver
   end
 
   def self.normalize(text)
-    ConversationTextNormalizer.call(text).gsub(/\bmedium\b/, "m")
+    ConversationTextNormalizer.call(text).gsub(/(\d)\s*(ml|মিলি)(?=\s|\z)/i, '\1 \2').gsub(/\bmedium\b/, "m")
       .gsub(/\bsmall\b/, "s").gsub(/\blarge\b/, "l")
       .gsub(/\b(?:metres?|meters?)\b/, "metre").squish
   end

@@ -15,6 +15,19 @@ class ConversationTurnDecision
     if text.match?(Constants::Conversation::EXPLICIT_CANCELLATION) && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:cancel, :cancelled)
     end
+    normalized = ConversationTextNormalizer.call(text)
+    if request.hypothetical?
+      quote = CataloguePriceQuote.new(conversation: order.conversation, text: text).content
+      return decision(:answer, quote.present? ? :catalogue_quote_requested : :confirmation_deferred)
+    end
+    if normalized.match?(Constants::Conversation::CART_ACTION_NEGATION) &&
+        [ Constants::Conversation::CART_ADDITION, Constants::Conversation::CART_REMOVAL,
+          Constants::Conversation::CART_ITEM_UPDATE ].any? { |pattern| normalized.match?(pattern) }
+      return decision(:answer, :confirmation_deferred)
+    end
+    if text.match?(Constants::Conversation::CART_REMOVAL) && !text.match?(/\b(?:shortlist|saved options)\b/i) && order.line_items.any?
+      return decision(:commerce, nil)
+    end
     if request.purchase_declined? && order.product.present? && !order.confirmed? && !order.submitted_to_woocommerce?
       return decision(:pause, :order_paused)
     end
@@ -41,6 +54,11 @@ class ConversationTurnDecision
     position = reference.option_position
     if position && reference.offered_products.any? && position >= reference.offered_products.size
       return decision(:answer, :offered_reference_clarification)
+    end
+    if position && reference.product && order.collecting_product? && order.line_items.empty? &&
+        text.match?(Constants::Conversation::ORDINAL_PURCHASE) &&
+        !ConversationTextNormalizer.call(text).match?(Constants::Conversation::CART_ACTION_NEGATION)
+      return decision(:select, :product_selected, reference.product)
     end
     return decision(:answer, :catalogue_quote_requested) if quote?
     if text.match?(/\b(?:not that one|oita na)\b/i) && position && reference.product

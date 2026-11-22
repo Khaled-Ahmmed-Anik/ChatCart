@@ -154,7 +154,7 @@ class AiIntentClassifier
   end
 
   def sanitize(value)
-    value.to_s.gsub(/\+?\d[\d\s().-]{6,}\d/, "[PHONE]").first(500)
+    value.to_s.gsub(/\+?[0-9০-৯][0-9০-৯\s().-]{6,}[0-9০-৯]/, "[PHONE]").first(500)
   end
 
   def response_schema

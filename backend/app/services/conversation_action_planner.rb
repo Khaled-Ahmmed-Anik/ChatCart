@@ -7,11 +7,11 @@ class ConversationActionPlanner
   end
 
   INFORMATIONAL_PATTERNS = {
-    return_policy_requested: /\breturn policy\b|রিটার্ন পলিসি/i,
+    return_policy_requested: /\breturn (?:policy|kora|it|this|the|an?|products?)\b|\bcan i return\b|রিটার্ন পলিসি|ফেরত.*(?:দেওয়া|দেয়া|দিতে|যাবে)/i,
     delivery_area_requested: /\b(?:deliver to|delivery areas?|shipping areas?)\b|\b(?:Sylhet|Dhaka|Chattogram)\s+delivery\s+hobe\b/i,
     delivery_charge_requested: /\b(delivery|shipping)\s*(charge|cost|fee|koto|kotho|included|free)|how much.*(?:delivery|shipping)|delivery charge|ডেলিভারি\s*(চার্জ|খরচ)/i,
-    delivery_time_requested: /\b(delivery|shipping)\s*(time|when|kobe)|(?:delivery|shipping|parcel).*?(?:koto din|koy din|how many days)|ডেলিভারি.*কত\s*দিন|কবে\s*(পাব|আসবে)/i,
-    cash_on_delivery_requested: /\b(cod|cash on delivery|cash e|cash-e)\b|ক্যাশ\s*(অন\s*ডেলিভারি)?/i,
+    delivery_time_requested: /\b(delivery|shipping)\s*(time|when|kobe)|(?:delivery|shipping|parcel).*?(?:koto din|koy din|how many days|take)|how long.*(?:delivery|shipping)|ডেলিভারি.*কত\s*দিন|কবে\s*(পাব|আসবে)/i,
+    cash_on_delivery_requested: /\b(cod|cash on delivery|cash e|cash-e)\b|\bpay\b.*\b(?:when|after|once)\b.*\b(?:receive|arrives?|delivered)\b|ক্যাশ\s*(অন\s*ডেলিভারি)?|(?:পণ্য|হাতে).*পাওয়ার পর.*(?:টাকা|পেমেন্ট)/i,
     payment_methods_requested: /\b(payment|pay)\s*(method|option|kivabe|how)|bkash|nagad|(?:credit|debit)\s+card/i,
     stock_inquiry: /\b(stock|available|availability|ache|ase)\b|স্টক|আছে/i,
     price_inquiry: /\b(price|dam|product cost)\b|দাম/i
@@ -67,7 +67,7 @@ class ConversationActionPlanner
     normalized = content.downcase
     matches = business.products.available_for_sale.select do |product|
       product.searchable_names.any? do |name|
-        normalized.match?(/(?:\A|\s)#{Regexp.escape(ConversationTextNormalizer.call(name))}(?:\z|\s)/)
+        normalized.match?(CatalogueProductMention.pattern(name))
       end
     end
     matches.reject! do |product|
@@ -121,6 +121,7 @@ class ConversationActionPlanner
 
   def ordering_cue?
     return false if ConversationTurnRequest.new(content).information_only?
+    return false if content.match?(Constants::Conversation::CART_ACTION_NEGATION)
     return false if content.match?(/\b(?:don t|do not|not ready|later|pore|nibo na|chai na)\b/i)
     return false if interpretation&.needs_clarification
     return false if interpretation.present? && interpretation.intents.intersect?(%w[compare_products reject_recommendations defer_confirmation])

@@ -5,12 +5,17 @@ class ConversationTurnRequest
   end
 
   def information_only?
+    return true if hypothetical?
     question = text.match?(Constants::Conversation::PRODUCT_FACT_QUESTION) ||
       @question_mark && Constants::Catalogue::QUESTION_TOPICS.values.any? { |topic| text.match?(topic.fetch(:question)) }
     return false unless question
 
     !text.match?(Constants::Conversation::EXPLICIT_PURCHASE_ACTION) &&
       !text.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
+  end
+
+  def hypothetical?
+    text.match?(Constants::Conversation::HYPOTHETICAL_PURCHASE)
   end
 
   def browsing_only?
