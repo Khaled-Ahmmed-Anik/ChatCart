@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+require_relative "../lib/oracle_migration_preflight"
+
+errors = OracleMigrationPreflight.errors(ENV)
+if errors.any?
+  warn errors.join("\n")
+  exit 1
+end
+puts "Configuration checks passed. Existing key equality, database identity, ARM boot and worker processing still require verification."
