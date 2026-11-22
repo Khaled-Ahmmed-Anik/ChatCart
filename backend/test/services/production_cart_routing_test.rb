@@ -29,7 +29,7 @@ class ProductionCartRoutingTest < ActiveSupport::TestCase
   test "quantity-first shorthand list replaces draft items without clearing customer details" do
     draft = record("The Office 15 ML 5 pieces den").pending_order
     draft.update!(customer_name: "Test Customer", phone: "01700000000", address: "Test address", status: :awaiting_confirmation)
-    result = record("3 office 10 ml + 2 party 15 ml")
+    result = record("replace cart with 3 office 10 ml + 2 party 15 ml")
     assert_equal :cart_updated, result.outcome
     assert_equal 2150.to_d, result.pending_order.total_price
     assert_equal "Test Customer", result.pending_order.customer_name

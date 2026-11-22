@@ -23,9 +23,9 @@ class ConversationCartManager
     unresolved_addition = unresolved_addition?(final_tail)
     repaired = resume_repair(matches)
     return repaired if repaired
-    addition = text.match?(/\b(?:add|include|adding)\b|\b(?:aro|r o)\b.*\b(?:product|item)\b/) && !text.match?(/\b(?:not|don t|do not)\b/)
+    addition = text.match?(Constants::Conversation::CART_ADDITION) && !text.match?(/\b(?:not|don t|do not)\b/)
     awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
-    named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY)
+    named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY) && !addition
     item_update = matches.any? && text.match?(Constants::Conversation::CART_ITEM_UPDATE) && !addition
     command = addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
@@ -48,7 +48,7 @@ class ConversationCartManager
     end
     plans = build_plans(matches)
     if unresolved_addition
-      store_repair(plans, replace_cart: explicit_list && !command, unknown: true)
+      store_repair(plans, replace_cart: replacement_request?, unknown: true)
       return clarification(translation("unknown"))
     end
     if text.match?(/\A(?:remove|delete|drop)\b|\b(?:bad den|bad din)\b/)
@@ -62,18 +62,21 @@ class ConversationCartManager
 
     if plans.any? { |plan| plan[:quantity].blank? || (plan[:product].available_variants.any? && plan[:variant].blank?) }
       if plans.size > 1
-        store_repair(plans, replace_cart: explicit_list && !command)
+        store_repair(plans, replace_cart: replacement_request?)
         return repair_question(plans)
       end
       return start_addition(plans.first)
     end
-    replace_cart = explicit_list && !command
-    commit_plans(plans, replace_cart: replace_cart)
+    commit_plans(plans, replace_cart: replacement_request?)
   end
 
   private
 
   attr_reader :message, :order, :text
+
+  def replacement_request?
+    text.match?(Constants::Conversation::CART_REPLACEMENT)
+  end
 
   def unresolved_addition?(tail)
     tail.split(Constants::Conversation::CART_CONJUNCTION).drop(1).reject(&:blank?).any? do |clause|
@@ -178,7 +181,8 @@ class ConversationCartManager
         end
       end
     end
-    if matches.empty? && text.match?(/\A(?:remove|delete|drop|make|change|update)|\b(?:bad den|koren|kore den)\b/)
+    if matches.empty? && (text.match?(/\A(?:remove|delete|drop|make|change|update)|\b(?:bad den|koren|kore den)\b/) ||
+        text.match?(Constants::Conversation::CART_ADDITION))
       order.line_items.map(&:product).uniq.group_by(&:category).each do |category, items|
         next if category.blank? || items.size != 1
         if (match = text.match(/\b#{Regexp.escape(category.downcase)}\b/))
