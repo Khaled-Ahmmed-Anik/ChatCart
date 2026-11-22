@@ -44,6 +44,30 @@ class MultiProductReliabilityTest < ActiveSupport::TestCase
     assert_equal before, quantities(order)
   end
 
+  test "unknown products at the beginning or middle cannot partially change the cart" do
+    [ "add Mystery Device 1 piece and Hoco EQ34 Plus 2 pieces",
+      "add Hoco EQ34 Plus 2 pieces and Mystery Device 1 piece and Anker Nano Charger 1 piece" ].each do |text|
+      @customer = SecureRandom.uuid
+      order = record("Hoco E103 Tracker 1 piece den").pending_order
+      result = record(text)
+      assert_equal :cart_needs_details, result.outcome
+      assert_equal({ @tracker.id => 1 }, quantities(order))
+    end
+  end
+
+  test "a negative quantity must not become a positive addition during normalization" do
+    order = record("Hoco EQ34 Plus 2 pieces den").pending_order
+    result = record("add Hoco EQ34 Plus -2 pieces")
+    assert_equal :cart_needs_details, result.outcome
+    assert_equal({ @buds.id => 2 }, quantities(order))
+  end
+
+  test "an explicitly requested single-product replacement removes the old cart" do
+    order = record("Hoco EQ34 Plus 2 pieces and Anker Nano Charger 1 piece den").pending_order
+    record("replace cart with Hoco E103 Tracker 1 piece")
+    assert_equal({ @tracker.id => 1 }, quantities(order))
+  end
+
   private
 
   def quantities(order)

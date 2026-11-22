@@ -9,6 +9,7 @@ class ConversationCartManager
 
   def call
     return if ConversationTurnRequest.new(message.content).information_only?
+    return clarification(translation("positive_quantity")) if message.content.to_s.tr("০১২৩৪৫৬৭৮৯", "0123456789").match?(/(?:\A|\s)-\s*\d/)
     if (correction = text.match(Constants::Conversation::CART_SHORT_CORRECTION))
       products = order.line_items.map(&:product).uniq.select do |product|
         ConversationTextNormalizer.call(product.name).split.include?(correction[1])
@@ -19,15 +20,14 @@ class ConversationCartManager
       end
     end
     matches = product_mentions
-    final_tail = matches.any? ? text[matches.last[:finish]..].to_s : ""
-    unresolved_addition = unresolved_addition?(final_tail)
+    unresolved_addition = unresolved_addition?(matches)
     repaired = resume_repair(matches)
     return repaired if repaired
     addition = text.match?(Constants::Conversation::CART_ADDITION) && !text.match?(/\b(?:not|don t|do not)\b/)
     awaiting_addition = order.conversation.conversation_state.to_h["cart_awaiting_product"] && matches.any?
     named_quantity = matches.one? && text.match?(Constants::Conversation::CART_NAMED_QUANTITY) && !addition
     item_update = matches.any? && text.match?(Constants::Conversation::CART_ITEM_UPDATE) && !addition
-    command = addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
+    command = replacement_request? || addition || awaiting_addition || named_quantity || item_update || text.match?(/\A(?:remove|delete|drop|change|update)|\b(?:aro|o|sathe)\s+.*(?:den|nibo)\b|\b(?:bad den|bad din)\z/)
     purchase = text.match?(/\b(?:order|take|want|buy|den|nibo|chai)\b/)
     multiple_clause = text.match?(/\b(?:and|ar|ebong)\b.+\b\d+\s*(?:pieces?|pcs?|ta|bottles?)\b/)
     quantity = ConversationQuantityParser.call(text, products: matches.map { |match| match[:product] })
@@ -78,8 +78,13 @@ class ConversationCartManager
     text.match?(Constants::Conversation::CART_REPLACEMENT)
   end
 
-  def unresolved_addition?(tail)
-    tail.split(Constants::Conversation::CART_CONJUNCTION).drop(1).reject(&:blank?).any? do |clause|
+  def unresolved_addition?(matches)
+    return false if matches.empty?
+
+    masked = text.dup
+    matches.reverse_each { |match| masked[match[:start]...match[:finish]] = " __known_product__ " }
+    masked.split(Constants::Conversation::CART_CONJUNCTION).reject(&:blank?).any? do |clause|
+      next false if clause.include?("__known_product__")
       next true if clause.match?(Constants::Conversation::EXPLICIT_PURCHASE_ACTION) ||
         clause.match?(Constants::Conversation::EXPLICIT_QUANTITY_UNITS)
 
