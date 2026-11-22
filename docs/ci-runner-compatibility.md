@@ -3,7 +3,7 @@
 Ruby CI and the manual Release workflow use `ubuntu-24.04`. The frontend-only job can
 continue using `ubuntu-latest` because it does not install the pinned Ruby runtime.
 
-The application currently pins Ruby 3.4.7 in `backend/.ruby-version`. When GitHub's
+The application originally pinned Ruby 3.4.7 in `backend/.ruby-version`. When GitHub's
 `ubuntu-latest` moved to 26.04, `ruby/setup-ruby` could not download a prebuilt
 3.4.7 binary for that image. Security scan, Ruby lint and test jobs failed during
 setup, before application checks ran. The previous PR checks were older runs on
@@ -53,3 +53,16 @@ response before changing hosting or security settings.
 
 When upgrading Ruby later, update the application's runtime declarations and
 Docker build deliberately, then evaluate the supported runner image together.
+
+## November 2026 runtime security patch
+
+The current pin is Ruby **3.4.13**, in both `backend/.ruby-version` and the
+Dockerfile. Brakeman **8.1.1** reports CVE-2026-132825 against the former 3.4.7
+runtime. Keep the scan enabled; do not ignore this warning. The
+[official Ruby 3.4.13 release](https://www.ruby-lang.org/en/news/2026/11/18/ruby-3-4-13-released/)
+contains security fixes. The `ruby:3.4.13-slim` image was confirmed available for
+amd64 and arm64 before updating the Docker pin. Hosted CI must verify the new
+runtime; successful local tests on an older installed Ruby are not a substitute.
+The refreshed dependency advisory database also flags GraphQL 2.6.14 and
+net-ssh 7.3.8. Conservative patch updates select GraphQL **2.6.16** and net-ssh
+**7.3.10**, leaving their minor versions and unrelated dependencies unchanged.

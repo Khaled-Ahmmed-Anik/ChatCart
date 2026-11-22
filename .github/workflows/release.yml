@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   validate_and_release:
-    # Match the Ruby CI jobs: 3.4.7 is unavailable on the newer ubuntu-latest image.
+    # Match the runner used by Ruby CI jobs.
     runs-on: ubuntu-24.04
     services:
       postgres:
