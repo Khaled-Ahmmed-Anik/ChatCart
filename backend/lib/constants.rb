@@ -152,6 +152,8 @@ module Constants
     CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|ekhon cart e ki ki ache|what is in (?:my |the )?cart(?: now)?)[?.! ]*\z/i
     CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den)\b/i
     CART_MUTATION_CUE = /\b(?:add|remove|delete|drop|change|update|den|nibo|give|take)\b/i
+    CART_ADDITION = /\b(?:add|include|adding|another|aro)\b|\br o\b/i
+    CART_REPLACEMENT = /\b(?:replace (?:my |the )?cart|replace (?:my |the )?order items|cart replace)\b/i
     CART_NAMED_QUANTITY = /\b(?:one|two|three|ekta|duita|\d+)\s+(?:koren|korun|করেন|করুন)\z/i
     CART_DISCARD_UNKNOWN = /\b(?:bad|remove|ignore|drop)\b.*\b(?:shudhu|only)\b/i
     PRODUCT_INQUIRY_OUTCOMES = %i[price_inquiry stock_inquiry product_details_requested product_variants_requested].freeze

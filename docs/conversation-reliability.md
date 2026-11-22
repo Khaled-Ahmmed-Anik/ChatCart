@@ -35,6 +35,10 @@ Discussion of a product is not consent to add it. Side questions never reset a c
 - Explicit corrections set quantities; explicit additions increment them.
 - An incomplete multi-product request is clarified without partial replacement.
 - Locked orders cannot be silently mutated.
+- Multi-product lists append by default. Replacing an existing cart requires
+  `replace cart with ...`; numeric shorthand alone no longer discards prior items.
+  Relative additions (`aro ekta earbuds`) resolve only a unique category already
+  in the cart. Ambiguous categories require clarification.
 - Model unavailability leaves a useful deterministic answer and a preserved cart.
 
 ## Evidence and limits
