@@ -203,7 +203,7 @@ module Constants
       yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
       ha haa ji jii thik thikache accha acha
     ].freeze
-    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
+    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|confrim|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
     EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|(?:please )?cancel (?:(?:my|the|this|entire)\s+)*(?:test\s+)?order(?: please)?|(?:ei |puro )?(?:test )?order(?: ta)? (?:cancel|bad|batil)(?: koro| korun| koren| den)?|batil koren|বাতিল করুন|অর্ডার(?:টা)? বাতিল করুন)[.! ]*\z/i
     NON_NAME_SENTENCE = /(?:\b(?:password|forgot|cannot|can't|don't|do not|confirm|cancel|delivery|refund|payment)\b|পাসওয়ার্ড|বাতিল|পরে)/i
     AI_OUTCOMES = {
