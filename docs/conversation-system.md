@@ -1,5 +1,13 @@
 # ChatCart Conversation System
 
+For the November reliability changes, see the [release contract](conversation-reliability.md)
+and [verification checklist](conversation-reliability-release-checklist.md). Greetings
+now use a concise localized discovery prompt rather than an automatic catalogue
+dump. Delivery questions take precedence over product charging facts and mixed
+confirmation requests; how-to-order follow-ups preserve checkout. Multi-product
+lists append unless the customer explicitly asks to replace the cart. Unknown
+list items and signed negative quantities cannot partially change existing items.
+
 This document describes how customer conversations currently work in ChatCart. It reflects the production implementation on `main`, rather than a future design.
 
 ## 1. Purpose and scope

@@ -81,6 +81,11 @@ adding customer data to logs. They do not weaken any existing guard.
   3.4.13 independently; do not infer that from the local result.
 - No production data, customer messages, orders or environment settings changed
   during this work. The independent/live gates above are still pending.
+- Hosted CI on code commit `1337767` verified Ruby **3.4.13** and passed the
+  **full** backend suite: **853 tests, 5,850 assertions**, zero failures/errors/
+  skips, including the image tests excluded locally. Security, lint, frontend
+  and Cloudflare preview checks also passed on that code head. Documentation-only
+  follow-ups still require their own latest-head checks before merging.
 
 ## Deployment and rollback
 
