@@ -898,7 +898,7 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
     assert_nil pending_order.reload.product
   end
 
-  test "exposes informational secondary outcomes without executing another order action" do
+  test "a model selection cannot turn a named policy question into purchase consent" do
     product = create_product(name: "Fresh Musk")
     pending_order = create_pending_order(status: :collecting_product)
     message = pending_order.conversation.messages.create!(
@@ -915,9 +915,9 @@ class ConversationMessageProcessorTest < ActiveSupport::TestCase
 
     processor.process
 
-    assert_equal :product_selected, processor.outcome
-    assert_equal [ :delivery_charge_requested ], processor.secondary_outcomes
-    assert_equal product, pending_order.reload.product
+    assert_equal :delivery_charge_requested, processor.outcome
+    assert_equal [], processor.secondary_outcomes
+    assert_nil pending_order.reload.product
     assert_nil pending_order.quantity
   end
 
