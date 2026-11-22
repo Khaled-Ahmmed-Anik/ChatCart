@@ -1463,7 +1463,9 @@ class ConversationMessageProcessor
   end
 
   def stock_question?
-    content.downcase.match?(/\b(stock|available|availability)\b/)
+    content.downcase.match?(/\b(stock|available|availability)\b/) ||
+      (content.match?(ConversationActionPlanner::INFORMATIONAL_PATTERNS[:stock_inquiry]) &&
+        CatalogueInquiryScope.new(business: pending_order.conversation.business, text: content).products.any?)
   end
 
   def comparison_request?

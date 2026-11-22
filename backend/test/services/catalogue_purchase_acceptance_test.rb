@@ -72,7 +72,7 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
   end
 
   test "ambiguous purchase acceptance preserves the offer list and asks which product" do
-    result = record("hi")
+    result = record("show all products")
     offered = result.conversation.reload.conversation_state["last_offered_options"]
     result = record("etai nibo")
     assert_equal :offered_reference_clarification, result.outcome
@@ -81,7 +81,7 @@ class CataloguePurchaseAcceptanceTest < ActiveSupport::TestCase
   end
 
   test "category selection chooses only the matching category among offered products" do
-    record("hi")
+    record("show all products")
     result = record("charger ta")
     assert_equal @charger.id, result.pending_order.reload.product_id
     assert_nil result.pending_order.quantity

@@ -14,7 +14,7 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
       reply = BotReplyGenerator.new(pending_order: order, customer_message: message, outcome: outcome).content
       assert_not_includes reply, "Archived Secret"
       assert_not_includes reply, "ARCHIVED SIZE"
-      assert_includes reply, "Available Shirt" unless outcome == :product_variants_requested
+      assert_includes reply, "Available Shirt" unless outcome.in?(%i[greeting product_variants_requested])
     end
   end
 
@@ -295,13 +295,13 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
 
     assert_includes reply, "Assalamu alaikum! 👋 Welcome to ChatCart."
-    assert_includes reply, "Here are a few products you can order:"
-    assert_includes reply, "• Fresh Musk — ৳750"
-    assert_includes reply, "any preferences, and your budget"
+    assert_includes reply, "What are you looking for?"
+    assert_includes reply, "several items together"
+    assert_not_includes reply, "• Fresh Musk"
     assert_not_includes reply, "single perfume"
   end
 
-  test "limits the greeting catalog and explains how to see the rest" do
+  test "greeting is concise and does not record options the customer never saw" do
     8.times do |index|
       Product.create!(name: "Product #{index + 1}", price: 500 + index, stock_quantity: 10)
     end
@@ -309,12 +309,9 @@ class BotReplyGeneratorTest < ActiveSupport::TestCase
 
     reply = BotReplyGenerator.new(pending_order: pending_order, outcome: :greeting).content
 
-    assert_equal 6, reply.lines.count { |line| line.start_with?("• Product") }
-    assert_includes reply, "• +2 more available"
-    assert_includes reply, "show all products"
-    offered = pending_order.conversation.reload.conversation_state.fetch("last_offered_options")
-    assert_equal "products", offered["kind"]
-    assert_equal 6, offered["options"].size
+    assert_equal 0, reply.lines.count { |line| line.start_with?("• Product") }
+    assert_operator reply.length, :<, 300
+    assert_nil pending_order.conversation.reload.conversation_state["last_offered_options"]
   end
 
   test "explains invalid phone input" do

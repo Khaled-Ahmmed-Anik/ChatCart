@@ -1,0 +1,44 @@
+en:
+  conversation_experience:
+    en:
+      inquiry_matches: "These catalogue products match your question:"
+      choose_match: "Which product do you mean? Please check the full name—an accessory is not the device itself."
+      welcome: "Assalamu alaikum%{address}! 👋 Welcome to %{business}."
+      discovery: "I can help you choose, compare products, or order several items together. What are you looking for? You can also send a product name, photo, or budget."
+      confirmation_help: "Would you like to place this order? Reply “confirm”, or tell me what you’d like to change."
+      confirmed: "Thank you! Your order is confirmed ✅ Was this chat helpful? Reply “helpful” or “not helpful”."
+      unknown_policy: "I don’t have confirmed information about %{topic} yet. The seller needs to confirm this; I won’t guess."
+      policy_topics:
+        delivery_charges: "delivery charges"
+        delivery_areas: "delivery areas"
+        delivery_times: "delivery times"
+        payment_methods: "payment methods"
+        cash_on_delivery: "cash on delivery"
+    banglish:
+      inquiry_matches: "Apnar proshner sathe ei catalogue product-gulo mile:"
+      choose_match: "Kon product-ta bolchen? Full naam-ta dekhe bolben—accessory ar device ek noy."
+      welcome: "Assalamu alaikum%{address}! 👋 %{business}-e shagotom."
+      discovery: "Product choose, compare, ba eksathe koyekta item order korte help korte pari. Ki khujchen? Product-er naam, chobi, ba budget-o bolte paren."
+      confirmation_help: "Order-ta place korben? “confirm” likhun, ba ki change korte chan bolun."
+      confirmed: "Dhonnobad! Apnar order confirm hoyeche ✅ Ei chat helpful chilo? “helpful” ba “not helpful” likhte paren."
+      unknown_policy: "%{topic} niye confirmed information ekhono nei. Seller-er confirmation lagbe; andaj kore bolbo na."
+      policy_topics:
+        delivery_charges: "Delivery charge"
+        delivery_areas: "Delivery area"
+        delivery_times: "Delivery time"
+        payment_methods: "Payment method"
+        cash_on_delivery: "Cash on delivery"
+    bn:
+      inquiry_matches: "আপনার প্রশ্নের সঙ্গে এই ক্যাটালগ পণ্যগুলো মেলে:"
+      choose_match: "কোন পণ্যটি বোঝাচ্ছেন? পুরো নামটি দেখে বলবেন—অ্যাক্সেসরি আর ডিভাইস এক নয়।"
+      welcome: "আসসালামু আলাইকুম%{address}! 👋 %{business}-এ স্বাগতম।"
+      discovery: "পণ্য বেছে নিতে, তুলনা করতে বা একসঙ্গে কয়েকটি পণ্য অর্ডার করতে সাহায্য করতে পারি। কী খুঁজছেন? পণ্যের নাম, ছবি বা বাজেটও জানাতে পারেন।"
+      confirmation_help: "অর্ডারটি করবেন? “confirm” লিখুন, অথবা কী পরিবর্তন করতে চান জানান।"
+      confirmed: "ধন্যবাদ! আপনার অর্ডার নিশ্চিত হয়েছে ✅ এই চ্যাট সহায়ক ছিল? “helpful” বা “not helpful” লিখতে পারেন।"
+      unknown_policy: "%{topic} সম্পর্কে নিশ্চিত তথ্য এখনো নেই। বিক্রেতার নিশ্চিত করা প্রয়োজন; অনুমান করে বলব না।"
+      policy_topics:
+        delivery_charges: "ডেলিভারি চার্জ"
+        delivery_areas: "ডেলিভারি এলাকা"
+        delivery_times: "ডেলিভারির সময়"
+        payment_methods: "পেমেন্ট পদ্ধতি"
+        cash_on_delivery: "ক্যাশ অন ডেলিভারি"

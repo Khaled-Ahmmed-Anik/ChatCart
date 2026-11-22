@@ -175,7 +175,7 @@ class BotReplyGenerator
     when :multiple_details_collected
       banglish? ? "Thik ache—selection save korechi. #{status_prompt}" : "Got it. #{status_prompt}"
     when :confirmation_unclear
-      "Just to make sure, reply “confirm” to place the order or “cancel” to stop. You can also say something like “change quantity to 3”."
+      experience_translation("confirmation_help")
     when :confirmation_deferred
       key = pending_order.product.present? || pending_order.line_items.any? ? "saved_unconfirmed" : "browsing"
       I18n.t("chat_language.#{repair_language}.#{key}")
@@ -195,7 +195,7 @@ class BotReplyGenerator
     when :cancelled_order_change_requested
       "That order was cancelled, so it can’t be edited. Send “new order” to start again."
     when :confirmed
-      "Thanks! Your order is confirmed ✅ We’ll send it for processing shortly. Was this chat helpful? Reply “helpful” or “not helpful”."
+      experience_translation("confirmed")
     when :cancelled
       I18n.t("chat_language.#{repair_language}.cancelled")
     end
@@ -257,25 +257,13 @@ class BotReplyGenerator
   end
 
   def greeting_reply
-    return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. #{status_prompt}" unless pending_order.collecting_product?
+    introduction = experience_translation("welcome", address: address_suffix, business: business_name)
+    prompt = pending_order.collecting_product? ? experience_translation("discovery") : status_prompt
+    "#{introduction}\n\n#{prompt}"
+  end
 
-    products = available_products
-    return "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}. How can I help you today?" if products.empty?
-
-    visible_products = products.first(Constants::Conversation::INITIAL_CATALOG_LIMIT)
-    remember_options!(:products, visible_products)
-    remaining_count = products.size - visible_products.size
-    more_products_line = "• +#{remaining_count} more available—send “show all products” to see them" if remaining_count.positive?
-
-    [
-      "Assalamu alaikum#{address_suffix}! 👋 Welcome to #{business_name}.",
-      "",
-      "Here are a few products you can order:",
-      *product_catalog_lines(visible_products),
-      more_products_line,
-      "",
-      repair_translation(:discovery)
-    ].compact.join("\n")
+  def experience_translation(key, **values)
+    I18n.t("conversation_experience.#{repair_language}.#{key}", **values)
   end
 
   def product_catalog_lines(products)
@@ -848,7 +836,8 @@ class BotReplyGenerator
   def configured_policy(topic, value)
     return value if value.present?
 
-    "The #{topic} information hasn’t been configured yet. Please ask the seller for confirmation."
+    label = experience_translation("policy_topics.#{topic.tr(' ', '_')}")
+    experience_translation("unknown_policy", topic: label)
   end
 
   def after_sales_reply(request_type)
@@ -864,6 +853,15 @@ class BotReplyGenerator
   end
 
   def product_information(kind)
+    scoped = CatalogueInquiryScope.new(business: pending_order.conversation.business,
+      text: customer_message&.content.to_s).products
+    if scoped.any? && !ProductResolutionService.new(business: pending_order.conversation.business,
+        query: customer_message&.content.to_s).resolve.matched?
+      visible = scoped.first(Constants::Conversation::INITIAL_CATALOG_LIMIT)
+      remember_options!(:products, visible)
+      return [ experience_translation("inquiry_matches"), *product_catalog_lines(visible),
+        experience_translation("choose_match") ].join("\n")
+    end
     product = contextual_product
     return product_selection_prompt if product.blank?
 

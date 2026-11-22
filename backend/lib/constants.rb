@@ -194,6 +194,11 @@ module Constants
     CONTEXTUAL_ACKNOWLEDGEMENT = /\A(?:hae?\s+)*(?:eitai|etai|eita|eta|oita|oitai)(?:\s+to)?\z/i
     ORDER_CONTINUATION_REQUEST = /\b(?:how (?:can|do) i (?:order|buy)|kivabe order korbo|order kivabe korbo)\b/i
     INITIAL_CATALOG_LIMIT = 6
+    INQUIRY_STOP_WORDS = %w[
+      the a an this that one product price cost stock available availability
+      have do you is it how much what please tar ta ti er ase ache koto dam ki
+      আছে কত দাম কি
+    ].freeze
     NUMBER_WORDS = {
       "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5,
       "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
@@ -203,7 +208,7 @@ module Constants
       yes yeah yep okay ok sure confirm confirmed fine good works perfect thanks thankyou
       ha haa ji jii thik thikache accha acha
     ].freeze
-    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
+    EXPLICIT_CONFIRMATION = /\A(?:confirm(?:ed)?|confrim|yes|y|confirm (?:my |the )?order|order confirm(?: koro| korun)?|হ্যাঁ|নিশ্চিত করুন)[.! ]*\z/i
     EXPLICIT_CANCELLATION = /\A(?:cancel(?:led)?|stop|(?:please )?cancel (?:(?:my|the|this|entire)\s+)*(?:test\s+)?order(?: please)?|(?:ei |puro )?(?:test )?order(?: ta)? (?:cancel|bad|batil)(?: koro| korun| koren| den)?|batil koren|বাতিল করুন|অর্ডার(?:টা)? বাতিল করুন)[.! ]*\z/i
     NON_NAME_SENTENCE = /(?:\b(?:password|forgot|cannot|can't|don't|do not|confirm|cancel|delivery|refund|payment)\b|পাসওয়ার্ড|বাতিল|পরে)/i
     AI_OUTCOMES = {
