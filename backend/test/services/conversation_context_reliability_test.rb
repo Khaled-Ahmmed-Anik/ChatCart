@@ -51,6 +51,19 @@ class ConversationContextReliabilityTest < ActiveSupport::TestCase
     assert_equal 1, @business.orders.count
   end
 
+  test "order instructions never reset an already selected product or checkout step" do
+    order = record("Hoco EQ34 Plus nibo").pending_order
+    result = record("Hae kivabe order korbo?")
+    assert_equal @product.id, result.pending_order.product_id
+    assert_predicate order.reload, :collecting_quantity?
+    record("2")
+    result = record("How do I order?")
+    assert_equal :help, result.outcome
+    assert_predicate order.reload, :collecting_name?
+    assert_equal 2, order.quantity
+    assert_equal @product.id, order.product_id
+  end
+
   private
 
   def record(content)

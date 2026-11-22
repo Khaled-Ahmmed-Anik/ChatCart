@@ -63,3 +63,6 @@ runtime. Keep the scan enabled; do not ignore this warning. The
 contains security fixes. The `ruby:3.4.13-slim` image was confirmed available for
 amd64 and arm64 before updating the Docker pin. Hosted CI must verify the new
 runtime; successful local tests on an older installed Ruby are not a substitute.
+The refreshed dependency advisory database also flags GraphQL 2.6.14 and
+net-ssh 7.3.8. Conservative patch updates select GraphQL **2.6.16** and net-ssh
+**7.3.10**, leaving their minor versions and unrelated dependencies unchanged.
