@@ -85,7 +85,7 @@ Detailed implementation documentation:
 
 ## Requirements
 
-- Ruby 3.4.7
+- Ruby 3.4.13
 - Bundler 2.6.9
 - PostgreSQL
 - An ngrok account for local Messenger testing
