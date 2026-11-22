@@ -63,6 +63,22 @@ adding customer data to logs. They do not weaken any existing guard.
 - [ ] Review actual English/Banglish/Bangla wording with a human, including
   provider unavailable and guardrail-rejected paths.
 
+## Recorded development evidence — 23 November 2026 (Bangladesh)
+
+- Combined local suite: **842 tests, 5,796 assertions, zero failures/errors**,
+  with only `photo_image_normalizer_test.rb` and
+  `public_product_image_fetcher_test.rb` excluded because local libvips is absent.
+- The 100-journey matrix is included in that combined run, including repeat
+  confirmation assertions. Its initial standalone run plus two failure-recovery
+  tests passed 102 tests / 1,550 assertions before the repeat-confirmation
+  assertions were added; use the combined result as the final local evidence.
+- RuboCop: **323 files**, no offenses.
+- Local runtime: installed Ruby 3.4.7; the PR stack updates the required CI and
+  Docker runtime to security-patched **3.4.13**. Verify the latest hosted run on
+  3.4.13 independently; do not infer that from the local result.
+- No production data, customer messages, orders or environment settings changed
+  during this work. The independent/live gates above are still pending.
+
 ## Deployment and rollback
 
 Merge in order WC-091 → WC-092 → WC-093 → WC-094 → WC-095, retargeting the next
