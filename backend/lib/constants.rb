@@ -43,7 +43,7 @@ module Constants
       noise: { question: /\b(?:anc|enc|noise|call quality|microphone)\b/i, evidence: /\b(?:anc|enc|noise|microphone|call)\b/i },
       cable: { question: /\bcable\b/i, evidence: /\bcable\b/i },
       charging: { question: /\b(?:watts?|charge|charging speed|fast charging)\b/i, evidence: /speed|protocol|watt|depends? on|charging/i },
-      warranty: { question: /\b(?:warranty|guarantee)\b/i, evidence: /\b(?:warranty|guarantee)\b/i },
+      warranty: { question: /\b(?:warranty|guarantee)\b|ওয়ারেন্টি|ওয়ারেন্টি|গ্যারান্টি/i, evidence: /\b(?:warranty|guarantee)\b|ওয়ারেন্টি|ওয়ারেন্টি|গ্যারান্টি/i },
       authenticity: { question: /\b(?:genuine|authentic|original Apple)\b/i, evidence: /\b(?:genuine|authentic|original Apple)\b/i },
       compatibility: { question: /compatib|\b(?:safe|fit|Android|iPhone|iOS|cholbe|work with)\b/i, evidence: /compatib|Android|iOS|iPhone|Samsung|protocol|physical fit/i },
       package: { question: /included|include|package|\b(?:straps?|koyta|inside|vitore|keychain|sathe|thakbe)\b/i, evidence: /included|include|package|straps?|keychain|contents|accessor/i },
@@ -61,7 +61,8 @@ module Constants
     }.freeze
     ACCESSORY_WORDS = /\b(?:case|cover|accessor(?:y|ies)|protector)\b/i
     PRODUCT_REFERENCE = /\b(?:this|that|it|its|these|those|ei|etate|eta|etai|etar|eita|eitai|oita|oi|first|second|third|previous|ager|prothom|ditiyo)\b/i
-    OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2 }.freeze
+    OPTION_POSITIONS = { "first" => 0, "prothom" => 0, "second" => 1, "ditiyo" => 1, "third" => 2,
+      "প্রথম(?:টা|টি)?" => 0, "দ্বিতীয়(?:টা|টি)?" => 1, "তৃতীয়(?:টা|টি)?" => 2 }.freeze
     PURCHASE_REFERENCE_ACCEPTANCE = /\A(?:(?:eta|eita|etai|eitai|ei|ai|oita|oitai)(?:\s+product)?(?:\s+tai?)?(?:\s+i)?\s+(?:nibo|nite chai)|(?:i\s+)?(?:want|will take|would like)\s+(?:this|that)(?:\s+(?:one|product))?|(?:this|that)(?:\s+one)?\s+please)\z/i
     PURCHASE_ACKNOWLEDGEMENT = /\A(?:g|ji|jee|yes|yeah|ha|haa|hya|হ্যাঁ|জি)\z/i
     PREVIOUS_CATEGORY_ACCEPTANCE = /\A(?:ager|previous)\s+(.+?)\s+(?:ta|tai|one)\s+(?:nibo|nite chai|please)\z/i
@@ -148,13 +149,17 @@ module Constants
     CART_SHORT_CORRECTION = /\Aactually\s+(?:\d+|one|two|three|ekta|duita)\s+([a-z]+)\z/i
     PRODUCT_CONTENTS_QUESTION = /\b(?:what is included|what does it include|etar vitore ki ache|er moddhe ki ache|what is inside)\b/i
     ENGINE_VERSION = "2026.10.7"
+    LANGUAGE_LOCALES = { "english" => "en", "en" => "en", "banglish" => "banglish",
+      "bengali" => "bn", "bangla" => "bn", "bn" => "bn" }.freeze
+    CART_LOCALES = { "en" => "cart", "banglish" => "cart_banglish", "bn" => "cart_bn" }.freeze
     CART_TOTAL_REQUEST = /\b(?:total|subtotal|mot dam|shob mile)\b|মোট.*(?:দাম|কত)|সব মিলিয়ে.*কত/i
     CART_CONTENTS_REQUEST = /\A(?:ki ki ache ekhon|order e ki ki ache|ekhon cart e ki ki ache|what is in (?:my |the )?cart(?: now)?)[?.! ]*\z/i
-    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den|করুন|করেন)\b/i
-    CART_REMOVAL = /\b(?:remove|delete|drop|bad den|bad din|বাদ দিন|বাদ দেন|সরিয়ে দিন)\b/i
-    CART_ACTION_NEGATION = /\b(?:do not|don t|nibo na|chai na)\b|(?:নেব|নিবো|চাই|করবেন|করুন)\s+না(?:\s|\z)/i
+    CART_ITEM_UPDATE = /\A(?:actually\s+)?(?:make|change|update)\b|\b(?:koren|korun|kore den|করুন|করেন|করবেন)\b/i
+    CART_REMOVAL = /\b(?:remove|delete|drop|bad den|bad din|বাদ দিন|বাদ দেন|বাদ দেবেন|সরিয়ে দিন)\b/i
+    CART_ACTION_NEGATION = /\b(?:do not|don t|nibo na|chai na)\b|(?:নেব|নিবো|চাই|করবেন|করুন|দেবেন)\s+না(?:\s|\z)/i
+    ORDINAL_PURCHASE = /\b(?:take|buy|nibo|nite chai)\b|নেব|নিবো/i
     CART_MUTATION_CUE = /\b(?:add|remove|delete|drop|change|update|den|nibo|give|take)\b/i
-    CART_ADDITION = /\b(?:add|include|adding|another|aro|যোগ করুন|যোগ করেন)\b|\br o\b/i
+    CART_ADDITION = /\b(?:add|include|adding|another|aro|যোগ করুন|যোগ করেন|যোগ করবেন)\b|\br o\b/i
     CART_REPLACEMENT = /\b(?:replace (?:my |the )?cart|replace (?:my |the )?order items|cart replace)\b/i
     CART_NAMED_QUANTITY = /\b(?:one|two|three|ekta|duita|\d+)\s+(?:koren|korun|করেন|করুন)\z/i
     CART_DISCARD_UNKNOWN = /\b(?:bad|remove|ignore|drop)\b.*\b(?:shudhu|only)\b/i

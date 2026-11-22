@@ -98,7 +98,7 @@ class ConversationCartManager
     matches.each_with_index.map do |match, index|
       segment = text[match[:start]...matches[index + 1]&.fetch(:start)]
       words = Constants::Conversation::NUMBER_WORDS.keys.map { |word| Regexp.escape(word) }.join("|")
-      prefix = text[0...match[:start]][/(?:\A|\s)((?:\d+\s*(?:ta|pieces?|pcs?)?|#{words}))\s*\z/, 1]
+      prefix = text[0...match[:start]][/(?:\A|\s)((?:\d+\s*(?:ta|ti|pieces?|pcs?|units?|bottles?|টা|টি)?|#{words}))\s*\z/, 1]
       plan_for(match[:product], segment, prefix_quantity: ConversationQuantityParser.call(prefix))
     end
   end
@@ -147,9 +147,8 @@ class ConversationCartManager
   end
 
   def translation(key, **options)
-    # Repair prompts follow the same deterministic language convention as existing cart prompts.
-    banglish = text.match?(/\b(?:ar|ekta|duita|koren|korbo|nibo|shudhu|bad)\b/)
-    I18n.t("#{banglish ? 'cart_banglish' : 'cart'}.#{key}", **options)
+    language = ConversationLanguagePreference.choose(message.content, order.conversation.conversation_state.to_h)
+    I18n.t("#{ConversationLanguagePreference.cart_namespace(language)}.#{key}", **options)
   end
 
   def commit_plans(plans, replace_cart:)

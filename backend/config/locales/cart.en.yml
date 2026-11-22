@@ -1,4 +1,20 @@
 en:
+  cart_bn:
+    positive_quantity: "পণ্যের সংখ্যা ধনাত্মক পূর্ণসংখ্যায় জানাবেন। আগের কার্ট অপরিবর্তিত আছে।"
+    pending_repair: "অর্ডার নিশ্চিত করার আগে কার্টের পরিবর্তনগুলো পরিষ্কার করা প্রয়োজন।"
+    subtotal: "পণ্যের উপমোট %{amount}। এতে ডেলিভারি চার্জ যোগ হয়নি।"
+    missing_product: "কোন পণ্যটি অর্ডার করবেন?"
+    missing_variant: "কোন উপলব্ধ বিকল্পটি নেবেন?"
+    missing_quantity: "কয়টি নেবেন?"
+    missing_name: "অর্ডারটি কার নামে হবে?"
+    missing_phone: "ডেলিভারির জন্য ফোন নম্বরটি জানাবেন?"
+    missing_address: "ডেলিভারির পুরো ঠিকানাটি জানাবেন?"
+    repair: "%{products}-এর বিকল্প ও সংখ্যা জানাবেন? আগের কার্ট অপরিবর্তিত আছে।"
+    unknown: "অপরিচিত পণ্যটির নাম পরিষ্কার করবেন, অথবা সেটি বাদ দিয়ে কোন পণ্য রাখবেন জানাবেন? আগের কার্ট অপরিবর্তিত আছে।"
+    choose_product: "কোন পণ্যটি যোগ করবেন? নাম, বিকল্প ও সংখ্যা জানাবেন। আগের পণ্যগুলো কার্টে থাকবে।"
+    updated: "আপনার কার্টে এখন আছে:"
+    locked: "নতুন পণ্যের জন্য নতুন অর্ডার শুরু করুন, অথবা নিশ্চিত অর্ডার পরিবর্তনে বিক্রেতার সাহায্য নিন।"
+    stock: "কিছু পণ্য চাওয়া সংখ্যায় উপলব্ধ নেই। নিশ্চিত করার আগে সংখ্যা বদলান বা পণ্য বাদ দিন।"
   cart:
     positive_quantity: "Please use a positive whole-number quantity. Your existing cart is unchanged."
     pending_repair: "Let’s finish clarifying the requested cart changes before confirming."

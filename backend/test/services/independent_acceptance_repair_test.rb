@@ -21,6 +21,11 @@ class IndependentAcceptanceRepairTest < ActiveSupport::TestCase
     assert_equal({ @buds.id => 2, @charger.id => 1 }, quantities(order))
   end
 
+  test "quantity-first Bengali units cannot be assigned to the next product" do
+    order = record("২টা ইয়ারবাড আর ১টা চার্জার চাই").pending_order
+    assert_equal({ @buds.id => 2, @charger.id => 1 }, quantities(order))
+  end
+
   test "polite and Bengali removal target the cart instead of shortlist or pause" do
     [ "Please remove the charger from my order.", "চার্জারটা বাদ দিন" ].each do |text|
       @customer = SecureRandom.uuid
@@ -58,6 +63,91 @@ class IndependentAcceptanceRepairTest < ActiveSupport::TestCase
       record(text)
       assert_equal({ @buds.id => 2, @charger.id => 1 }, quantities(order))
     end
+  end
+
+  test "product warranty and business delivery are both answered without changing the cart" do
+    [ "What is the warranty and how much is delivery?", "warranty koto din ar delivery charge koto?",
+      "ওয়ারেন্টি কতদিন আর ডেলিভারি চার্জ কত?" ].each do |text|
+      @customer = SecureRandom.uuid
+      order = record("earbuds 2 pieces den").pending_order
+      reply = record(text).bot_reply.content
+      assert_includes reply, "6 months"
+      assert_includes reply, "80"
+      assert_equal({ @buds.id => 2 }, quantities(order))
+    end
+  end
+
+  test "multi-item warranty question asks which product instead of choosing the current line" do
+    order = record("add earbuds 2 pieces and charger 1 piece").pending_order
+    reply = record("What is the warranty and how much is delivery?").bot_reply.content
+    assert_includes reply, "80"
+    assert_includes reply, "Which product"
+    assert_not_includes reply, "6 months"
+    assert_equal({ @buds.id => 2, @charger.id => 1 }, quantities(order))
+  end
+
+  test "natural payment and delivery-time questions use configured policy" do
+    record("earbuds 1 piece den")
+    assert_includes record("Can I pay when I receive it?").bot_reply.content, "Cash on delivery"
+    assert_includes record("How long does delivery take?").bot_reply.content, "2–3 days"
+  end
+
+  test "Bengali ordinal selects only a currently displayed option" do
+    result = record("show all products")
+    second = result.conversation.reload.conversation_state.dig("last_offered_options", "options", 1, "id")
+    result = record("দ্বিতীয়টা নেব")
+    assert_equal second, result.pending_order.product_id
+    assert_not_predicate result.pending_order, :confirmed?
+  end
+
+  test "Bengali contact digits are validated and stored in canonical form" do
+    record("earbuds 1 piece den")
+    record("নাদিয়া রহমান")
+    result = record("০১৭০০০০০০০০")
+    assert_predicate result.pending_order, :collecting_address?
+    assert_equal "01700000000", result.pending_order.phone
+    result = record("বাড়ি ১২, রোড ৪, ঢাকা")
+    assert_predicate result.pending_order, :awaiting_confirmation?
+    assert_equal :confirmed, record("নিশ্চিত করুন").outcome
+  end
+
+  test "Bengali checkout keeps native copy through a short name and numeric reply" do
+    record("ইয়ারবাড ২টা আর চার্জার ১টা চাই")
+    named = record("নাদিয়া রহমান")
+    assert_includes named.bot_reply.content, "ফোন নম্বর"
+    phone = record("০১৭০০০০০০০০")
+    assert_includes phone.bot_reply.content, "ঠিকানা"
+    summary = record("বাড়ি ১২, রোড ৪, ঢাকা")
+    assert_includes summary.bot_reply.content, "আপনার অর্ডারের বিবরণ"
+    assert_includes summary.bot_reply.content, "ডেলিভারি চার্জ যোগ হয়নি"
+    assert_equal "bengali", summary.conversation.reload.conversation_state["preferred_language"]
+  end
+
+  test "an explicitly requested English language is respected for a Bengali name" do
+    state = { "preferred_language" => "english", "language_explicit" => true }
+    assert_equal "english", ConversationLanguagePreference.choose("নাদিয়া রহমান", state)
+    assert_equal "bengali", ConversationLanguagePreference.choose("নাদিয়া রহমান", state.except("language_explicit"))
+  end
+
+  test "Bengali phone digits are redacted from classifier prompts" do
+    message = Struct.new(:content).new("ফোন ০১৭০০০০০০০০")
+    classifier = AiIntentClassifier.new(message: message, pending_order: nil, recent_messages: [], api_key: nil)
+    sanitized = classifier.send(:sanitize, message.content)
+    assert_includes sanitized, "[PHONE]"
+    assert_not_includes sanitized, "০১৭০০০০০০০০"
+  end
+
+  test "localized confirmed details show final status without asking for confirmation again" do
+    record("earbuds 1 piece den")
+    record("Nadia Rahman")
+    record("01700000000")
+    record("Test address, Dhaka")
+    record("confirm")
+    result = record("amar order details ta ki silo?")
+    assert_includes result.bot_reply.content, "confirmed order details"
+    assert_includes result.bot_reply.content, "already confirmed"
+    assert_not_includes result.bot_reply.content, "“confirm”"
+    assert_equal 1, @business.orders.count
   end
 
   private

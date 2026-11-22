@@ -14,10 +14,15 @@ class ConversationLanguagePreference
   end
 
   def self.choose(text, state, interpretation: nil)
-    remembered = state["preferred_language"] if state["language_explicit"] || text.to_s.split.size <= 2
-    explicit(text) || remembered || detect(text) ||
+    locked = state["preferred_language"] if state["language_explicit"]
+    remembered = state["preferred_language"] if text.to_s.split.size <= 2
+    explicit(text) || locked || detect(text) || remembered ||
       (interpretation&.confidence.to_f >= 0.7 ? interpretation.language : nil) || state.fetch("preferred_language", "english")
   end
+
+  def self.locale(language) = Constants::Conversation::LANGUAGE_LOCALES.fetch(language.to_s, "en")
+
+  def self.cart_namespace(language) = Constants::Conversation::CART_LOCALES.fetch(locale(language))
 
   def self.remember!(conversation, text)
     state = conversation.conversation_state.to_h

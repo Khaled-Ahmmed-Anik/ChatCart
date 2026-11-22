@@ -1160,12 +1160,12 @@ class ConversationMessageProcessor
   end
 
   def phone_number?(value = content)
-    digits = value.to_s.gsub(/\D/, "")
+    digits = value.to_s.tr("০১২৩৪৫৬৭৮৯", "0123456789").gsub(/\D/, "")
     digits.match?(/\A01[3-9]\d{8}\z/) || digits.match?(/\A8801[3-9]\d{8}\z/)
   end
 
   def valid_phone_candidate(*values)
-    value = values.compact.map(&:to_s).find { |candidate| phone_number?(candidate) }
+    value = values.compact.map { |candidate| candidate.to_s.tr("০১২৩৪৫৬৭৮৯", "0123456789") }.find { |candidate| phone_number?(candidate) }
     return if value.blank?
 
     stripped = value.strip

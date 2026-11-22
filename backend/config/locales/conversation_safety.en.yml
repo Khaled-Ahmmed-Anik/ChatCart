@@ -1,5 +1,7 @@
 en:
   conversation_safety:
+    bn:
+      name_required: "অর্ডারটি কার নামে হবে? শুধু গ্রাহকের নামটি জানাবেন।"
     en:
       name_required: "What name should I put on the order? Please send the customer name only."
     banglish:
